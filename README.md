@@ -25,13 +25,32 @@ use the manual controls or satisfy an explicitly configured display condition.
 - optional NPC-target auto-advance for find steps
 - built-in Pages of Valor tracker
 - dedicated Pages of Valor window that appears from chat evidence
-- separate Guides and Valor tabs in Guide Config
-- independent frame visibility settings for the Guides and Valor windows
+- built-in brown treasure casket code helper
+- dedicated Casket Helper window that appears from live casket chat hints
+- separate Guides, Valor, and Casket tabs in Guide Config
+- independent frame visibility settings for the Guides, Valor, and Casket windows
 - AshitaChat-style transparent layout and compact dark tabs when the guide frame is hidden
 - configurable all-steps list in the normal guide window
 - balanced navigation layout with configurable map size
 - Pages of Valor progress seeding from the current character chat log
 - live Pages of Valor updates from incoming chat text and appended log lines
+
+## Casket Helper
+
+The built-in Casket Helper watches live incoming chat for brown treasure casket
+lock hints. It opens its own movable window while a casket is active, displays
+the full parsed hint list, and renders a 10-99 grid:
+
+- green: next best guess
+- yellow: still possible
+- dim: eliminated
+
+The helper is display-only. It does not enter numbers, send commands, inject
+packets, click menus, or automate casket interaction. Historical chat-log
+seeding is ignored for caskets so stale casket hints do not reopen the window
+on login. The Casket tab in Guide Config controls whether the helper is enabled,
+whether the window frame is hidden, and how long an inactive casket session is
+kept before new hints start a fresh session.
 
 ## Pages of Valor
 
@@ -72,9 +91,9 @@ Ashita/config/addons/ashitaguide/ashitaguide_config.lua
 
 Edit that persistent copy when adding or changing guides. The addon writes UI
 preferences to `Ashita/config/addons/ashitaguide/settings.lua`, including window
-positions and sizes, visibility, frame settings, map size, Valor settings, and
-active normal guides. Replacing or reinstalling the addon directory does not
-overwrite either persistent file.
+positions and sizes, visibility, frame settings, map size, Valor settings,
+Casket settings, and active normal guides. Replacing or reinstalling the addon
+directory does not overwrite either persistent file.
 
 ## Config Shape
 

@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.10.1';
+addon.version = '0.11.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -55,6 +55,13 @@ local COLORS = {
     active_hover = { 0.28, 0.50, 0.42, 1.00 },
     selected = { 0.24, 0.36, 0.50, 0.94 },
     selected_hover = { 0.30, 0.44, 0.60, 1.00 },
+    casket_best = { 0.18, 0.86, 0.34, 0.94 },
+    casket_best_hover = { 0.28, 0.96, 0.44, 1.00 },
+    casket_possible = { 0.92, 0.74, 0.18, 0.88 },
+    casket_possible_hover = { 1.00, 0.84, 0.26, 0.96 },
+    casket_impossible = { 0.07, 0.07, 0.07, 0.26 },
+    casket_impossible_hover = { 0.10, 0.10, 0.10, 0.34 },
+    casket_dark_text = { 0.02, 0.02, 0.02, 1.00 },
     frameless_tab = { 0.015, 0.015, 0.018, 0.86 },
     frameless_tab_hover = { 0.095, 0.095, 0.105, 0.92 },
     frameless_tab_active = { 0.165, 0.165, 0.180, 0.98 },
@@ -84,6 +91,13 @@ local DEFAULT_SETTINGS = {
     valor_window_y = 160,
     valor_window_width = 300,
     valor_window_height = 110,
+    casket_enabled = true,
+    casket_hide_frame = false,
+    casket_window_x = 990,
+    casket_window_y = 290,
+    casket_window_width = 430,
+    casket_window_height = 360,
+    casket_stale_seconds = 210,
     opacity = 92,
     chat_log_seed_lines = 700,
     poll_chat_log = true,
@@ -102,10 +116,14 @@ local state = {
     valor_enabled = T{ true },
     valor_show_zone = T{ true },
     valor_show_totals = T{ true },
+    casket_visible = T{ false },
+    casket_enabled = T{ true },
     guide_hide_frame = T{ false },
     guide_show_step_list = T{ true },
     guide_map_size = T{ 160 },
     valor_hide_frame = T{ false },
+    casket_hide_frame = T{ false },
+    casket_stale_seconds = T{ 210 },
     settings = DEFAULT_SETTINGS,
     config_error = nil,
     guides = {},
@@ -125,6 +143,7 @@ local state = {
     navigation_targets = {},
     pov_run = nil,
     pov_active = false,
+    casket = nil,
     settings_observed_text = nil,
     settings_saved_text = nil,
     settings_pending_at = 0,
@@ -468,6 +487,13 @@ local function normalize_settings(source)
         valor_window_y = bounded_number(source.valor_window_y, DEFAULT_SETTINGS.valor_window_y, 0, 10000),
         valor_window_width = bounded_number(source.valor_window_width, DEFAULT_SETTINGS.valor_window_width, 220, 600),
         valor_window_height = bounded_number(source.valor_window_height, DEFAULT_SETTINGS.valor_window_height, 80, 400),
+        casket_enabled = bounded_boolean(source.casket_enabled, DEFAULT_SETTINGS.casket_enabled),
+        casket_hide_frame = bounded_boolean(source.casket_hide_frame, DEFAULT_SETTINGS.casket_hide_frame),
+        casket_window_x = bounded_number(source.casket_window_x, DEFAULT_SETTINGS.casket_window_x, 0, 10000),
+        casket_window_y = bounded_number(source.casket_window_y, DEFAULT_SETTINGS.casket_window_y, 0, 10000),
+        casket_window_width = bounded_number(source.casket_window_width, DEFAULT_SETTINGS.casket_window_width, 430, 900),
+        casket_window_height = bounded_number(source.casket_window_height, DEFAULT_SETTINGS.casket_window_height, 280, 800),
+        casket_stale_seconds = bounded_number(source.casket_stale_seconds, DEFAULT_SETTINGS.casket_stale_seconds, 0, 900),
         opacity = bounded_number(source.opacity, DEFAULT_SETTINGS.opacity, 20, 100),
         chat_log_seed_lines = bounded_number(source.chat_log_seed_lines, DEFAULT_SETTINGS.chat_log_seed_lines, 0, 5000),
         poll_chat_log = bounded_boolean(source.poll_chat_log, DEFAULT_SETTINGS.poll_chat_log),
@@ -529,6 +555,330 @@ local function new_pov_state()
             level_range = '',
         },
     };
+end
+
+local function casket_all_candidates()
+    local values = {};
+    for value = 10, 99 do
+        table.insert(values, value);
+    end
+    return values;
+end
+
+local function new_casket_state()
+    return {
+        active = false,
+        candidates = casket_all_candidates(),
+        clues = {},
+        started_at = 0,
+        updated_at = 0,
+        last_event = nil,
+        last_result = nil,
+    };
+end
+
+local function reset_casket_state(now)
+    state.casket = new_casket_state();
+    state.casket.active = true;
+    state.casket.started_at = now or os.clock();
+    state.casket.updated_at = now or os.clock();
+    state.casket.last_event = nil;
+    state.casket.last_result = nil;
+    return state.casket;
+end
+
+local function casket_copy_candidates(candidates)
+    local copy = {};
+    for _, value in ipairs(candidates or {}) do
+        table.insert(copy, value);
+    end
+    table.sort(copy);
+    return copy;
+end
+
+local function casket_tens(value)
+    return math.floor(value / 10);
+end
+
+local function casket_ones(value)
+    return value % 10;
+end
+
+local function casket_extract_digits(text)
+    local digits = {};
+    local seen = {};
+    for number in tostring(text or ''):gmatch('%f[%d](%d)%f[%D]') do
+        local digit = tonumber(number);
+        if (digit ~= nil and digit >= 0 and digit <= 9 and seen[digit] ~= true) then
+            table.insert(digits, digit);
+            seen[digit] = true;
+        end
+    end
+    table.sort(digits);
+    return digits;
+end
+
+local function casket_digit_set(digits)
+    local set = {};
+    for _, digit in ipairs(digits or {}) do
+        set[digit] = true;
+    end
+    return set;
+end
+
+local function casket_parse_position_digit_event(lower, original)
+    local position = nil;
+    local phrase = nil;
+    local first_start, first_end = lower:find('first%s+digit');
+    local second_start, second_end = lower:find('second%s+digit');
+
+    if (first_start ~= nil and (second_start == nil or first_start < second_start)) then
+        position = 'first';
+        phrase = lower:sub(first_end + 1);
+    elseif (second_start ~= nil) then
+        position = 'second';
+        phrase = lower:sub(second_end + 1);
+    else
+        return nil;
+    end
+
+    if (phrase:find('even', 1, true) ~= nil) then
+        return { kind = 'digit_parity', position = position, parity = 0, message = original };
+    end
+    if (phrase:find('odd', 1, true) ~= nil) then
+        return { kind = 'digit_parity', position = position, parity = 1, message = original };
+    end
+
+    local digits = casket_extract_digits(phrase);
+    if (#digits > 0) then
+        return { kind = 'digit_set', position = position, digits = digits, message = original };
+    end
+
+    return nil;
+end
+
+local function casket_parse_any_digit_event(lower, original)
+    local patterns = {
+        'one%s+of%s+the%s+two%s+digits%s+is%s+an%s+(%d)',
+        'one%s+of%s+the%s+two%s+digits%s+is%s+a%s+(%d)',
+        'one%s+of%s+the%s+two%s+digits%s+is%s+(%d)',
+        'one%s+of%s+the%s+digits%s+is%s+an%s+(%d)',
+        'one%s+of%s+the%s+digits%s+is%s+a%s+(%d)',
+        'one%s+of%s+the%s+digits%s+is%s+(%d)',
+        'one%s+digit%s+is%s+an%s+(%d)',
+        'one%s+digit%s+is%s+a%s+(%d)',
+        'one%s+digit%s+is%s+(%d)',
+        'either%s+digit%s+is%s+an%s+(%d)',
+        'either%s+digit%s+is%s+a%s+(%d)',
+        'either%s+digit%s+is%s+(%d)',
+    };
+
+    for _, pattern in ipairs(patterns) do
+        local digit = tonumber(lower:match(pattern));
+        if (digit ~= nil and digit >= 0 and digit <= 9) then
+            return { kind = 'any_digit', digit = digit, message = original };
+        end
+    end
+
+    return nil;
+end
+
+local function casket_parse_range_event(lower, original)
+    local low, high = lower:match('(%d+)%s*<%s*x%s*<%s*(%d+)');
+    if (low == nil or high == nil) then
+        low, high = lower:match('greater%s+than%s+(%d+).-less%s+than%s+(%d+)');
+    end
+    if (low == nil or high == nil) then
+        low, high = lower:match('more%s+than%s+(%d+).-less%s+than%s+(%d+)');
+    end
+    if (low == nil or high == nil) then
+        low, high = lower:match('between%s+(%d+)%s+and%s+(%d+)');
+    end
+
+    low = tonumber(low);
+    high = tonumber(high);
+    if (low == nil or high == nil) then
+        return nil;
+    end
+    if (low > high) then
+        low, high = high, low;
+    end
+
+    if (low == 10 and high == 99
+        and (lower:find('two-digit', 1, true) ~= nil
+            or lower:find('between 10 and 99', 1, true) ~= nil)) then
+        return { kind = 'session', message = original };
+    end
+
+    return { kind = 'range', low = low, high = high, message = original };
+end
+
+local function casket_parse_message(message)
+    local original = clean_message(message);
+    if (original == '') then
+        return nil;
+    end
+
+    local lower = original:lower();
+    if (lower:find('succeeded in opening the lock', 1, true) ~= nil
+        or lower:find('you open the treasure casket', 1, true) ~= nil
+        or lower:find('the treasure casket opens', 1, true) ~= nil) then
+        return { kind = 'opened', message = original };
+    end
+
+    if (lower:find('failed to open the lock', 1, true) ~= nil
+        or lower:find('the lock breaks', 1, true) ~= nil
+        or lower:find('the treasure casket disappears', 1, true) ~= nil) then
+        return { kind = 'finished', message = original };
+    end
+
+    local event = casket_parse_range_event(lower, original);
+    if (event ~= nil) then
+        return event;
+    end
+
+    local value = tonumber(
+        lower:match('combination%s+is%s+greater%s+than%s+(%d+)')
+            or lower:match('greater%s+than%s+(%d+)')
+            or lower:match('more%s+than%s+(%d+)'));
+    if (value ~= nil) then
+        return { kind = 'greater', value = value, message = original };
+    end
+
+    value = tonumber(
+        lower:match('combination%s+is%s+less%s+than%s+(%d+)')
+            or lower:match('less%s+than%s+(%d+)'));
+    if (value ~= nil) then
+        return { kind = 'less', value = value, message = original };
+    end
+
+    event = casket_parse_position_digit_event(lower, original) or casket_parse_any_digit_event(lower, original);
+    if (event ~= nil) then
+        return event;
+    end
+
+    if (lower:find('chest is locked', 1, true) ~= nil
+        or lower:find('casket is locked', 1, true) ~= nil
+        or lower:find('two-digit combination between 10 and 99', 1, true) ~= nil) then
+        return { kind = 'session', message = original };
+    end
+
+    return nil;
+end
+
+local function casket_apply_event(casket, event)
+    local filtered = {};
+    local set = event.kind == 'digit_set' and casket_digit_set(event.digits) or nil;
+
+    for _, candidate in ipairs(casket_copy_candidates(casket.candidates)) do
+        local keep = true;
+        if (event.kind == 'range') then
+            keep = candidate > event.low and candidate < event.high;
+        elseif (event.kind == 'greater') then
+            keep = candidate > event.value;
+        elseif (event.kind == 'less') then
+            keep = candidate < event.value;
+        elseif (event.kind == 'digit_parity') then
+            local digit = event.position == 'first' and casket_tens(candidate) or casket_ones(candidate);
+            keep = (digit % 2) == event.parity;
+        elseif (event.kind == 'digit_set') then
+            local digit = event.position == 'first' and casket_tens(candidate) or casket_ones(candidate);
+            keep = set[digit] == true;
+        elseif (event.kind == 'any_digit') then
+            keep = casket_tens(candidate) == event.digit or casket_ones(candidate) == event.digit;
+        end
+
+        if (keep) then
+            table.insert(filtered, candidate);
+        end
+    end
+
+    casket.candidates = filtered;
+end
+
+local function casket_analyze(casket)
+    local candidates = casket_copy_candidates(casket ~= nil and casket.candidates or {});
+    local count = #candidates;
+    if (count == 0) then
+        return { count = 0, best = nil, less_count = 0, greater_count = 0, worst_after_miss = 0 };
+    end
+
+    local best_index = math.max(1, math.floor((count + 1) / 2));
+    local best = candidates[best_index];
+    local less_count = 0;
+    local greater_count = 0;
+    for _, candidate in ipairs(candidates) do
+        if (candidate < best) then
+            less_count = less_count + 1;
+        elseif (candidate > best) then
+            greater_count = greater_count + 1;
+        end
+    end
+
+    return {
+        count = count,
+        best = best,
+        less_count = less_count,
+        greater_count = greater_count,
+        worst_after_miss = math.max(less_count, greater_count),
+    };
+end
+
+local function casket_is_stale(casket, now)
+    if (casket == nil or casket.active ~= true) then
+        return true;
+    end
+    local stale_seconds = tonumber(state.casket_stale_seconds[1]) or DEFAULT_SETTINGS.casket_stale_seconds;
+    if (stale_seconds <= 0) then
+        return false;
+    end
+    return ((now or os.clock()) - (tonumber(casket.updated_at) or 0)) > stale_seconds;
+end
+
+local function process_casket_text(text, source)
+    if (state.casket_enabled[1] ~= true or source == 'seed') then
+        return false;
+    end
+
+    state.casket = state.casket or new_casket_state();
+
+    local event = casket_parse_message(text);
+    if (event == nil) then
+        return false;
+    end
+
+    local now = os.clock();
+    if (event.kind == 'session') then
+        if (casket_is_stale(state.casket, now)) then
+            reset_casket_state(now);
+        end
+        state.casket.active = true;
+        state.casket.updated_at = now;
+        state.casket.last_event = event;
+        state.casket_visible[1] = true;
+        return true;
+    end
+
+    if (event.kind == 'opened' or event.kind == 'finished') then
+        state.casket.active = false;
+        state.casket.updated_at = now;
+        state.casket.last_event = event;
+        state.casket.last_result = event.kind;
+        state.casket_visible[1] = false;
+        return true;
+    end
+
+    if (casket_is_stale(state.casket, now)) then
+        reset_casket_state(now);
+    end
+
+    casket_apply_event(state.casket, event);
+    state.casket.active = true;
+    state.casket.updated_at = now;
+    state.casket.last_event = event;
+    table.insert(state.casket.clues, event);
+    state.casket_visible[1] = true;
+    return true;
 end
 
 local function create_run(guide, previous)
@@ -807,10 +1157,17 @@ local function load_config()
     state.valor_enabled[1] = state.settings.valor_enabled;
     state.valor_show_zone[1] = state.settings.valor_show_zone;
     state.valor_show_totals[1] = state.settings.valor_show_totals;
+    state.casket_enabled[1] = state.settings.casket_enabled;
     state.guide_hide_frame[1] = state.settings.guide_hide_frame;
     state.guide_show_step_list[1] = state.settings.guide_show_step_list;
     state.guide_map_size[1] = state.settings.guide_map_size;
     state.valor_hide_frame[1] = state.settings.valor_hide_frame;
+    state.casket_hide_frame[1] = state.settings.casket_hide_frame;
+    state.casket_stale_seconds[1] = state.settings.casket_stale_seconds;
+    state.casket = state.casket or new_casket_state();
+    if (state.casket_enabled[1] ~= true) then
+        state.casket_visible[1] = false;
+    end
     state.settings_observed_text = nil;
     state.settings_saved_text = nil;
     state.settings_pending_at = 0;
@@ -930,6 +1287,13 @@ local function settings_text()
         string.format('    valor_window_y = %d,', bounded_number(values.valor_window_y, DEFAULT_SETTINGS.valor_window_y, 0, 10000)),
         string.format('    valor_window_width = %d,', bounded_number(values.valor_window_width, DEFAULT_SETTINGS.valor_window_width, 220, 600)),
         string.format('    valor_window_height = %d,', bounded_number(values.valor_window_height, DEFAULT_SETTINGS.valor_window_height, 80, 400)),
+        string.format('    casket_enabled = %s,', lua_boolean(state.casket_enabled[1])),
+        string.format('    casket_hide_frame = %s,', lua_boolean(state.casket_hide_frame[1])),
+        string.format('    casket_window_x = %d,', bounded_number(values.casket_window_x, DEFAULT_SETTINGS.casket_window_x, 0, 10000)),
+        string.format('    casket_window_y = %d,', bounded_number(values.casket_window_y, DEFAULT_SETTINGS.casket_window_y, 0, 10000)),
+        string.format('    casket_window_width = %d,', bounded_number(values.casket_window_width, DEFAULT_SETTINGS.casket_window_width, 430, 900)),
+        string.format('    casket_window_height = %d,', bounded_number(values.casket_window_height, DEFAULT_SETTINGS.casket_window_height, 280, 800)),
+        string.format('    casket_stale_seconds = %d,', bounded_number(state.casket_stale_seconds[1], DEFAULT_SETTINGS.casket_stale_seconds, 0, 900)),
         string.format('    opacity = %d,', bounded_number(values.opacity, DEFAULT_SETTINGS.opacity, 20, 100)),
         string.format('    chat_log_seed_lines = %d,', bounded_number(values.chat_log_seed_lines, DEFAULT_SETTINGS.chat_log_seed_lines, 0, 5000)),
         string.format('    poll_chat_log = %s,', lua_boolean(values.poll_chat_log)),
@@ -1269,38 +1633,39 @@ local function process_observed_text(text, source)
         return false;
     end
 
+    local handled = process_casket_text(cleaned, source);
     local guide = state.guide_by_key.pages_of_valor;
-    if (guide == nil) then
-        return false;
-    end
-
-    local run = state.pov_run;
-    if (run == nil) then
-        run = create_run(guide);
-        state.pov_run = run;
-    end
-
-    local current, total = extract_progress(cleaned);
-    local designated_current, designated_total = extract_designated_progress(cleaned);
-    local activation_evidence = is_training_accept(cleaned)
-        or (current ~= nil and total ~= nil)
-        or (designated_current ~= nil and designated_total ~= nil);
-    local ended = is_training_cancel(cleaned) or is_training_complete(cleaned);
-    local handled = handle_pov_text(run, cleaned) or activation_evidence;
-
-    if (activation_evidence) then
-        local was_active = state.pov_active;
-        state.pov_active = true;
-        if (not was_active and state.valor_enabled[1] == true) then
-            state.valor_visible[1] = true;
+    if (guide ~= nil) then
+        local run = state.pov_run;
+        if (run == nil) then
+            run = create_run(guide);
+            state.pov_run = run;
         end
-    elseif (ended) then
-        state.pov_active = false;
-        state.valor_visible[1] = false;
+
+        local current, total = extract_progress(cleaned);
+        local designated_current, designated_total = extract_designated_progress(cleaned);
+        local activation_evidence = is_training_accept(cleaned)
+            or (current ~= nil and total ~= nil)
+            or (designated_current ~= nil and designated_total ~= nil);
+        local ended = is_training_cancel(cleaned) or is_training_complete(cleaned);
+        local pov_handled = handle_pov_text(run, cleaned) or activation_evidence;
+
+        if (activation_evidence) then
+            local was_active = state.pov_active;
+            state.pov_active = true;
+            if (not was_active and state.valor_enabled[1] == true) then
+                state.valor_visible[1] = true;
+            end
+        elseif (ended) then
+            state.pov_active = false;
+            state.valor_visible[1] = false;
+        end
+
+        handled = handled or pov_handled;
     end
 
     if (handled == true) then
-        if (source == 'log') then
+        if (source == 'log' or source == 'seed') then
             state.observed_log_events = state.observed_log_events + 1;
         else
             state.observed_text_events = state.observed_text_events + 1;
@@ -1334,7 +1699,7 @@ local function seed_chat_log()
     end
 
     for _, line in ipairs(lines) do
-        process_observed_text(line, 'log');
+        process_observed_text(line, 'seed');
     end
 
     state.observed_log_path = path;
@@ -1535,6 +1900,74 @@ local function render_valor_config()
         imgui.Checkbox('Window visible##ashitaguide_valor_visible', state.valor_visible);
     else
         imgui.TextColored(COLORS.muted, 'Status: inactive');
+    end
+end
+
+local function casket_odds_label(count)
+    count = tonumber(count) or 0;
+    if (count <= 0) then
+        return 'no candidates';
+    end
+    if (count == 1) then
+        return 'certain';
+    end
+    return string.format('1 in %d', count);
+end
+
+local function casket_best_summary(analysis)
+    if (analysis.count <= 0) then
+        return 'No valid candidates remain; reset and re-check the hints.';
+    end
+    if (analysis.count == 1) then
+        return string.format('Code is %02d.', analysis.best);
+    end
+    return string.format(
+        'Best %02d; %s now; miss leaves at most %d.',
+        analysis.best,
+        casket_odds_label(analysis.count),
+        analysis.worst_after_miss);
+end
+
+local function reset_casket_inactive()
+    state.casket = new_casket_state();
+    state.casket_visible[1] = false;
+end
+
+local function run_casket_sample()
+    reset_casket_state(os.clock());
+    process_casket_text('You have a hunch that one of the two digits is 8.', 'text');
+    process_casket_text("You have a hunch that the lock's combination is greater than 80.", 'text');
+    process_casket_text("You have a hunch that the lock's combination is less than 88.", 'text');
+end
+
+local function render_casket_config()
+    state.casket = state.casket or new_casket_state();
+
+    imgui.TextColored(COLORS.header, 'Casket Helper');
+    local enabled_changed = imgui.Checkbox('Enabled##ashitaguide_casket_enabled', state.casket_enabled);
+    if (enabled_changed and state.casket_enabled[1] ~= true) then
+        state.casket_visible[1] = false;
+    elseif (enabled_changed and state.casket_enabled[1] == true and state.casket.active == true) then
+        state.casket_visible[1] = true;
+    end
+
+    imgui.Checkbox('Hide Casket frame##ashitaguide_casket_hide_frame', state.casket_hide_frame);
+    imgui.SliderInt('Stale timeout##ashitaguide_casket_stale_seconds', state.casket_stale_seconds, 0, 900, '%d sec');
+
+    if (state.casket.active == true) then
+        imgui.Checkbox('Window visible##ashitaguide_casket_visible', state.casket_visible);
+        if (imgui.Button('Reset##ashitaguide_casket_reset', { 86, 0 })) then
+            reset_casket_inactive();
+        end
+        local analysis = casket_analyze(state.casket);
+        imgui.SameLine(0, 8);
+        imgui.TextColored(COLORS.muted, string.format('%d possible', analysis.count));
+    else
+        imgui.TextColored(COLORS.muted, 'Status: inactive');
+    end
+
+    if (imgui.Button('Sample##ashitaguide_casket_sample', { 86, 0 })) then
+        run_casket_sample();
     end
 end
 
@@ -2145,6 +2578,119 @@ local function render_valor_window()
     pop_window_style();
 end
 
+local function casket_candidate_map()
+    local map = {};
+    for _, candidate in ipairs((state.casket or {}).candidates or {}) do
+        map[candidate] = true;
+    end
+    return map;
+end
+
+local function render_casket_code_cell(value, possible, best)
+    local button_color = COLORS.casket_impossible;
+    local hover_color = COLORS.casket_impossible_hover;
+    local active_color = COLORS.casket_impossible_hover;
+    local text_color = COLORS.muted;
+
+    if (best == true) then
+        button_color = COLORS.casket_best;
+        hover_color = COLORS.casket_best_hover;
+        active_color = COLORS.casket_best_hover;
+        text_color = COLORS.casket_dark_text;
+    elseif (possible == true) then
+        button_color = COLORS.casket_possible;
+        hover_color = COLORS.casket_possible_hover;
+        active_color = COLORS.casket_possible_hover;
+        text_color = COLORS.casket_dark_text;
+    end
+
+    imgui.PushStyleColor(IMGUI.col_button, button_color);
+    imgui.PushStyleColor(IMGUI.col_button_hovered, hover_color);
+    imgui.PushStyleColor(IMGUI.col_button_active, active_color);
+    imgui.PushStyleColor(IMGUI.col_text, text_color);
+    imgui.Button(string.format('%02d##ashitaguide_casket_code_%02d', value, value), { 36, 22 });
+    imgui.PopStyleColor(4);
+end
+
+local function render_casket_grid(analysis)
+    local possible = casket_candidate_map();
+    for row = 1, 9 do
+        for column = 0, 9 do
+            local value = (row * 10) + column;
+            render_casket_code_cell(value, possible[value] == true, analysis.best == value);
+            if (column < 9) then
+                imgui.SameLine(0, 4);
+            end
+        end
+    end
+end
+
+local function render_casket_hints()
+    local clues = (state.casket or {}).clues or {};
+    if (#clues == 0) then
+        imgui.TextColored(COLORS.muted, 'No hints yet.');
+        return;
+    end
+
+    local child_open, child_visible = begin_child(
+        '##ashitaguide_casket_hints',
+        { state.settings.casket_window_width - 26, 118 },
+        true);
+    if (child_visible) then
+        for index, clue in ipairs(clues) do
+            text_wrapped(string.format('%d. %s', index, clue.message or 'hint'));
+        end
+    end
+    if (child_open) then
+        imgui.EndChild();
+    end
+end
+
+local function render_casket_window()
+    if (state.casket_enabled[1] ~= true
+        or state.casket == nil
+        or state.casket.active ~= true
+        or state.casket_visible[1] ~= true) then
+        return;
+    end
+
+    imgui.SetNextWindowPos(
+        { state.settings.casket_window_x, state.settings.casket_window_y },
+        IMGUI.cond_first_use);
+    imgui.SetNextWindowSize(
+        { state.settings.casket_window_width, state.settings.casket_window_height },
+        IMGUI.cond_first_use);
+    push_window_style(state.casket_hide_frame[1] == true);
+    local flags = IMGUI.window_no_collapse;
+    if (state.casket_hide_frame[1] == true) then
+        flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
+    end
+
+    local visible = imgui.Begin('Casket Helper###AshitaGuideCasket', state.casket_visible, flags);
+    capture_window_geometry(
+        'casket_window_x',
+        'casket_window_y',
+        'casket_window_width',
+        'casket_window_height',
+        430,
+        900,
+        280,
+        800);
+    if (visible) then
+        local analysis = casket_analyze(state.casket);
+        imgui.TextColored(COLORS.header, 'Brown Casket');
+        imgui.Text(casket_best_summary(analysis));
+        imgui.Text(string.format('Possible: %d', analysis.count));
+        imgui.Separator();
+        render_casket_grid(analysis);
+        imgui.Separator();
+        imgui.TextColored(COLORS.header, 'Hints');
+        render_casket_hints();
+    end
+    imgui.End();
+    pop_window_style();
+end
+
 local function render_config_window()
     if (state.config_visible[1] ~= true) then
         return;
@@ -2185,12 +2731,18 @@ local function render_config_window()
                     render_valor_config();
                     imgui.EndTabItem();
                 end
+                if (imgui.BeginTabItem('Casket##ashitaguide_config_casket')) then
+                    render_casket_config();
+                    imgui.EndTabItem();
+                end
                 imgui.EndTabBar();
             end
         else
             render_guide_selector();
             imgui.Separator();
             render_valor_config();
+            imgui.Separator();
+            render_casket_config();
         end
     end
     imgui.End();
@@ -2372,6 +2924,7 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     render_npc_world_marker();
     render_guide_window();
     render_valor_window();
+    render_casket_window();
     render_config_window();
     save_settings_if_needed(false);
 end);
