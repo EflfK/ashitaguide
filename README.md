@@ -29,8 +29,8 @@ use the manual controls or satisfy an explicitly configured display condition.
 - dedicated Casket Helper window that appears from live casket chat hints
 - separate Guides, Valor, and Casket tabs in Guide Config
 - independent 0-100% background opacity for the Guides, Valor, and Casket windows
-- independent frame visibility settings for the Guides, Valor, and Casket windows
-- AshitaChat-style transparent layout and compact dark tabs when the guide frame is hidden
+- permanent AshitaChat-style titleless frames, dark borders, and transparent child regions
+- compact AshitaChat-style tabs in the Guides window only
 - configurable all-steps list in the normal guide window
 - balanced navigation layout with configurable map size
 - Pages of Valor progress seeding from the current character chat log
@@ -50,8 +50,8 @@ The helper is display-only. It does not enter numbers, send commands, inject
 packets, click menus, or automate casket interaction. Historical chat-log
 seeding is ignored for caskets so stale casket hints do not reopen the window
 on login. The Casket tab in Guide Config controls whether the helper is enabled,
-whether the window frame is hidden, and how long an inactive casket session is
-kept before new hints start a fresh session.
+its background opacity, and how long an inactive casket session is kept before
+new hints start a fresh session.
 
 ## Pages of Valor
 
@@ -69,10 +69,10 @@ target progress updates each captured target row independently.
 The dedicated window stays compact: it shows only the zone and remaining kill
 counts. Its enabled state, zone display, progress totals, and visibility are
 controlled from the Valor tab in Guide Config.
-The Guides tab can hide the normal guide window frame, and the Valor tab can
-hide the dedicated Valor window frame independently. Frameless windows remove
-their background and border; the normal guide also switches to compact dark
-tabs so its presentation matches AshitaChat's frameless mode.
+The Guides, Valor, and Casket windows use the same titleless dark frame and
+adjustable background opacity as AshitaChat. Only the Guides window renders a
+tab strip because it can contain multiple active guides; the single-view Valor
+and Casket windows do not render tabs.
 The Guides tab also controls whether the all-steps section is shown at the
 bottom of the normal guide window. Map size is configurable from 120 to 260
 pixels and defaults to 160 pixels.
@@ -92,9 +92,10 @@ Ashita/config/addons/ashitaguide/ashitaguide_config.lua
 
 Edit that persistent copy when adding or changing guides. The addon writes UI
 preferences to `Ashita/config/addons/ashitaguide/settings.lua`, including window
-positions and sizes, visibility, frame settings, map size, Valor settings,
-Casket settings, per-window background opacity, and active normal guides. Replacing
-or reinstalling the addon directory does not overwrite either persistent file.
+positions and sizes, visibility, map size, Valor settings,
+Casket settings, per-window background opacity, and active normal guides.
+Replacing or reinstalling the addon directory does not overwrite either
+persistent file.
 
 ## Config Shape
 

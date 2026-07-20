@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.13.0';
+addon.version = '0.14.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -38,7 +38,6 @@ local IMGUI = {
     window_no_saved_settings = imgui_const('ImGuiWindowFlags_NoSavedSettings'),
     window_no_inputs = imgui_const('ImGuiWindowFlags_NoInputs'),
     window_no_background = imgui_const('ImGuiWindowFlags_NoBackground'),
-    tabbar_no_close = imgui_const('ImGuiTabBarFlags_NoCloseWithMiddleMouseButton'),
     draw_corner_all = imgui_const('ImDrawCornerFlags_All'),
 };
 
@@ -46,15 +45,14 @@ local COLORS = {
     panel_bg = { 0.030, 0.034, 0.040, 0.92 },
     child_bg = { 0.015, 0.018, 0.022, 0.72 },
     border = { 0.28, 0.32, 0.36, 0.88 },
+    display_bg = { 0.000, 0.000, 0.000, 0.74 },
+    display_child_bg = { 0.000, 0.000, 0.000, 0.00 },
+    display_border = { 0.28, 0.28, 0.30, 0.78 },
     header = { 0.92, 0.82, 0.52, 1.00 },
     accent = { 0.42, 0.82, 0.68, 1.00 },
     muted = { 0.62, 0.65, 0.70, 1.00 },
     warning = { 1.00, 0.66, 0.36, 1.00 },
     error = { 1.00, 0.38, 0.34, 1.00 },
-    active = { 0.22, 0.42, 0.34, 0.94 },
-    active_hover = { 0.28, 0.50, 0.42, 1.00 },
-    selected = { 0.24, 0.36, 0.50, 0.94 },
-    selected_hover = { 0.30, 0.44, 0.60, 1.00 },
     casket_best = { 0.18, 0.86, 0.34, 0.94 },
     casket_best_hover = { 0.28, 0.96, 0.44, 1.00 },
     casket_possible = { 0.92, 0.74, 0.18, 0.88 },
@@ -62,11 +60,11 @@ local COLORS = {
     casket_impossible = { 0.07, 0.07, 0.07, 0.26 },
     casket_impossible_hover = { 0.10, 0.10, 0.10, 0.34 },
     casket_dark_text = { 0.02, 0.02, 0.02, 1.00 },
-    frameless_tab = { 0.015, 0.015, 0.018, 0.86 },
-    frameless_tab_hover = { 0.095, 0.095, 0.105, 0.92 },
-    frameless_tab_active = { 0.165, 0.165, 0.180, 0.98 },
-    frameless_tab_text = { 0.78, 0.78, 0.82, 1.00 },
-    frameless_tab_text_active = { 0.98, 0.98, 1.00, 1.00 },
+    tab = { 0.015, 0.015, 0.018, 0.86 },
+    tab_hover = { 0.095, 0.095, 0.105, 0.92 },
+    tab_active = { 0.165, 0.165, 0.180, 0.98 },
+    tab_text = { 0.78, 0.78, 0.82, 1.00 },
+    tab_text_active = { 0.98, 0.98, 1.00, 1.00 },
 };
 
 local DEFAULT_SETTINGS = {
@@ -75,7 +73,6 @@ local DEFAULT_SETTINGS = {
     window_y = 160,
     window_width = 560,
     window_height = 540,
-    guide_hide_frame = false,
     guide_show_step_list = true,
     guide_map_size = 160,
     guide_opacity = 92,
@@ -87,14 +84,12 @@ local DEFAULT_SETTINGS = {
     valor_enabled = true,
     valor_show_zone = true,
     valor_show_totals = true,
-    valor_hide_frame = false,
     valor_opacity = 92,
     valor_window_x = 990,
     valor_window_y = 160,
     valor_window_width = 300,
     valor_window_height = 110,
     casket_enabled = true,
-    casket_hide_frame = false,
     casket_opacity = 92,
     casket_window_x = 990,
     casket_window_y = 290,
@@ -120,13 +115,10 @@ local state = {
     valor_show_totals = T{ true },
     casket_visible = T{ false },
     casket_enabled = T{ true },
-    guide_hide_frame = T{ false },
     guide_show_step_list = T{ true },
     guide_map_size = T{ 160 },
     guide_opacity = T{ 92 },
-    valor_hide_frame = T{ false },
     valor_opacity = T{ 92 },
-    casket_hide_frame = T{ false },
     casket_opacity = T{ 92 },
     casket_stale_seconds = T{ 210 },
     settings = DEFAULT_SETTINGS,
@@ -477,7 +469,6 @@ local function normalize_settings(source)
         window_y = bounded_number(source.window_y, DEFAULT_SETTINGS.window_y, 0, 10000),
         window_width = bounded_number(source.window_width, DEFAULT_SETTINGS.window_width, 520, 1400),
         window_height = bounded_number(source.window_height, DEFAULT_SETTINGS.window_height, 360, 1000),
-        guide_hide_frame = bounded_boolean(source.guide_hide_frame, DEFAULT_SETTINGS.guide_hide_frame),
         guide_show_step_list = bounded_boolean(source.guide_show_step_list, DEFAULT_SETTINGS.guide_show_step_list),
         guide_map_size = bounded_number(source.guide_map_size, DEFAULT_SETTINGS.guide_map_size, 120, 260),
         guide_opacity = bounded_number(source.guide_opacity, legacy_opacity, 0, 100),
@@ -489,14 +480,12 @@ local function normalize_settings(source)
         valor_enabled = bounded_boolean(source.valor_enabled, DEFAULT_SETTINGS.valor_enabled),
         valor_show_zone = bounded_boolean(source.valor_show_zone, DEFAULT_SETTINGS.valor_show_zone),
         valor_show_totals = bounded_boolean(source.valor_show_totals, DEFAULT_SETTINGS.valor_show_totals),
-        valor_hide_frame = bounded_boolean(source.valor_hide_frame, DEFAULT_SETTINGS.valor_hide_frame),
         valor_opacity = bounded_number(source.valor_opacity, legacy_opacity, 0, 100),
         valor_window_x = bounded_number(source.valor_window_x, DEFAULT_SETTINGS.valor_window_x, 0, 10000),
         valor_window_y = bounded_number(source.valor_window_y, DEFAULT_SETTINGS.valor_window_y, 0, 10000),
         valor_window_width = bounded_number(source.valor_window_width, DEFAULT_SETTINGS.valor_window_width, 220, 600),
         valor_window_height = bounded_number(source.valor_window_height, DEFAULT_SETTINGS.valor_window_height, 80, 400),
         casket_enabled = bounded_boolean(source.casket_enabled, DEFAULT_SETTINGS.casket_enabled),
-        casket_hide_frame = bounded_boolean(source.casket_hide_frame, DEFAULT_SETTINGS.casket_hide_frame),
         casket_opacity = bounded_number(source.casket_opacity, legacy_opacity, 0, 100),
         casket_window_x = bounded_number(source.casket_window_x, DEFAULT_SETTINGS.casket_window_x, 0, 10000),
         casket_window_y = bounded_number(source.casket_window_y, DEFAULT_SETTINGS.casket_window_y, 0, 10000),
@@ -1166,13 +1155,10 @@ local function load_config()
     state.valor_show_zone[1] = state.settings.valor_show_zone;
     state.valor_show_totals[1] = state.settings.valor_show_totals;
     state.casket_enabled[1] = state.settings.casket_enabled;
-    state.guide_hide_frame[1] = state.settings.guide_hide_frame;
     state.guide_show_step_list[1] = state.settings.guide_show_step_list;
     state.guide_map_size[1] = state.settings.guide_map_size;
     state.guide_opacity[1] = state.settings.guide_opacity;
-    state.valor_hide_frame[1] = state.settings.valor_hide_frame;
     state.valor_opacity[1] = state.settings.valor_opacity;
-    state.casket_hide_frame[1] = state.settings.casket_hide_frame;
     state.casket_opacity[1] = state.settings.casket_opacity;
     state.casket_stale_seconds[1] = state.settings.casket_stale_seconds;
     state.casket = state.casket or new_casket_state();
@@ -1282,7 +1268,6 @@ local function settings_text()
         string.format('    window_y = %d,', bounded_number(values.window_y, DEFAULT_SETTINGS.window_y, 0, 10000)),
         string.format('    window_width = %d,', bounded_number(values.window_width, DEFAULT_SETTINGS.window_width, 520, 1400)),
         string.format('    window_height = %d,', bounded_number(values.window_height, DEFAULT_SETTINGS.window_height, 360, 1000)),
-        string.format('    guide_hide_frame = %s,', lua_boolean(state.guide_hide_frame[1])),
         string.format('    guide_show_step_list = %s,', lua_boolean(state.guide_show_step_list[1])),
         string.format('    guide_map_size = %d,', bounded_number(state.guide_map_size[1], DEFAULT_SETTINGS.guide_map_size, 120, 260)),
         string.format('    guide_opacity = %d,', bounded_number(state.guide_opacity[1], DEFAULT_SETTINGS.guide_opacity, 0, 100)),
@@ -1294,14 +1279,12 @@ local function settings_text()
         string.format('    valor_enabled = %s,', lua_boolean(state.valor_enabled[1])),
         string.format('    valor_show_zone = %s,', lua_boolean(state.valor_show_zone[1])),
         string.format('    valor_show_totals = %s,', lua_boolean(state.valor_show_totals[1])),
-        string.format('    valor_hide_frame = %s,', lua_boolean(state.valor_hide_frame[1])),
         string.format('    valor_opacity = %d,', bounded_number(state.valor_opacity[1], DEFAULT_SETTINGS.valor_opacity, 0, 100)),
         string.format('    valor_window_x = %d,', bounded_number(values.valor_window_x, DEFAULT_SETTINGS.valor_window_x, 0, 10000)),
         string.format('    valor_window_y = %d,', bounded_number(values.valor_window_y, DEFAULT_SETTINGS.valor_window_y, 0, 10000)),
         string.format('    valor_window_width = %d,', bounded_number(values.valor_window_width, DEFAULT_SETTINGS.valor_window_width, 220, 600)),
         string.format('    valor_window_height = %d,', bounded_number(values.valor_window_height, DEFAULT_SETTINGS.valor_window_height, 80, 400)),
         string.format('    casket_enabled = %s,', lua_boolean(state.casket_enabled[1])),
-        string.format('    casket_hide_frame = %s,', lua_boolean(state.casket_hide_frame[1])),
         string.format('    casket_opacity = %d,', bounded_number(state.casket_opacity[1], DEFAULT_SETTINGS.casket_opacity, 0, 100)),
         string.format('    casket_window_x = %d,', bounded_number(values.casket_window_x, DEFAULT_SETTINGS.casket_window_x, 0, 10000)),
         string.format('    casket_window_y = %d,', bounded_number(values.casket_window_y, DEFAULT_SETTINGS.casket_window_y, 0, 10000)),
@@ -1832,7 +1815,6 @@ end
 
 local function render_guide_selector()
     imgui.TextColored(COLORS.header, 'Guides');
-    imgui.Checkbox('Hide guide frame##ashitaguide_guide_hide_frame', state.guide_hide_frame);
     imgui.PushItemWidth(220);
     imgui.SliderInt('Background opacity##ashitaguide_guide_opacity', state.guide_opacity, 0, 100, '%d%%');
     imgui.PopItemWidth();
@@ -1911,7 +1893,6 @@ local function render_valor_config()
     end
     imgui.Checkbox('Show zone##ashitaguide_valor_zone', state.valor_show_zone);
     imgui.Checkbox('Show progress totals##ashitaguide_valor_totals', state.valor_show_totals);
-    imgui.Checkbox('Hide Valor frame##ashitaguide_valor_hide_frame', state.valor_hide_frame);
     imgui.PushItemWidth(220);
     imgui.SliderInt('Background opacity##ashitaguide_valor_opacity', state.valor_opacity, 0, 100, '%d%%');
     imgui.PopItemWidth();
@@ -1970,7 +1951,6 @@ local function render_casket_config()
         state.casket_visible[1] = true;
     end
 
-    imgui.Checkbox('Hide Casket frame##ashitaguide_casket_hide_frame', state.casket_hide_frame);
     imgui.PushItemWidth(220);
     imgui.SliderInt('Background opacity##ashitaguide_casket_opacity', state.casket_opacity, 0, 100, '%d%%');
     imgui.PopItemWidth();
@@ -2438,36 +2418,6 @@ local function render_active_tabs()
     end
 
     local close_keys = {};
-    if (state.guide_hide_frame[1] ~= true
-        and type(imgui.BeginTabBar) == 'function'
-        and type(imgui.BeginTabItem) == 'function'
-        and type(imgui.EndTabItem) == 'function'
-        and type(imgui.EndTabBar) == 'function') then
-        if (imgui.BeginTabBar('##ashitaguide_active_tabs', IMGUI.tabbar_no_close)) then
-            for _, key in ipairs(state.active_order) do
-                local run = state.active[key];
-                if (run ~= nil) then
-                    local visible = imgui.BeginTabItem(
-                        run.guide.name .. '##ashitaguide_tab_' .. key,
-                        run.tab_open);
-                    if (visible) then
-                        state.selected_active_key = key;
-                        render_active_guide(run);
-                        imgui.EndTabItem();
-                    end
-                    if (run.tab_open[1] ~= true) then
-                        table.insert(close_keys, key);
-                    end
-                end
-            end
-            imgui.EndTabBar();
-        end
-        for _, key in ipairs(close_keys) do
-            stop_guide(key);
-        end
-        return;
-    end
-
     for index, key in ipairs(state.active_order) do
         local run = state.active[key];
         if (run ~= nil) then
@@ -2475,16 +2425,10 @@ local function render_active_tabs()
                 imgui.SameLine(0, 3);
             end
             local selected = state.selected_active_key == key;
-            local frameless = state.guide_hide_frame[1] == true;
-            if (frameless) then
-                imgui.PushStyleColor(IMGUI.col_button, selected and COLORS.frameless_tab_active or COLORS.frameless_tab);
-                imgui.PushStyleColor(IMGUI.col_button_hovered, COLORS.frameless_tab_hover);
-                imgui.PushStyleColor(IMGUI.col_button_active, COLORS.frameless_tab_active);
-                imgui.PushStyleColor(IMGUI.col_text, selected and COLORS.frameless_tab_text_active or COLORS.frameless_tab_text);
-            elseif (selected) then
-                imgui.PushStyleColor(IMGUI.col_button, COLORS.selected);
-                imgui.PushStyleColor(IMGUI.col_button_hovered, COLORS.selected_hover);
-            end
+            imgui.PushStyleColor(IMGUI.col_button, selected and COLORS.tab_active or COLORS.tab);
+            imgui.PushStyleColor(IMGUI.col_button_hovered, COLORS.tab_hover);
+            imgui.PushStyleColor(IMGUI.col_button_active, COLORS.tab_active);
+            imgui.PushStyleColor(IMGUI.col_text, selected and COLORS.tab_text_active or COLORS.tab_text);
             local label_width = type(imgui.CalcTextSize) == 'function'
                 and tonumber(imgui.CalcTextSize(run.guide.name))
                 or 100;
@@ -2496,11 +2440,7 @@ local function render_active_tabs()
             if (imgui.Button('x##ashitaguide_tab_close_' .. key, { 22, 22 })) then
                 table.insert(close_keys, key);
             end
-            if (frameless) then
-                imgui.PopStyleColor(4);
-            elseif (selected) then
-                imgui.PopStyleColor(2);
-            end
+            imgui.PopStyleColor(4);
         end
     end
     for _, key in ipairs(close_keys) do
@@ -2510,23 +2450,28 @@ local function render_active_tabs()
     render_active_guide(state.active[state.selected_active_key] or state.active[state.active_order[1]]);
 end
 
-local function push_window_style(frameless, opacity)
-    local alpha = opacity ~= nil
-        and (bounded_number(opacity[1], 92, 0, 100) / 100)
-        or COLORS.panel_bg[4];
-    local bg = frameless
-        and { 0.0, 0.0, 0.0, 0.0 }
-        or { COLORS.panel_bg[1], COLORS.panel_bg[2], COLORS.panel_bg[3], alpha };
-    local child_bg = frameless
-        and { 0.0, 0.0, 0.0, 0.0 }
-        or { COLORS.child_bg[1], COLORS.child_bg[2], COLORS.child_bg[3], math.min(COLORS.child_bg[4], alpha) };
-    local border = frameless and { 0.0, 0.0, 0.0, 0.0 } or COLORS.border;
-    imgui.PushStyleVar(IMGUI.style_window_padding, frameless and { 6, 4 } or { 8, 8 });
-    imgui.PushStyleVar(IMGUI.style_window_border_size, frameless and 0.0 or 1.0);
-    imgui.PushStyleVar(IMGUI.style_frame_padding, frameless and { 5, 2 } or { 4, 3 });
-    imgui.PushStyleColor(IMGUI.col_window_bg, bg);
-    imgui.PushStyleColor(IMGUI.col_child_bg, child_bg);
-    imgui.PushStyleColor(IMGUI.col_border, border);
+local function push_display_window_style(opacity)
+    local alpha = bounded_number(opacity[1], 92, 0, 100) / 100;
+    imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 4 });
+    imgui.PushStyleVar(IMGUI.style_window_border_size, 1.0);
+    imgui.PushStyleVar(IMGUI.style_frame_padding, { 5, 2 });
+    imgui.PushStyleColor(IMGUI.col_window_bg, {
+        COLORS.display_bg[1],
+        COLORS.display_bg[2],
+        COLORS.display_bg[3],
+        alpha,
+    });
+    imgui.PushStyleColor(IMGUI.col_child_bg, COLORS.display_child_bg);
+    imgui.PushStyleColor(IMGUI.col_border, COLORS.display_border);
+end
+
+local function push_config_window_style()
+    imgui.PushStyleVar(IMGUI.style_window_padding, { 8, 8 });
+    imgui.PushStyleVar(IMGUI.style_window_border_size, 1.0);
+    imgui.PushStyleVar(IMGUI.style_frame_padding, { 4, 3 });
+    imgui.PushStyleColor(IMGUI.col_window_bg, COLORS.panel_bg);
+    imgui.PushStyleColor(IMGUI.col_child_bg, COLORS.child_bg);
+    imgui.PushStyleColor(IMGUI.col_border, COLORS.border);
 end
 
 local function pop_window_style()
@@ -2554,11 +2499,8 @@ local function render_guide_window()
 
     imgui.SetNextWindowPos({ state.settings.window_x, state.settings.window_y }, IMGUI.cond_first_use);
     imgui.SetNextWindowSize({ state.settings.window_width, state.settings.window_height }, IMGUI.cond_first_use);
-    push_window_style(state.guide_hide_frame[1] == true, state.guide_opacity);
-    local flags = IMGUI.window_no_collapse;
-    if (state.guide_hide_frame[1] == true) then
-        flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
-    end
+    push_display_window_style(state.guide_opacity);
+    local flags = bit.bor(IMGUI.window_no_title_bar, IMGUI.window_no_collapse);
     local visible = imgui.Begin(string.format('Guides v%s###AshitaGuideGuides', addon.version), state.visible, flags);
     capture_window_geometry('window_x', 'window_y', 'window_width', 'window_height', 520, 1400, 360, 1000);
     if (visible) then
@@ -2582,11 +2524,8 @@ local function render_valor_window()
     imgui.SetNextWindowSize(
         { state.settings.valor_window_width, state.settings.valor_window_height },
         IMGUI.cond_first_use);
-    push_window_style(state.valor_hide_frame[1] == true, state.valor_opacity);
-    local flags = IMGUI.window_no_collapse;
-    if (state.valor_hide_frame[1] == true) then
-        flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
-    end
+    push_display_window_style(state.valor_opacity);
+    local flags = bit.bor(IMGUI.window_no_title_bar, IMGUI.window_no_collapse);
     local visible = imgui.Begin('Pages of Valor###AshitaGuideValor', state.valor_visible, flags);
     capture_window_geometry(
         'valor_window_x',
@@ -2686,11 +2625,8 @@ local function render_casket_window()
     imgui.SetNextWindowSize(
         { state.settings.casket_window_width, state.settings.casket_window_height },
         IMGUI.cond_first_use);
-    push_window_style(state.casket_hide_frame[1] == true, state.casket_opacity);
-    local flags = IMGUI.window_no_collapse;
-    if (state.casket_hide_frame[1] == true) then
-        flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
-    end
+    push_display_window_style(state.casket_opacity);
+    local flags = bit.bor(IMGUI.window_no_title_bar, IMGUI.window_no_collapse);
 
     local visible = imgui.Begin('Casket Helper###AshitaGuideCasket', state.casket_visible, flags);
     capture_window_geometry(
@@ -2728,7 +2664,7 @@ local function render_config_window()
     imgui.SetNextWindowSize(
         { state.settings.config_window_width, state.settings.config_window_height },
         IMGUI.cond_first_use);
-    push_window_style(false, nil);
+    push_config_window_style();
     local visible = imgui.Begin('Guide Config###AshitaGuideConfig', state.config_visible, IMGUI.window_no_collapse);
     capture_window_geometry(
         'config_window_x',
