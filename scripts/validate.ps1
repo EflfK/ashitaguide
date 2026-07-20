@@ -63,6 +63,13 @@ $required = @(
     "make_ai_guide_permanent",
     "render_ai_guide_config",
     "AI Guides##ashitaguide_config_ai_guides",
+    "auction_sale_guide.lua",
+    "auction_sale_list",
+    "poll_auction_sale_guide_file",
+    "delete_auction_sale_guide",
+    "render_auction_sale_config",
+    "render_auction_sale_items",
+    "Auction Sales##ashitaguide_config_auction_sales",
     "BeginTabBar",
     "AshitaGuideConfig",
     "tab_open",
@@ -113,6 +120,35 @@ if ($content -notmatch "for _, key in ipairs\(close_keys\) do\s+close_guide_tab\
 
 if ($content -notmatch "guide\.origin == 'ai'\) then\s+return delete_ai_guide\(key\)") {
     throw 'AI guide tabs are not wired to persistent deletion.'
+}
+
+if ($content -notmatch "guide\.origin == 'auction_sale'\) then\s+return delete_auction_sale_guide\(key\)") {
+    throw 'Auction sale guide tabs are not wired to permanent deletion.'
+}
+
+if ($content -notmatch "poll_ai_guides_file\(\);\s+poll_auction_sale_guide_file\(\);") {
+    throw 'Auction sale guide publication is not polled with AI guide data.'
+}
+
+$mcpProject = Join-Path $root 'src\AshitaGuide.Mcp\AshitaGuide.Mcp.csproj'
+$mcpTools = Join-Path $root 'src\AshitaGuide.Mcp\AuctionSaleGuideTools.cs'
+$mcpStorage = Join-Path $root 'src\AshitaGuide.Mcp\AuctionSaleGuideStorage.cs'
+foreach ($path in @($mcpProject, $mcpTools, $mcpStorage)) {
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "Missing AshitaGuide MCP surface: $path"
+    }
+}
+
+$toolsContent = Get-Content -LiteralPath $mcpTools -Raw
+$storageContent = Get-Content -LiteralPath $mcpStorage -Raw
+if ($toolsContent -notlike '*publish_auction_sale_guide*') {
+    throw 'AshitaGuide MCP publish tool is missing.'
+}
+if ($storageContent -notlike '*File.Move(tempPath, targetPath, true)*') {
+    throw 'AshitaGuide MCP publication must replace the fixed file atomically.'
+}
+if ($storageContent -match 'QueueCommand|InjectPacket|SendPacket|SetTarget') {
+    throw 'AshitaGuide MCP crossed the display-only safety boundary.'
 }
 
 if ($content -notmatch "guide\.origin ~= 'ai'") {

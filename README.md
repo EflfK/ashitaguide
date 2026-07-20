@@ -14,6 +14,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - automatically persisted UI settings and window geometry
 - separate guide runner and guide configuration windows
 - live-polled, AI/MCP-authored temporary guides in the normal guide window
+- typed MCP publication of a structured, one-step Auction House sale list
 - reinstall-safe AI guide persistence with delete-on-tab-close lifecycle
 - in-game conversion of AI guides into permanent, reusable normal guides
 - free-form categories with an in-game category filter
@@ -32,7 +33,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - dedicated Pages of Valor window that appears from chat evidence
 - built-in brown treasure casket code helper
 - dedicated Casket Helper window that appears from live casket chat hints
-- separate Guides, AI Guides, Valor, and Casket tabs in Guide Config
+- separate Guides, AI Guides, Auction Sales, Valor, and Casket tabs in Guide Config
 - independent 0-100% background opacity for the Guides, Valor, and Casket windows
 - permanent AshitaChat-style titleless frames, dark borders, and transparent child regions
 - compact AshitaChat-style tabs in the Guides window only
@@ -166,6 +167,69 @@ comma-separated categories used by the normal guide filters, and description.
 `permanent_guides.lua`, and makes it available forever in the normal Guides
 picker. Permanent guides are not deleted when their active tabs are closed.
 
+## Auction House Sale Guides
+
+`AshitaGuide.Mcp` exposes a narrowly scoped `publish_auction_sale_guide` tool.
+It accepts structured item rows and atomically replaces one fixed publication:
+
+```text
+Ashita/config/addons/ashitaguide/auction_sale_guide.lua
+```
+
+The addon polls that file once per second and opens the publication in the
+normal Guides window. An auction sale guide always has exactly one step and
+renders one list. Each row contains:
+
+- exact item name and optional resource id;
+- quantity owned;
+- listing quantity (`1` for singles or the full stack size);
+- suggested gil price for one complete AH listing;
+- optional market basis, observation date, and note.
+
+The price is explicitly a suggested **listing price**, not a known current
+minimum bid. Singles and stacks are distinct markets in FFXI and must be
+published as separate rows when both are relevant.
+
+Closing the auction sale guide tab deletes `auction_sale_guide.lua`. The list
+cannot be reopened afterward; the AI must publish a new list. The **Auction
+Sales** configuration tab can enable or suppress published lists, hide market
+evidence or observation dates, focus the current list, or delete it forever.
+
+This feature is display-only. The MCP server cannot open the Auction House,
+move items, submit listings, send game commands, inject packets, or automate
+selling. The player performs every Auction House action manually.
+
+### Run the MCP server
+
+Build the server first so package restore/build output cannot interfere with
+MCP stdio:
+
+```powershell
+dotnet build .\src\AshitaGuide.Mcp\AshitaGuide.Mcp.csproj
+```
+
+Configure the client to launch the built DLL:
+
+```json
+{
+  "mcpServers": {
+    "ashitaguide": {
+      "command": "dotnet",
+      "args": [
+        "<repository>\\src\\AshitaGuide.Mcp\\bin\\Debug\\net10.0\\AshitaGuide.Mcp.dll"
+      ]
+    }
+  }
+}
+```
+
+The default Ashita root is
+`C:\Games\CatsEyeXI\catseyexi-client\Ashita`. Set
+`ASHITAGUIDE_CONFIG_DIR` to the full persistent config directory or
+`ASHITA_ROOT` to another Ashita installation when needed. Neither setting can
+be supplied through an MCP tool, and the publisher never accepts a destination
+path.
+
 ## Config Shape
 
 ```lua
@@ -264,8 +328,19 @@ If PowerShell blocks local scripts:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate.ps1
 ```
 
+Build and run the publisher self-test:
+
+```powershell
+dotnet build .\src\AshitaGuide.Mcp\AshitaGuide.Mcp.csproj
+dotnet run --project .\src\AshitaGuide.Mcp\AshitaGuide.Mcp.csproj --no-build -- --self-test
+```
+
 For an in-game test, copy the `ashitaguide` folder into the Ashita addons
-folder and load it:
+folder or run `install.ps1`, then load it:
+
+```powershell
+.\install.ps1
+```
 
 ```text
 /addon load ashitaguide

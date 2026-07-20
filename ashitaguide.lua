@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.17.0';
+addon.version = '0.18.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -97,6 +97,9 @@ local DEFAULT_SETTINGS = {
     casket_window_width = 430,
     casket_window_height = 360,
     casket_stale_seconds = 210,
+    auction_sale_enabled = true,
+    auction_sale_show_price_basis = true,
+    auction_sale_show_observed_at = true,
     chat_log_seed_lines = 700,
     poll_chat_log = true,
     default_active_guides = {},
@@ -201,6 +204,13 @@ local state = {
     ai_storage_error = nil,
     ai_observed_text = nil,
     ai_last_poll = 0,
+    auction_sale_enabled = T{ true },
+    auction_sale_show_price_basis = T{ true },
+    auction_sale_show_observed_at = T{ true },
+    auction_sale_guide = nil,
+    auction_sale_storage_error = nil,
+    auction_sale_observed_text = nil,
+    auction_sale_last_poll = 0,
 };
 
 local function trim_string(value)
@@ -474,6 +484,35 @@ local function normalize_required_job(value)
     return JOB_ALIASES[job] or job;
 end
 
+local function normalize_sale_items(source)
+    local output = {};
+    if (type(source) ~= 'table') then
+        return output;
+    end
+
+    for _, item in ipairs(source) do
+        if (type(item) == 'table') then
+            local name = trim_string(item.name);
+            local quantity_owned = bounded_number(item.quantity_owned, 1, 1, 9999);
+            local listing_quantity = bounded_number(item.listing_quantity, 1, 1, 9999);
+            local suggested_price_gil = bounded_number(item.suggested_price_gil, 1, 1, 999999999);
+            if (name ~= '') then
+                table.insert(output, {
+                    name = name,
+                    item_id = tonumber(item.item_id),
+                    quantity_owned = quantity_owned,
+                    listing_quantity = listing_quantity,
+                    suggested_price_gil = suggested_price_gil,
+                    price_basis = trim_string(item.price_basis),
+                    observed_at = trim_string(item.observed_at),
+                    note = trim_string(item.note),
+                });
+            end
+        end
+    end
+    return output;
+end
+
 local function normalize_step(source, index)
     if (type(source) == 'string') then
         source = { text = source };
@@ -506,6 +545,7 @@ local function normalize_step(source, index)
         advance_on_target = bounded_boolean(
             source.advance_on_target or source.auto_advance_on_target,
             false),
+        sale_items = normalize_sale_items(source.sale_items or source.items),
     };
 end
 
@@ -575,6 +615,13 @@ local function normalize_settings(source)
         casket_window_width = bounded_number(source.casket_window_width, DEFAULT_SETTINGS.casket_window_width, 430, 900),
         casket_window_height = bounded_number(source.casket_window_height, DEFAULT_SETTINGS.casket_window_height, 280, 800),
         casket_stale_seconds = bounded_number(source.casket_stale_seconds, DEFAULT_SETTINGS.casket_stale_seconds, 0, 900),
+        auction_sale_enabled = bounded_boolean(source.auction_sale_enabled, DEFAULT_SETTINGS.auction_sale_enabled),
+        auction_sale_show_price_basis = bounded_boolean(
+            source.auction_sale_show_price_basis,
+            DEFAULT_SETTINGS.auction_sale_show_price_basis),
+        auction_sale_show_observed_at = bounded_boolean(
+            source.auction_sale_show_observed_at,
+            DEFAULT_SETTINGS.auction_sale_show_observed_at),
         chat_log_seed_lines = bounded_number(source.chat_log_seed_lines, DEFAULT_SETTINGS.chat_log_seed_lines, 0, 5000),
         poll_chat_log = bounded_boolean(source.poll_chat_log, DEFAULT_SETTINGS.poll_chat_log),
         default_active_guides = copy_array(source.default_active_guides or DEFAULT_SETTINGS.default_active_guides),
@@ -582,7 +629,10 @@ local function normalize_settings(source)
 end
 
 local function guide_is_configurable(guide)
-    return guide ~= nil and guide.type ~= 'pages_of_valor' and guide.origin ~= 'ai';
+    return guide ~= nil
+        and guide.type ~= 'pages_of_valor'
+        and guide.origin ~= 'ai'
+        and guide.origin ~= 'auction_sale';
 end
 
 local function category_catalog(guides)
@@ -1108,6 +1158,11 @@ local function permanent_guides_file_path()
     return dir ~= nil and path_join(dir, 'permanent_guides.lua') or nil;
 end
 
+local function auction_sale_guide_file_path()
+    local dir = config_dir_path();
+    return dir ~= nil and path_join(dir, 'auction_sale_guide.lua') or nil;
+end
+
 local function file_exists(path)
     if (path == nil or path == '') then
         return false;
@@ -1441,6 +1496,33 @@ local function load_persisted_guides(path, label)
     return values, nil, contents;
 end
 
+local function load_persisted_auction_sale()
+    local path = auction_sale_guide_file_path();
+    if (not file_exists(path)) then
+        return nil, nil, '';
+    end
+    local contents = read_text_file(path) or '';
+    local chunk, load_error = loadfile(path);
+    if (chunk == nil) then
+        return nil, string.format(
+            'auction_sale_guide.lua could not be loaded: %s',
+            tostring(load_error or 'unknown error')),
+            contents;
+    end
+    local ok, values = pcall(chunk);
+    if (not ok or type(values) ~= 'table') then
+        return nil, string.format(
+            'auction_sale_guide.lua did not return a table: %s',
+            tostring(values or 'unknown error')),
+            contents;
+    end
+    local source = type(values.guide) == 'table' and values.guide or values;
+    if (type(source) ~= 'table') then
+        return nil, 'auction_sale_guide.lua did not contain a guide.', contents;
+    end
+    return source, nil, contents;
+end
+
 local function lua_quoted(value)
     return string.format('%q', tostring(value or ''));
 end
@@ -1485,6 +1567,24 @@ local function guide_storage_text(guides)
                 table.insert(lines, string.format('                    required_job = %s,', lua_quoted(step.required_job)));
             end
             table.insert(lines, string.format('                    advance_on_target = %s,', step.advance_on_target == true and 'true' or 'false'));
+            if (type(step.sale_items) == 'table' and #step.sale_items > 0) then
+                table.insert(lines, '                    sale_items = {');
+                for _, item in ipairs(step.sale_items) do
+                    table.insert(lines, '                        {');
+                    table.insert(lines, string.format('                            name = %s,', lua_quoted(item.name)));
+                    if (item.item_id ~= nil) then
+                        table.insert(lines, string.format('                            item_id = %d,', item.item_id));
+                    end
+                    table.insert(lines, string.format('                            quantity_owned = %d,', item.quantity_owned));
+                    table.insert(lines, string.format('                            listing_quantity = %d,', item.listing_quantity));
+                    table.insert(lines, string.format('                            suggested_price_gil = %d,', item.suggested_price_gil));
+                    table.insert(lines, string.format('                            price_basis = %s,', lua_quoted(item.price_basis)));
+                    table.insert(lines, string.format('                            observed_at = %s,', lua_quoted(item.observed_at)));
+                    table.insert(lines, string.format('                            note = %s,', lua_quoted(item.note)));
+                    table.insert(lines, '                        },');
+                end
+                table.insert(lines, '                    },');
+            end
             table.insert(lines, '                },');
         end
         table.insert(lines, '            },');
@@ -1528,7 +1628,8 @@ local function load_config()
     local permanent_sources, permanent_error = load_persisted_guides(
         permanent_guides_file_path(), 'permanent_guides.lua');
     local ai_sources, ai_error, ai_text = load_persisted_guides(ai_guides_file_path(), 'ai_guides.lua');
-    state.config_error = config_error or settings_error or permanent_error or ai_error;
+    local auction_sale_source, auction_sale_error, auction_sale_text = load_persisted_auction_sale();
+    state.config_error = config_error or settings_error or permanent_error or ai_error or auction_sale_error;
     state.settings = normalize_settings(merge_tables(config.settings, persisted_settings));
     state.visible[1] = state.settings.visible;
     state.config_visible[1] = state.settings.config_visible;
@@ -1543,6 +1644,9 @@ local function load_config()
     state.valor_opacity[1] = state.settings.valor_opacity;
     state.casket_opacity[1] = state.settings.casket_opacity;
     state.casket_stale_seconds[1] = state.settings.casket_stale_seconds;
+    state.auction_sale_enabled[1] = state.settings.auction_sale_enabled;
+    state.auction_sale_show_price_basis[1] = state.settings.auction_sale_show_price_basis;
+    state.auction_sale_show_observed_at[1] = state.settings.auction_sale_show_observed_at;
     state.casket = state.casket or new_casket_state();
     if (state.casket_enabled[1] ~= true) then
         state.casket_visible[1] = false;
@@ -1605,6 +1709,22 @@ local function load_config()
     state.ai_storage_error = permanent_error or ai_error;
     state.ai_observed_text = ai_text or '';
 
+    local auction_sale_guide = nil;
+    if (auction_sale_source ~= nil) then
+        local candidate = normalize_guide(auction_sale_source, #guides + 1, 'auction_sale');
+        candidate.type = 'auction_sale_list';
+        if (guides_by_key[candidate.key] == nil) then
+            auction_sale_guide = candidate;
+            guides_by_key[candidate.key] = candidate;
+            table.insert(guides, candidate);
+        else
+            auction_sale_error = 'Auction sale guide key conflicts with another guide.';
+        end
+    end
+    state.auction_sale_guide = auction_sale_guide;
+    state.auction_sale_storage_error = auction_sale_error;
+    state.auction_sale_observed_text = auction_sale_text or '';
+
     state.guides = guides;
     state.guide_by_key = guides_by_key;
     state.categories = category_catalog(guides);
@@ -1614,12 +1734,17 @@ local function load_config()
     local desired_order = #previous_order > 0 and previous_order or state.settings.default_active_guides;
     for _, key in ipairs(desired_order) do
         local guide = state.guide_by_key[key];
-        if (guide ~= nil and guide.type ~= 'pages_of_valor') then
+        if (guide ~= nil
+            and guide.type ~= 'pages_of_valor'
+            and (guide.origin ~= 'auction_sale' or state.auction_sale_enabled[1] == true)) then
             start_guide(guide, previous_active[key]);
         end
     end
     for _, guide in ipairs(state.ai_guides) do
         start_guide(guide, previous_active[guide.key]);
+    end
+    if (state.auction_sale_enabled[1] == true and state.auction_sale_guide ~= nil) then
+        start_guide(state.auction_sale_guide, previous_active[state.auction_sale_guide.key]);
     end
 
     local pov_guide = state.guide_by_key.pages_of_valor;
@@ -1631,7 +1756,10 @@ local function load_config()
 
     state.selected_active_key = previous_selected_active;
     if (state.selected_active_key == nil or state.active[state.selected_active_key] == nil) then
-        state.selected_active_key = state.active_order[1];
+        state.selected_active_key = state.auction_sale_enabled[1] == true
+            and state.auction_sale_guide ~= nil
+            and state.auction_sale_guide.key
+            or state.active_order[1];
     end
 
     state.selected_guide_key = previous_selected_guide;
@@ -1708,6 +1836,9 @@ local function settings_text()
         string.format('    casket_window_width = %d,', bounded_number(values.casket_window_width, DEFAULT_SETTINGS.casket_window_width, 430, 900)),
         string.format('    casket_window_height = %d,', bounded_number(values.casket_window_height, DEFAULT_SETTINGS.casket_window_height, 280, 800)),
         string.format('    casket_stale_seconds = %d,', bounded_number(state.casket_stale_seconds[1], DEFAULT_SETTINGS.casket_stale_seconds, 0, 900)),
+        string.format('    auction_sale_enabled = %s,', lua_boolean(state.auction_sale_enabled[1])),
+        string.format('    auction_sale_show_price_basis = %s,', lua_boolean(state.auction_sale_show_price_basis[1])),
+        string.format('    auction_sale_show_observed_at = %s,', lua_boolean(state.auction_sale_show_observed_at[1])),
         string.format('    chat_log_seed_lines = %d,', bounded_number(values.chat_log_seed_lines, DEFAULT_SETTINGS.chat_log_seed_lines, 0, 5000)),
         string.format('    poll_chat_log = %s,', lua_boolean(values.poll_chat_log)),
         string.format('    default_active_guides = %s,', lua_string_list(state.active_order)),
@@ -2179,6 +2310,26 @@ local function poll_ai_guides_file()
     end
 end
 
+local function poll_auction_sale_guide_file()
+    local now = os.time();
+    if (now - state.auction_sale_last_poll < 1.0) then
+        return;
+    end
+    state.auction_sale_last_poll = now;
+    local path = auction_sale_guide_file_path();
+    local contents = '';
+    if (file_exists(path)) then
+        contents = read_text_file(path) or '';
+    end
+    if (state.auction_sale_observed_text ~= nil and contents ~= state.auction_sale_observed_text) then
+        load_config();
+        if (state.auction_sale_enabled[1] == true and state.auction_sale_guide ~= nil) then
+            state.selected_active_key = state.auction_sale_guide.key;
+            state.visible[1] = true;
+        end
+    end
+end
+
 local function guides_without_key(guides, key)
     local output = {};
     for _, guide in ipairs(guides or {}) do
@@ -2209,8 +2360,33 @@ local function delete_ai_guide(key)
     return true;
 end
 
+local function delete_auction_sale_guide(key)
+    local guide = state.guide_by_key[key];
+    if (guide == nil or guide.origin ~= 'auction_sale') then
+        stop_guide(key);
+        return true;
+    end
+
+    local path = auction_sale_guide_file_path();
+    if (path ~= nil and file_exists(path)) then
+        local ok, error_message = os.remove(path);
+        if (not ok) then
+            state.auction_sale_storage_error = tostring(error_message or 'auction sale guide could not be deleted');
+            log_warn('Auction sale guide delete failed: ' .. state.auction_sale_storage_error);
+            return false;
+        end
+    end
+
+    state.auction_sale_storage_error = nil;
+    load_config();
+    return true;
+end
+
 local function close_guide_tab(key)
     local guide = state.guide_by_key[key];
+    if (guide ~= nil and guide.origin == 'auction_sale') then
+        return delete_auction_sale_guide(key);
+    end
     if (guide ~= nil and guide.origin == 'ai') then
         return delete_ai_guide(key);
     end
@@ -2493,6 +2669,63 @@ local function render_ai_guide_config()
     if (imgui.Button('Focus##ashitaguide_ai_focus', { 76, 0 })) then
         state.selected_active_key = selected.key;
         state.visible[1] = true;
+    end
+end
+
+local function render_auction_sale_config()
+    imgui.TextColored(COLORS.header, 'Auction Sales');
+    text_colored_wrapped(
+        COLORS.muted,
+        'A trusted local MCP client can publish one temporary sale list. Closing its guide tab deletes it forever.');
+
+    local enabled_changed = imgui.Checkbox(
+        'Enable published sale lists##ashitaguide_auction_sale_enabled',
+        state.auction_sale_enabled);
+    if (enabled_changed) then
+        if (state.auction_sale_enabled[1] == true and state.auction_sale_guide ~= nil) then
+            start_guide(state.auction_sale_guide);
+            state.selected_active_key = state.auction_sale_guide.key;
+            state.visible[1] = true;
+        elseif (state.auction_sale_guide ~= nil) then
+            stop_guide(state.auction_sale_guide.key);
+        end
+    end
+    imgui.Checkbox(
+        'Show price basis##ashitaguide_auction_sale_price_basis',
+        state.auction_sale_show_price_basis);
+    imgui.Checkbox(
+        'Show market date##ashitaguide_auction_sale_observed_at',
+        state.auction_sale_show_observed_at);
+
+    imgui.Separator();
+    if (state.auction_sale_storage_error ~= nil) then
+        text_colored_wrapped(COLORS.warning, 'Storage warning: ' .. state.auction_sale_storage_error);
+    end
+    if (state.auction_sale_guide == nil) then
+        imgui.TextColored(COLORS.muted, 'No auction sale list is currently published.');
+        return;
+    end
+
+    local step = state.auction_sale_guide.steps[1];
+    local item_count = step ~= nil and #(step.sale_items or {}) or 0;
+    imgui.TextColored(COLORS.accent, state.auction_sale_guide.name);
+    text_colored_wrapped(COLORS.muted, string.format('%d sale item%s published.', item_count, item_count == 1 and '' or 's'));
+
+    if (state.active[state.auction_sale_guide.key] ~= nil) then
+        if (imgui.Button('Focus##ashitaguide_auction_sale_focus', { 92, 0 })) then
+            state.selected_active_key = state.auction_sale_guide.key;
+            state.visible[1] = true;
+        end
+    elseif (state.auction_sale_enabled[1] == true) then
+        if (imgui.Button('Open##ashitaguide_auction_sale_open', { 92, 0 })) then
+            start_guide(state.auction_sale_guide);
+            state.selected_active_key = state.auction_sale_guide.key;
+            state.visible[1] = true;
+        end
+    end
+    imgui.SameLine(0, 6);
+    if (imgui.Button('Delete Forever##ashitaguide_auction_sale_delete', { 126, 0 })) then
+        delete_auction_sale_guide(state.auction_sale_guide.key);
     end
 end
 
@@ -3196,6 +3429,55 @@ local function render_guide_navigation_row(run)
     end
 end
 
+local function format_gil(value)
+    local text = tostring(math.max(0, math.floor(tonumber(value) or 0)));
+    local reversed = text:reverse():gsub('(%d%d%d)', '%1,'):reverse():gsub('^,', '');
+    return reversed .. ' gil';
+end
+
+local function render_auction_sale_items(step)
+    local items = type(step.sale_items) == 'table' and step.sale_items or {};
+    if (step.text ~= '') then
+        text_wrapped(step.text);
+    end
+    if (#items == 0) then
+        text_colored_wrapped(COLORS.warning, 'This published sale list contains no items.');
+        return;
+    end
+
+    imgui.Separator();
+    for index, item in ipairs(items) do
+        imgui.TextColored(COLORS.header, string.format('%d. %s', index, item.name));
+        local listing_quantity = math.max(1, tonumber(item.listing_quantity) or 1);
+        local listing_count = math.floor((tonumber(item.quantity_owned) or 1) / listing_quantity);
+        local listing_label = listing_quantity == 1
+            and 'Single'
+            or string.format('Stack of %d', listing_quantity);
+        text_colored_wrapped(
+            COLORS.muted,
+            string.format(
+                'Owned: %d  |  List as: %s  |  Listings: %d',
+                item.quantity_owned,
+                listing_label,
+                listing_count));
+        imgui.TextColored(
+            COLORS.accent,
+            'Suggested listing price: ' .. format_gil(item.suggested_price_gil));
+        if (state.auction_sale_show_price_basis[1] == true and item.price_basis ~= '') then
+            text_colored_wrapped(COLORS.muted, 'Basis: ' .. item.price_basis);
+        end
+        if (state.auction_sale_show_observed_at[1] == true and item.observed_at ~= '') then
+            text_colored_wrapped(COLORS.muted, 'Market observed: ' .. item.observed_at);
+        end
+        if (item.note ~= '') then
+            text_colored_wrapped(COLORS.warning, item.note);
+        end
+        if (index < #items) then
+            imgui.Separator();
+        end
+    end
+end
+
 local function render_active_guide(run)
     if (run == nil) then
         imgui.TextColored(COLORS.muted, 'No active guide selected.');
@@ -3214,6 +3496,10 @@ local function render_active_guide(run)
     imgui.Separator();
     if (#guide.steps == 1 and step.title ~= '') then
         imgui.TextColored(COLORS.header, step.title);
+    end
+    if (guide.type == 'auction_sale_list') then
+        render_auction_sale_items(step);
+        return;
     end
     text_wrapped(step.text);
     local navigation = navigation_context(step);
@@ -3512,6 +3798,10 @@ local function render_config_window()
                     render_ai_guide_config();
                     imgui.EndTabItem();
                 end
+                if (imgui.BeginTabItem('Auction Sales##ashitaguide_config_auction_sales')) then
+                    render_auction_sale_config();
+                    imgui.EndTabItem();
+                end
                 if (imgui.BeginTabItem('Valor##ashitaguide_config_valor')) then
                     render_valor_config();
                     imgui.EndTabItem();
@@ -3526,6 +3816,8 @@ local function render_config_window()
             render_guide_selector();
             imgui.Separator();
             render_ai_guide_config();
+            imgui.Separator();
+            render_auction_sale_config();
             imgui.Separator();
             render_valor_config();
             imgui.Separator();
@@ -3749,6 +4041,7 @@ end);
 ashita.events.register('d3d_present', 'present_cb', function ()
     poll_chat_log();
     poll_ai_guides_file();
+    poll_auction_sale_guide_file();
     update_npc_step_auto_advance();
     update_level_step_auto_advance();
     render_npc_world_marker();
