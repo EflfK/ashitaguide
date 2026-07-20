@@ -26,6 +26,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - pure-Lua navigation map showing only the player and step destination
 - world-space arrow above the current step NPC when rendered
 - optional NPC-target auto-advance for find steps
+- optional job-and-level auto-advance for leveling steps
 - built-in Pages of Valor tracker
 - dedicated Pages of Valor window that appears from chat evidence
 - built-in brown treasure casket code helper
@@ -122,6 +123,12 @@ return {
             categories = { 'Quest', 'AI' },
             steps = {
                 {
+                    title = 'Level Beastmaster to 30',
+                    text = 'Reach level 30 as Beastmaster.',
+                    minimum_level = 30,
+                    required_job = 'BST',
+                },
+                {
                     title = 'Talk to the NPC',
                     text = 'Speak with Mendi.',
                     zone = 'Lower Jeuno',
@@ -202,6 +209,12 @@ Any step with `npc` displays a world-space arrow above that NPC while it is
 rendered. Set `advance_on_target = true` on find/select steps to advance once
 the player selects that NPC. Leave it false or omit it on talk/interact steps
 so keeping the NPC selected does not skip later instructions.
+
+Set `minimum_level` on a step to advance automatically when the active main job
+reaches that level. Add `required_job` to restrict completion to one job. Job
+abbreviations and full names are accepted, so `BST` and `Beastmaster` are
+equivalent. A qualifying level-up or switching to an already-qualified main job
+advances the guide; a different job does not satisfy a restricted step.
 
 ## Commands
 

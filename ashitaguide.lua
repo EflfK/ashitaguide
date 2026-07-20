@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.15.0';
+addon.version = '0.16.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -99,6 +99,40 @@ local DEFAULT_SETTINGS = {
     chat_log_seed_lines = 700,
     poll_chat_log = true,
     default_active_guides = {},
+};
+
+local JOB_NAMES = {
+    [1] = 'WAR',
+    [2] = 'MNK',
+    [3] = 'WHM',
+    [4] = 'BLM',
+    [5] = 'RDM',
+    [6] = 'THF',
+    [7] = 'PLD',
+    [8] = 'DRK',
+    [9] = 'BST',
+    [10] = 'BRD',
+    [11] = 'RNG',
+    [12] = 'SAM',
+    [13] = 'NIN',
+    [14] = 'DRG',
+    [15] = 'SMN',
+    [16] = 'BLU',
+    [17] = 'COR',
+    [18] = 'PUP',
+    [19] = 'DNC',
+    [20] = 'SCH',
+    [21] = 'GEO',
+    [22] = 'RUN',
+};
+
+local JOB_ALIASES = {
+    WARRIOR = 'WAR', MONK = 'MNK', WHITEMAGE = 'WHM', BLACKMAGE = 'BLM',
+    REDMAGE = 'RDM', THIEF = 'THF', PALADIN = 'PLD', DARKKNIGHT = 'DRK',
+    BEASTMASTER = 'BST', BARD = 'BRD', RANGER = 'RNG', SAMURAI = 'SAM',
+    NINJA = 'NIN', DRAGOON = 'DRG', SUMMONER = 'SMN', BLUEMAGE = 'BLU',
+    CORSAIR = 'COR', PUPPETMASTER = 'PUP', DANCER = 'DNC', SCHOLAR = 'SCH',
+    GEOMANCER = 'GEO', RUNEFENCER = 'RUN',
 };
 
 local commands = {
@@ -416,6 +450,19 @@ local function normalize_categories(source)
     return output;
 end
 
+local function normalize_required_job(value)
+    local numeric = tonumber(value);
+    if (numeric ~= nil and JOB_NAMES[math.floor(numeric)] ~= nil) then
+        return JOB_NAMES[math.floor(numeric)];
+    end
+
+    local job = trim_string(value):upper():gsub('[^%w]', '');
+    if (job == '') then
+        return '';
+    end
+    return JOB_ALIASES[job] or job;
+end
+
 local function normalize_step(source, index)
     if (type(source) == 'string') then
         source = { text = source };
@@ -428,6 +475,11 @@ local function normalize_step(source, index)
         text = string.format('Step %d', index);
     end
 
+    local minimum_level = tonumber(source.minimum_level or source.min_level);
+    if (minimum_level ~= nil) then
+        minimum_level = bounded_number(minimum_level, 1, 1, 99);
+    end
+
     return {
         title = title,
         text = text,
@@ -438,6 +490,8 @@ local function normalize_step(source, index)
         note = trim_string(source.note or source.notes),
         target_x = tonumber(source.target_x or source.x),
         target_y = tonumber(source.target_y or source.y),
+        minimum_level = minimum_level,
+        required_job = normalize_required_job(source.required_job or source.job),
         advance_on_target = bounded_boolean(
             source.advance_on_target or source.auto_advance_on_target,
             false),
@@ -1207,6 +1261,12 @@ local function guide_storage_text(guides)
             end
             if (step.target_y ~= nil) then
                 table.insert(lines, string.format('                    target_y = %.6f,', step.target_y));
+            end
+            if (step.minimum_level ~= nil) then
+                table.insert(lines, string.format('                    minimum_level = %d,', step.minimum_level));
+            end
+            if (step.required_job ~= '') then
+                table.insert(lines, string.format('                    required_job = %s,', lua_quoted(step.required_job)));
             end
             table.insert(lines, string.format('                    advance_on_target = %s,', step.advance_on_target == true and 'true' or 'false'));
             table.insert(lines, '                },');
@@ -2457,6 +2517,36 @@ local function update_npc_step_auto_advance()
     end
 end
 
+local function update_level_step_auto_advance()
+    local run = state.active[state.selected_active_key];
+    if (run == nil) then
+        return;
+    end
+
+    local step = run.guide.steps[run.step_index];
+    if (step == nil or step.minimum_level == nil) then
+        run.level_match_step = nil;
+        return;
+    end
+
+    local memory = safe_read(function () return AshitaCore:GetMemoryManager(); end, nil);
+    local player = memory ~= nil and safe_read(function () return memory:GetPlayer(); end, nil) or nil;
+    local job_id = player ~= nil and tonumber(safe_read(function () return player:GetMainJob(); end, nil)) or nil;
+    local level = player ~= nil and tonumber(safe_read(function () return player:GetMainJobLevel(); end, nil)) or nil;
+    local job = job_id ~= nil and JOB_NAMES[job_id] or nil;
+    local job_matches = step.required_job == '' or job == step.required_job;
+    local token = string.format('%s:%d', run.key, run.step_index);
+
+    if (level ~= nil and level >= step.minimum_level and job_matches) then
+        if (run.level_match_step ~= token) then
+            run.level_match_step = token;
+            next_step(run);
+        end
+    else
+        run.level_match_step = nil;
+    end
+end
+
 local function render_npc_world_marker()
     local run = state.active[state.selected_active_key];
     local step = run ~= nil and run.guide.steps[run.step_index] or nil;
@@ -3231,6 +3321,7 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     poll_chat_log();
     poll_ai_guides_file();
     update_npc_step_auto_advance();
+    update_level_step_auto_advance();
     render_npc_world_marker();
     render_guide_window();
     render_valor_window();

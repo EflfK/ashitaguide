@@ -66,6 +66,10 @@ $required = @(
     "world_to_screen",
     "truthy",
     "advance_on_target",
+    "update_level_step_auto_advance",
+    "minimum_level",
+    "required_job",
+    "GetMainJobLevel",
     "target_x",
     "Progress"
 )
