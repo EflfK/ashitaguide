@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.9.0';
+addon.version = '0.10.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -117,6 +117,11 @@ local state = {
     navigation_targets = {},
     pov_run = nil,
     pov_active = false,
+    settings_observed_text = nil,
+    settings_saved_text = nil,
+    settings_pending_at = 0,
+    settings_last_poll = 0,
+    settings_save_error = nil,
 };
 
 local function trim_string(value)
@@ -628,12 +633,116 @@ local function previous_step(run)
     run.step_index = math.max(1, (tonumber(run.step_index) or 1) - 1);
 end
 
-local function config_file_path()
+local function ashita_install_path()
+    local install_path = clean_message(safe_read(function () return AshitaCore:GetInstallPath(); end, ''));
+    return install_path ~= '' and install_path or nil;
+end
+
+local function config_dir_path()
+    local install_path = ashita_install_path();
+    if (install_path == nil) then
+        return nil;
+    end
+    return path_join(path_join(path_join(install_path, 'config'), 'addons'), addon.name);
+end
+
+local function bundled_config_file_path()
     return path_join(addon.path or '', 'ashitaguide_config.lua');
 end
 
+local function config_file_path()
+    local dir = config_dir_path();
+    return dir ~= nil and path_join(dir, 'ashitaguide_config.lua') or bundled_config_file_path();
+end
+
+local function settings_file_path()
+    local dir = config_dir_path();
+    return dir ~= nil and path_join(dir, 'settings.lua') or nil;
+end
+
+local function file_exists(path)
+    if (path == nil or path == '') then
+        return false;
+    end
+    local file = io.open(path, 'rb');
+    if (file == nil) then
+        return false;
+    end
+    file:close();
+    return true;
+end
+
+local function read_text_file(path)
+    local file, error_message = io.open(path, 'rb');
+    if (file == nil) then
+        return nil, error_message;
+    end
+    local contents = file:read('*a');
+    file:close();
+    return contents, nil;
+end
+
+local function write_text_file(path, contents)
+    local file, error_message = io.open(path, 'wb');
+    if (file == nil) then
+        return false, error_message;
+    end
+    local ok, write_error = file:write(contents);
+    file:close();
+    if (not ok) then
+        return false, write_error;
+    end
+    return true, nil;
+end
+
+local function ensure_config_dir()
+    local install_path = ashita_install_path();
+    if (install_path == nil) then
+        return false, 'Ashita install path is unavailable.';
+    end
+    if (ashita == nil or ashita.fs == nil) then
+        return false, 'Ashita filesystem helpers are unavailable.';
+    end
+
+    local config_root = path_join(install_path, 'config');
+    local addons_root = path_join(config_root, 'addons');
+    local addon_root = path_join(addons_root, addon.name);
+    if (not ashita.fs.exists(config_root)) then
+        ashita.fs.create_dir(config_root);
+    end
+    if (not ashita.fs.exists(addons_root)) then
+        ashita.fs.create_dir(addons_root);
+    end
+    if (not ashita.fs.exists(addon_root)) then
+        ashita.fs.create_dir(addon_root);
+    end
+    return true, addon_root;
+end
+
+local function bootstrap_persistent_config()
+    local persistent_path = config_file_path();
+    if (persistent_path == bundled_config_file_path() or file_exists(persistent_path)) then
+        return persistent_path, nil;
+    end
+
+    local dir_ok, dir_or_error = ensure_config_dir();
+    if (not dir_ok) then
+        return bundled_config_file_path(), tostring(dir_or_error);
+    end
+    persistent_path = path_join(dir_or_error, 'ashitaguide_config.lua');
+    local contents, read_error = read_text_file(bundled_config_file_path());
+    if (contents == nil) then
+        return bundled_config_file_path(), tostring(read_error or 'bundled config could not be read');
+    end
+    local write_ok, write_error = write_text_file(persistent_path, contents);
+    if (not write_ok) then
+        return bundled_config_file_path(), tostring(write_error or 'persistent config could not be created');
+    end
+    return persistent_path, nil;
+end
+
 local function load_raw_config()
-    local path = config_file_path();
+    local path, bootstrap_error = bootstrap_persistent_config();
     local chunk, load_error = loadfile(path);
     if (chunk == nil) then
         return {}, tostring(load_error or 'config not found');
@@ -644,7 +753,34 @@ local function load_raw_config()
         return {}, tostring(config or 'config did not return a table');
     end
 
-    return config, nil;
+    return config, bootstrap_error;
+end
+
+local function load_persisted_settings()
+    local path = settings_file_path();
+    if (not file_exists(path)) then
+        return {}, nil;
+    end
+    local chunk, load_error = loadfile(path);
+    if (chunk == nil) then
+        return {}, tostring(load_error or 'settings could not be loaded');
+    end
+    local ok, values = pcall(chunk);
+    if (not ok or type(values) ~= 'table') then
+        return {}, tostring(values or 'settings did not return a table');
+    end
+    return values, nil;
+end
+
+local function merge_tables(base, overrides)
+    local output = {};
+    for key, value in pairs(type(base) == 'table' and base or {}) do
+        output[key] = value;
+    end
+    for key, value in pairs(type(overrides) == 'table' and overrides or {}) do
+        output[key] = value;
+    end
+    return output;
 end
 
 local function load_config()
@@ -655,8 +791,9 @@ local function load_config()
     local previous_pov_run = state.pov_run;
 
     local config, config_error = load_raw_config();
-    state.config_error = config_error;
-    state.settings = normalize_settings(config.settings or {});
+    local persisted_settings, settings_error = load_persisted_settings();
+    state.config_error = config_error or settings_error;
+    state.settings = normalize_settings(merge_tables(config.settings, persisted_settings));
     state.visible[1] = state.settings.visible;
     state.config_visible[1] = state.settings.config_visible;
     state.valor_enabled[1] = state.settings.valor_enabled;
@@ -666,6 +803,11 @@ local function load_config()
     state.guide_show_step_list[1] = state.settings.guide_show_step_list;
     state.guide_map_size[1] = state.settings.guide_map_size;
     state.valor_hide_frame[1] = state.settings.valor_hide_frame;
+    state.settings_observed_text = nil;
+    state.settings_saved_text = nil;
+    state.settings_pending_at = 0;
+    state.settings_last_poll = 0;
+    state.settings_save_error = nil;
 
     local guides_by_key = {};
     local guides = {};
@@ -741,6 +883,92 @@ local function load_config()
     if (filter_exists ~= true) then
         state.category_filter = 'all';
     end
+end
+
+local function lua_boolean(value)
+    return value == true and 'true' or 'false';
+end
+
+local function lua_string_list(values)
+    local pieces = {};
+    for _, value in ipairs(values or {}) do
+        table.insert(pieces, string.format('%q', tostring(value)));
+    end
+    return #pieces > 0 and ('{ ' .. table.concat(pieces, ', ') .. ' }') or '{}';
+end
+
+local function settings_text()
+    local values = state.settings;
+    local lines = {
+        'return {',
+        string.format('    visible = %s,', lua_boolean(state.visible[1])),
+        string.format('    window_x = %d,', bounded_number(values.window_x, DEFAULT_SETTINGS.window_x, 0, 10000)),
+        string.format('    window_y = %d,', bounded_number(values.window_y, DEFAULT_SETTINGS.window_y, 0, 10000)),
+        string.format('    window_width = %d,', bounded_number(values.window_width, DEFAULT_SETTINGS.window_width, 520, 1400)),
+        string.format('    window_height = %d,', bounded_number(values.window_height, DEFAULT_SETTINGS.window_height, 360, 1000)),
+        string.format('    guide_hide_frame = %s,', lua_boolean(state.guide_hide_frame[1])),
+        string.format('    guide_show_step_list = %s,', lua_boolean(state.guide_show_step_list[1])),
+        string.format('    guide_map_size = %d,', bounded_number(state.guide_map_size[1], DEFAULT_SETTINGS.guide_map_size, 120, 260)),
+        string.format('    config_visible = %s,', lua_boolean(state.config_visible[1])),
+        string.format('    config_window_x = %d,', bounded_number(values.config_window_x, DEFAULT_SETTINGS.config_window_x, 0, 10000)),
+        string.format('    config_window_y = %d,', bounded_number(values.config_window_y, DEFAULT_SETTINGS.config_window_y, 0, 10000)),
+        string.format('    config_window_width = %d,', bounded_number(values.config_window_width, DEFAULT_SETTINGS.config_window_width, 260, 600)),
+        string.format('    config_window_height = %d,', bounded_number(values.config_window_height, DEFAULT_SETTINGS.config_window_height, 320, 1000)),
+        string.format('    valor_enabled = %s,', lua_boolean(state.valor_enabled[1])),
+        string.format('    valor_show_zone = %s,', lua_boolean(state.valor_show_zone[1])),
+        string.format('    valor_show_totals = %s,', lua_boolean(state.valor_show_totals[1])),
+        string.format('    valor_hide_frame = %s,', lua_boolean(state.valor_hide_frame[1])),
+        string.format('    valor_window_x = %d,', bounded_number(values.valor_window_x, DEFAULT_SETTINGS.valor_window_x, 0, 10000)),
+        string.format('    valor_window_y = %d,', bounded_number(values.valor_window_y, DEFAULT_SETTINGS.valor_window_y, 0, 10000)),
+        string.format('    valor_window_width = %d,', bounded_number(values.valor_window_width, DEFAULT_SETTINGS.valor_window_width, 220, 600)),
+        string.format('    valor_window_height = %d,', bounded_number(values.valor_window_height, DEFAULT_SETTINGS.valor_window_height, 80, 400)),
+        string.format('    opacity = %d,', bounded_number(values.opacity, DEFAULT_SETTINGS.opacity, 20, 100)),
+        string.format('    chat_log_seed_lines = %d,', bounded_number(values.chat_log_seed_lines, DEFAULT_SETTINGS.chat_log_seed_lines, 0, 5000)),
+        string.format('    poll_chat_log = %s,', lua_boolean(values.poll_chat_log)),
+        string.format('    default_active_guides = %s,', lua_string_list(state.active_order)),
+        '};',
+        '',
+    };
+    return table.concat(lines, '\n');
+end
+
+local function save_settings_if_needed(force)
+    local now = os.clock();
+    if (not force and now - state.settings_last_poll < 0.25) then
+        return;
+    end
+    state.settings_last_poll = now;
+
+    local current_text = settings_text();
+    if (current_text ~= state.settings_observed_text) then
+        state.settings_observed_text = current_text;
+        state.settings_pending_at = now;
+    end
+    if (not force and (current_text == state.settings_saved_text or now - state.settings_pending_at < 0.75)) then
+        return;
+    end
+
+    local dir_ok, dir_or_error = ensure_config_dir();
+    if (not dir_ok) then
+        local message = tostring(dir_or_error or 'persistent settings directory is unavailable');
+        if (state.settings_save_error ~= message) then
+            state.settings_save_error = message;
+            log_warn('Settings save failed: ' .. message);
+        end
+        return;
+    end
+    local path = path_join(dir_or_error, 'settings.lua');
+    local write_ok, write_error = write_text_file(path, current_text);
+    if (not write_ok) then
+        local message = tostring(write_error or 'settings file could not be written');
+        if (state.settings_save_error ~= message) then
+            state.settings_save_error = message;
+            log_warn('Settings save failed: ' .. message);
+        end
+        return;
+    end
+    state.settings_saved_text = current_text;
+    state.settings_save_error = nil;
 end
 
 local function current_pov_page(run)
@@ -1814,6 +2042,19 @@ local function push_window_style()
     imgui.PushStyleColor(IMGUI.col_border, COLORS.border);
 end
 
+local function capture_window_geometry(x_key, y_key, width_key, height_key, min_width, max_width, min_height, max_height)
+    if (type(imgui.GetWindowPos) == 'function') then
+        local x, y = imgui.GetWindowPos();
+        state.settings[x_key] = bounded_number(x, state.settings[x_key], 0, 10000);
+        state.settings[y_key] = bounded_number(y, state.settings[y_key], 0, 10000);
+    end
+    if (type(imgui.GetWindowSize) == 'function') then
+        local width, height = imgui.GetWindowSize();
+        state.settings[width_key] = bounded_number(width, state.settings[width_key], min_width, max_width);
+        state.settings[height_key] = bounded_number(height, state.settings[height_key], min_height, max_height);
+    end
+end
+
 local function render_guide_window()
     if (state.visible[1] ~= true) then
         return;
@@ -1826,7 +2067,9 @@ local function render_guide_window()
     if (state.guide_hide_frame[1] == true) then
         flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
     end
-    if (imgui.Begin(string.format('Guides v%s###AshitaGuideGuides', addon.version), state.visible, flags)) then
+    local visible = imgui.Begin(string.format('Guides v%s###AshitaGuideGuides', addon.version), state.visible, flags);
+    capture_window_geometry('window_x', 'window_y', 'window_width', 'window_height', 520, 1400, 360, 1000);
+    if (visible) then
         render_active_tabs();
     end
     imgui.End();
@@ -1852,7 +2095,17 @@ local function render_valor_window()
     if (state.valor_hide_frame[1] == true) then
         flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
     end
-    if (imgui.Begin('Pages of Valor###AshitaGuideValor', state.valor_visible, flags)) then
+    local visible = imgui.Begin('Pages of Valor###AshitaGuideValor', state.valor_visible, flags);
+    capture_window_geometry(
+        'valor_window_x',
+        'valor_window_y',
+        'valor_window_width',
+        'valor_window_height',
+        220,
+        600,
+        80,
+        400);
+    if (visible) then
         render_pov_panel(state.pov_run);
     end
     imgui.End();
@@ -1871,7 +2124,17 @@ local function render_config_window()
         { state.settings.config_window_width, state.settings.config_window_height },
         IMGUI.cond_first_use);
     push_window_style();
-    if (imgui.Begin('Guide Config###AshitaGuideConfig', state.config_visible, IMGUI.window_no_collapse)) then
+    local visible = imgui.Begin('Guide Config###AshitaGuideConfig', state.config_visible, IMGUI.window_no_collapse);
+    capture_window_geometry(
+        'config_window_x',
+        'config_window_y',
+        'config_window_width',
+        'config_window_height',
+        260,
+        600,
+        320,
+        1000);
+    if (visible) then
         if (state.config_error ~= nil) then
             text_colored_wrapped(COLORS.warning, 'Config warning: ' .. state.config_error);
             imgui.Separator();
@@ -2057,6 +2320,7 @@ ashita.events.register('load', 'load_cb', function ()
 end);
 
 ashita.events.register('unload', 'unload_cb', function ()
+    save_settings_if_needed(true);
     state.visible[1] = false;
     state.config_visible[1] = false;
 end);
@@ -2076,4 +2340,5 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     render_guide_window();
     render_valor_window();
     render_config_window();
+    save_settings_if_needed(false);
 end);

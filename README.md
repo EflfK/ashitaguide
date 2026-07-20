@@ -10,7 +10,8 @@ use the manual controls or satisfy an explicitly configured display condition.
 
 ## Current Features
 
-- guide definitions in `ashitaguide_config.lua`
+- persistent guide definitions under `config/addons/ashitaguide/`
+- automatically persisted UI settings and window geometry
 - separate guide runner and guide configuration windows
 - free-form categories with an in-game category filter
 - guide name/key/category search
@@ -53,10 +54,24 @@ The Guides tab also controls whether the all-steps section is shown at the
 bottom of the normal guide window. Map size is configurable from 120 to 260
 pixels and defaults to 160 pixels.
 
-An accepted training regime or `Progress x/y` line opens the Pages of Valor tab
-automatically. Completion or cancellation closes it. You can close the tab
+An accepted training regime or `Progress x/y` line opens the Pages of Valor window
+automatically. Completion or cancellation closes it. You can close the window
 manually; its background tracker remains active and will reopen it when another
 progress line arrives.
+
+## Persistent Configuration
+
+On first load, the bundled `ashitaguide_config.lua` template is copied to:
+
+```text
+Ashita/config/addons/ashitaguide/ashitaguide_config.lua
+```
+
+Edit that persistent copy when adding or changing guides. The addon writes UI
+preferences to `Ashita/config/addons/ashitaguide/settings.lua`, including window
+positions and sizes, visibility, frame settings, map size, Valor settings, and
+active normal guides. Replacing or reinstalling the addon directory does not
+overwrite either persistent file.
 
 ## Config Shape
 

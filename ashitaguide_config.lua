@@ -1,3 +1,6 @@
+-- Bundled template. On first load this file is copied to:
+-- Ashita/config/addons/ashitaguide/ashitaguide_config.lua
+-- Edit the persistent copy so custom guides survive addon reinstalls.
 return {
     settings = {
         visible = true,
