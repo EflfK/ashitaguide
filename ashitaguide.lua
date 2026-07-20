@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.16.0';
+addon.version = '0.17.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -75,6 +75,7 @@ local DEFAULT_SETTINGS = {
     window_height = 540,
     guide_show_step_list = true,
     guide_map_size = 160,
+    minimap_marker_enabled = true,
     guide_opacity = 92,
     config_visible = true,
     config_window_x = 110,
@@ -151,6 +152,7 @@ local state = {
     casket_enabled = T{ true },
     guide_show_step_list = T{ true },
     guide_map_size = T{ 160 },
+    minimap_marker_enabled = T{ true },
     guide_opacity = T{ 92 },
     valor_opacity = T{ 92 },
     casket_opacity = T{ 92 },
@@ -172,6 +174,15 @@ local state = {
     observed_text_events = 0,
     observed_log_events = 0,
     navigation_targets = {},
+    minimap = {
+        settings = nil,
+        settings_checked_at = 0,
+        runtime_pointer_address = 0,
+        map_table_address = 0,
+        zone_scales = {},
+        reported_scale_zone = nil,
+        reported_marker_step = nil,
+    },
     pov_run = nil,
     pov_active = false,
     casket = nil,
@@ -540,6 +551,9 @@ local function normalize_settings(source)
         window_height = bounded_number(source.window_height, DEFAULT_SETTINGS.window_height, 360, 1000),
         guide_show_step_list = bounded_boolean(source.guide_show_step_list, DEFAULT_SETTINGS.guide_show_step_list),
         guide_map_size = bounded_number(source.guide_map_size, DEFAULT_SETTINGS.guide_map_size, 120, 260),
+        minimap_marker_enabled = bounded_boolean(
+            source.minimap_marker_enabled,
+            DEFAULT_SETTINGS.minimap_marker_enabled),
         guide_opacity = bounded_number(source.guide_opacity, legacy_opacity, 0, 100),
         config_visible = bounded_boolean(source.config_visible, DEFAULT_SETTINGS.config_visible),
         config_window_x = bounded_number(source.config_window_x, DEFAULT_SETTINGS.config_window_x, 0, 10000),
@@ -1116,6 +1130,208 @@ local function read_text_file(path)
     return contents, nil;
 end
 
+local function parse_ini(contents)
+    local result = {};
+    local section = '';
+    for line in tostring(contents or ''):gmatch('[^\r\n]+') do
+        local clean = trim_string(line:gsub('[;#].*$', ''));
+        local next_section = clean:match('^%[([^%]]+)%]$');
+        if (next_section ~= nil) then
+            section = trim_string(next_section):lower();
+        else
+            local key, value = clean:match('^([^=]+)=(.*)$');
+            if (key ~= nil) then
+                result[section .. '.' .. trim_string(key):lower()] = trim_string(value);
+            end
+        end
+    end
+    return result;
+end
+
+local function minimap_file_path(...)
+    local install_path = ashita_install_path();
+    if (install_path == nil) then
+        return nil;
+    end
+    local path = path_join(path_join(install_path, 'config'), 'minimap');
+    for _, part in ipairs({ ... }) do
+        path = path_join(path, part);
+    end
+    return path;
+end
+
+local function minimap_plugin_loaded()
+    local manager = safe_read(function () return AshitaCore:GetPluginManager(); end, nil);
+    if (manager == nil) then
+        return false;
+    end
+    return truthy(safe_read(function () return manager:IsLoaded('Minimap'); end, false))
+        or truthy(safe_read(function () return manager:IsLoaded('minimap'); end, false));
+end
+
+-- Minimap keeps command and mouse-wheel changes in its live plugin object.  Its
+-- ini file is only a persisted fallback, so reading only that file makes an
+-- overlay lag behind zoom, rotation, movement, and scale changes.
+local MINIMAP_RUNTIME_SIGNATURE =
+    'A1????????F30F104044C3CCCCCCCCCCA1????????F30F10402C';
+
+local function initialize_minimap_runtime()
+    if (state.minimap.runtime_pointer_address ~= 0) then
+        return;
+    end
+    local signature = tonumber(safe_read(function ()
+        return ashita.memory.find('Minimap.dll', 0, MINIMAP_RUNTIME_SIGNATURE, 0, 0);
+    end, 0)) or 0;
+    if (signature ~= 0) then
+        state.minimap.runtime_pointer_address = tonumber(safe_read(function ()
+            return ashita.memory.read_uint32(signature + 0x01);
+        end, 0)) or 0;
+    end
+end
+
+local function apply_live_minimap_settings(settings)
+    initialize_minimap_runtime();
+    local pointer_address = state.minimap.runtime_pointer_address;
+    if (pointer_address == 0) then
+        return settings;
+    end
+    local runtime = tonumber(safe_read(function ()
+        return ashita.memory.read_uint32(pointer_address);
+    end, 0)) or 0;
+    if (runtime == 0) then
+        return settings;
+    end
+
+    local x = tonumber(safe_read(function ()
+        return ashita.memory.read_float(runtime + 0x28);
+    end, nil));
+    local y = tonumber(safe_read(function ()
+        return ashita.memory.read_float(runtime + 0x2C);
+    end, nil));
+    local scale_x = tonumber(safe_read(function ()
+        return ashita.memory.read_float(runtime + 0x30);
+    end, nil));
+    local scale_y = tonumber(safe_read(function ()
+        return ashita.memory.read_float(runtime + 0x34);
+    end, nil));
+    local zoom = tonumber(safe_read(function ()
+        return ashita.memory.read_float(runtime + 0x44);
+    end, nil));
+    local rotate_map = tonumber(safe_read(function ()
+        return ashita.memory.read_uint8(runtime + 0x4C);
+    end, nil));
+    local rotate_frame = tonumber(safe_read(function ()
+        return ashita.memory.read_uint8(runtime + 0x4D);
+    end, nil));
+    local map_extent = tonumber(safe_read(function ()
+        return ashita.memory.read_float(runtime + 0xB0);
+    end, nil));
+
+    if (x ~= nil and math.abs(x) < 100000) then settings.x = x; end
+    if (y ~= nil and math.abs(y) < 100000) then settings.y = y; end
+    if (scale_x ~= nil and scale_x > 0 and scale_x < 100) then settings.scale_x = scale_x; end
+    if (scale_y ~= nil and scale_y > 0 and scale_y < 100) then settings.scale_y = scale_y; end
+    if (zoom ~= nil and zoom >= 0.1 and zoom <= 2.0) then settings.zoom = zoom; end
+    if (rotate_map == 0 or rotate_map == 1) then settings.rotate_map = rotate_map == 1; end
+    if (rotate_frame == 0 or rotate_frame == 1) then settings.rotate_frame = rotate_frame == 1; end
+    if (map_extent ~= nil and math.abs(map_extent) > 0.01 and math.abs(map_extent) < 10000) then
+        settings.native_map_extent = map_extent;
+    end
+    settings.runtime_address = runtime;
+    return settings;
+end
+
+local function load_minimap_settings()
+    local now = os.clock();
+    if (state.minimap.settings ~= nil and now - state.minimap.settings_checked_at < 1.0) then
+        return apply_live_minimap_settings(state.minimap.settings);
+    end
+    state.minimap.settings_checked_at = now;
+
+    local settings_path = minimap_file_path('minimap.ini');
+    local settings_text = settings_path ~= nil and read_text_file(settings_path) or nil;
+    if (settings_text == nil) then
+        state.minimap.settings = nil;
+        return nil;
+    end
+
+    local values = parse_ini(settings_text);
+    local theme = lower_string(values['theme.name']);
+    if (theme ~= 'square-minimal') then
+        state.minimap.settings = nil;
+        return nil;
+    end
+
+    local theme_path = minimap_file_path('themes', theme, 'theme.ini');
+    local theme_text = theme_path ~= nil and read_text_file(theme_path) or nil;
+    local theme_values = parse_ini(theme_text or '');
+    state.minimap.settings = {
+        x = tonumber(values['main.x']) or 0,
+        y = tonumber(values['main.y']) or 0,
+        scale_x = tonumber(values['main.scale_x']) or 1,
+        scale_y = tonumber(values['main.scale_y']) or 1,
+        zoom = tonumber(values['main.zoom']) or 1,
+        rotate_map = truthy(tonumber(values['main.rotate_map']) or 0),
+        frame_width = tonumber(theme_values['frame.w']) or 248,
+        frame_height = tonumber(theme_values['frame.h']) or 248,
+        mask_width = tonumber(theme_values['mask.w']) or 210,
+        mask_height = tonumber(theme_values['mask.h']) or 210,
+    };
+    return apply_live_minimap_settings(state.minimap.settings);
+end
+
+local MAP_TABLE_SIGNATURE = '8A0D????????5333C05684C95774??8A5424188B7424148B7C2410B9';
+local MAP_TABLE_ENTRY_SIZE = 0x0E;
+local MINIMAP_COORDINATE_SCALE = 1.06;
+
+local function initialize_map_table()
+    if (state.minimap.map_table_address ~= 0) then
+        return;
+    end
+    local signature = tonumber(safe_read(function ()
+        return ashita.memory.find('FFXiMain.dll', 0, MAP_TABLE_SIGNATURE, 0, 0);
+    end, 0)) or 0;
+    if (signature ~= 0) then
+        state.minimap.map_table_address = tonumber(safe_read(function ()
+            return ashita.memory.read_uint32(signature + 0x1C);
+        end, 0)) or 0;
+    end
+end
+
+local function map_scale_for_zone(zone_id)
+    zone_id = tonumber(zone_id);
+    if (zone_id == nil or zone_id <= 0) then
+        return nil;
+    end
+    if (state.minimap.zone_scales[zone_id] ~= nil) then
+        return state.minimap.zone_scales[zone_id];
+    end
+
+    initialize_map_table();
+    local address = state.minimap.map_table_address;
+    if (address == 0) then
+        return nil;
+    end
+    for index = 0, 999 do
+        local entry = address + (index * MAP_TABLE_ENTRY_SIZE);
+        local entry_zone = tonumber(safe_read(function ()
+            return ashita.memory.read_uint16(entry);
+        end, 0)) or 0;
+        if (entry_zone == zone_id) then
+            local raw = tonumber(safe_read(function ()
+                return ashita.memory.read_uint8(entry + 0x05);
+            end, 0)) or 0;
+            local signed = raw >= 0x80 and raw - 0x100 or raw;
+            local scale = math.abs(signed);
+            if (scale > 0) then
+                state.minimap.zone_scales[zone_id] = scale;
+                return scale;
+            end
+        end
+    end
+    return nil;
+end
+
 local function write_text_file(path, contents)
     local file, error_message = io.open(path, 'wb');
     if (file == nil) then
@@ -1322,6 +1538,7 @@ local function load_config()
     state.casket_enabled[1] = state.settings.casket_enabled;
     state.guide_show_step_list[1] = state.settings.guide_show_step_list;
     state.guide_map_size[1] = state.settings.guide_map_size;
+    state.minimap_marker_enabled[1] = state.settings.minimap_marker_enabled;
     state.guide_opacity[1] = state.settings.guide_opacity;
     state.valor_opacity[1] = state.settings.valor_opacity;
     state.casket_opacity[1] = state.settings.casket_opacity;
@@ -1469,6 +1686,7 @@ local function settings_text()
         string.format('    window_height = %d,', bounded_number(values.window_height, DEFAULT_SETTINGS.window_height, 360, 1000)),
         string.format('    guide_show_step_list = %s,', lua_boolean(state.guide_show_step_list[1])),
         string.format('    guide_map_size = %d,', bounded_number(state.guide_map_size[1], DEFAULT_SETTINGS.guide_map_size, 120, 260)),
+        string.format('    minimap_marker_enabled = %s,', lua_boolean(state.minimap_marker_enabled[1])),
         string.format('    guide_opacity = %d,', bounded_number(state.guide_opacity[1], DEFAULT_SETTINGS.guide_opacity, 0, 100)),
         string.format('    config_visible = %s,', lua_boolean(state.config_visible[1])),
         string.format('    config_window_x = %d,', bounded_number(values.config_window_x, DEFAULT_SETTINGS.config_window_x, 0, 10000)),
@@ -2147,6 +2365,7 @@ local function render_guide_selector()
     imgui.SliderInt('Background opacity##ashitaguide_guide_opacity', state.guide_opacity, 0, 100, '%d%%');
     imgui.PopItemWidth();
     imgui.Checkbox('Show step list##ashitaguide_guide_show_step_list', state.guide_show_step_list);
+    imgui.Checkbox('Show destination on Minimap##ashitaguide_minimap_marker', state.minimap_marker_enabled);
     imgui.PushItemWidth(220);
     imgui.SliderInt('Map size##ashitaguide_guide_map_size', state.guide_map_size, 120, 260, '%d px');
     imgui.PopItemWidth();
@@ -2437,7 +2656,7 @@ local function current_navigation_player()
     local zone_name = resources ~= nil
         and clean_message(safe_read(function () return resources:GetString('zones.names', zone_id); end, ''))
         or '';
-    return { x = x, y = y, yaw = yaw, zone = zone_name, entity = entity };
+    return { x = x, y = y, yaw = yaw, zone = zone_name, zone_id = zone_id, entity = entity };
 end
 
 local function find_navigation_target(entity, npc)
@@ -2640,6 +2859,175 @@ local function navigation_context(step)
         distance = math.sqrt((delta_x * delta_x) + (delta_y * delta_y)),
         selected = live_target ~= nil and live_target.index == current_target_index(),
     };
+end
+
+local function rotate_minimap_delta(x, y, yaw)
+    local angle = (-math.pi / 2) - yaw;
+    local cosine = math.cos(angle);
+    local sine = math.sin(angle);
+    return (x * cosine) - (y * sine), (x * sine) + (y * cosine);
+end
+
+local function render_minimap_destination_marker()
+    if (state.minimap_marker_enabled[1] ~= true or not minimap_plugin_loaded()) then
+        return;
+    end
+
+    local run = state.active[state.selected_active_key];
+    local step = run ~= nil and run.guide.steps[run.step_index] or nil;
+    local navigation = navigation_context(step);
+    if (navigation == nil) then
+        return;
+    end
+
+    local minimap = load_minimap_settings();
+    local zone_scale = map_scale_for_zone(navigation.player.zone_id);
+    if (minimap == nil or zone_scale == nil) then
+        return;
+    end
+    if (state.minimap.reported_scale_zone ~= navigation.player.zone_id) then
+        state.minimap.reported_scale_zone = navigation.player.zone_id;
+        log_info(string.format(
+            'Minimap marker: zone=%d mapScale=%.1f zoom=%.2f scale=%.2fx%.2f.',
+            navigation.player.zone_id,
+            zone_scale,
+            minimap.zoom,
+            minimap.scale_x,
+            minimap.scale_y));
+    end
+
+    local delta_x = navigation.delta_x;
+    local delta_y = -navigation.delta_y;
+    if (minimap.rotate_map) then
+        delta_x, delta_y = rotate_minimap_delta(delta_x, delta_y, navigation.player.yaw);
+    end
+
+    local center_x = (minimap.x + (minimap.frame_width / 2)) * minimap.scale_x;
+    local center_y = (minimap.y + (minimap.frame_height / 2)) * minimap.scale_y;
+    -- FFXI zone maps are 512px textures. Minimap fits that texture into the
+    -- theme mask, then applies zoom and the configured display scale.
+    local native_scale = minimap.native_map_extent ~= nil
+        and (zone_scale / 5) * minimap.zoom * (512 / minimap.native_map_extent)
+            * MINIMAP_COORDINATE_SCALE
+        or nil;
+    local pixels_per_yalm_x = native_scale ~= nil
+        and native_scale * minimap.scale_x
+        or (zone_scale / 5) * minimap.zoom * minimap.scale_x;
+    local pixels_per_yalm_y = native_scale ~= nil
+        and native_scale * minimap.scale_y
+        or (zone_scale / 5) * minimap.zoom * minimap.scale_y;
+    local marker_x = center_x + (delta_x * pixels_per_yalm_x);
+    local marker_y = center_y + (delta_y * pixels_per_yalm_y);
+
+    state.minimap.debug = {
+        player_x = navigation.player.x,
+        player_y = navigation.player.y,
+        player_yaw = navigation.player.yaw,
+        target_x = navigation.target_x,
+        target_y = navigation.target_y,
+        target_index = navigation.live_target ~= nil and navigation.live_target.index or 0,
+        delta_x = navigation.delta_x,
+        delta_y = navigation.delta_y,
+        transformed_x = delta_x,
+        transformed_y = delta_y,
+        center_x = center_x,
+        center_y = center_y,
+        marker_x = marker_x,
+        marker_y = marker_y,
+        pixels_per_yalm_x = pixels_per_yalm_x,
+        pixels_per_yalm_y = pixels_per_yalm_y,
+        zoom = minimap.zoom,
+        scale_x = minimap.scale_x,
+        scale_y = minimap.scale_y,
+        map_extent = minimap.native_map_extent,
+        zone_scale = zone_scale,
+        rotate_map = minimap.rotate_map,
+        rotate_frame = minimap.rotate_frame,
+        runtime_address = minimap.runtime_address,
+    };
+
+    local marker_radius = 10;
+    local half_width = math.max(marker_radius, (minimap.mask_width * minimap.scale_x) / 2 - marker_radius);
+    local half_height = math.max(marker_radius, (minimap.mask_height * minimap.scale_y) / 2 - marker_radius);
+    local clamped = false;
+    if (marker_x < center_x - half_width) then
+        marker_x = center_x - half_width;
+        clamped = true;
+    elseif (marker_x > center_x + half_width) then
+        marker_x = center_x + half_width;
+        clamped = true;
+    end
+    if (marker_y < center_y - half_height) then
+        marker_y = center_y - half_height;
+        clamped = true;
+    elseif (marker_y > center_y + half_height) then
+        marker_y = center_y + half_height;
+        clamped = true;
+    end
+
+    local marker_token = string.format('%s:%d', run.key, run.step_index);
+    if (state.minimap.reported_marker_step ~= marker_token) then
+        state.minimap.reported_marker_step = marker_token;
+        log_info(string.format(
+            'Minimap marker geometry: center=%.1f,%.1f marker=%.1f,%.1f delta=%.1f,%.1f clamped=%s.',
+            center_x,
+            center_y,
+            marker_x,
+            marker_y,
+            navigation.delta_x,
+            navigation.delta_y,
+            tostring(clamped)));
+    end
+
+    local viewport = safe_read(function ()
+        local _, value = d3d8_device:GetViewport();
+        return value;
+    end, nil);
+    if (viewport == nil) then
+        return;
+    end
+    local flags = bit.bor(
+        bit.lshift(1, 0),  -- NoTitleBar
+        bit.lshift(1, 1),  -- NoResize
+        bit.lshift(1, 2),  -- NoMove
+        bit.lshift(1, 3),  -- NoScrollbar
+        bit.lshift(1, 7),  -- NoBackground
+        bit.lshift(1, 8),  -- NoSavedSettings
+        bit.lshift(1, 9),  -- NoMouseInputs
+        bit.lshift(1, 12), -- NoFocusOnAppearing
+        bit.lshift(1, 13), -- NoBringToFrontOnFocus
+        bit.lshift(1, 18), -- NoNavInputs
+        bit.lshift(1, 19));-- NoNavFocus
+    imgui.SetNextWindowPos({ 0, 0 }, 0);
+    imgui.SetNextWindowSize({ viewport.Width, viewport.Height }, 0);
+    if (type(imgui.SetNextWindowBgAlpha) == 'function') then
+        imgui.SetNextWindowBgAlpha(0.0);
+    end
+    if (imgui.Begin('##ashitaguide_minimap_destination_marker', true, flags)) then
+        local draw_list = imgui.GetWindowDrawList();
+        if (state.minimap.reported_overlay_window ~= true) then
+            state.minimap.reported_overlay_window = true;
+            local window_x, window_y = imgui.GetWindowPos();
+            local cursor_x, cursor_y = imgui.GetCursorScreenPos();
+            log_info(string.format(
+                'Minimap overlay window: position=%.1f,%.1f cursor=%.1f,%.1f viewport=%dx%d.',
+                tonumber(window_x) or -1,
+                tonumber(window_y) or -1,
+                tonumber(cursor_x) or -1,
+                tonumber(cursor_y) or -1,
+                tonumber(viewport.Width) or 0,
+                tonumber(viewport.Height) or 0));
+        end
+        local pulse = 0.82 + ((math.sin(os.clock() * 5) + 1) * 0.09);
+        local fill_color = navigation.distance <= 2.5
+            and imgui.GetColorU32(COLORS.accent)
+            or imgui.GetColorU32({ COLORS.header[1], COLORS.header[2], COLORS.header[3], pulse });
+        local outline_color = imgui.GetColorU32({ 0.02, 0.02, 0.02, 0.96 });
+        draw_list:AddCircleFilled({ marker_x, marker_y }, 6.0, outline_color, 20);
+        draw_list:AddCircleFilled({ marker_x, marker_y }, 4.0, fill_color, 20);
+        draw_list:AddCircle({ marker_x, marker_y }, clamped and 9.0 or 8.0, fill_color, 20, 2.0);
+    end
+    imgui.End();
 end
 
 local function navigation_world_radius(distance)
@@ -3164,7 +3552,7 @@ local function print_help()
     log_info('/agguide config [show | hide | toggle]');
     log_info('/agguide start <guide> | stop <guide> | select <guide>');
     log_info('/agguide next [guide] | back [guide]');
-    log_info('/agguide list | status | reload');
+    log_info('/agguide list | status | mapdebug | reload');
 end
 
 local function print_list()
@@ -3184,6 +3572,44 @@ local function print_status()
         tostring(state.selected_active_key or 'none'),
         state.observed_text_events,
         state.observed_log_events));
+end
+
+local function print_minimap_debug()
+    local debug = state.minimap.debug;
+    if (debug == nil) then
+        log_warn('Minimap debug is unavailable; show an active guide step with a map destination first.');
+        return;
+    end
+    log_info(string.format(
+        'MapDebug world: player=(%.3f,%.3f) yaw=%.4f target=(%.3f,%.3f) index=%d delta=(%.3f,%.3f).',
+        debug.player_x,
+        debug.player_y,
+        debug.player_yaw,
+        debug.target_x,
+        debug.target_y,
+        debug.target_index,
+        debug.delta_x,
+        debug.delta_y));
+    log_info(string.format(
+        'MapDebug live: runtime=%s center=(%.2f,%.2f) zoom=%.3f scale=(%.3f,%.3f) extent=%s zoneScale=%.1f rotateMap=%s rotateFrame=%s.',
+        tostring(debug.runtime_address or 'none'),
+        debug.center_x,
+        debug.center_y,
+        debug.zoom,
+        debug.scale_x,
+        debug.scale_y,
+        debug.map_extent ~= nil and string.format('%.3f', debug.map_extent) or 'none',
+        debug.zone_scale,
+        tostring(debug.rotate_map),
+        tostring(debug.rotate_frame)));
+    log_info(string.format(
+        'MapDebug pixels: transformed=(%.3f,%.3f) pxPerYalm=(%.3f,%.3f) marker=(%.2f,%.2f).',
+        debug.transformed_x,
+        debug.transformed_y,
+        debug.pixels_per_yalm_x,
+        debug.pixels_per_yalm_y,
+        debug.marker_x,
+        debug.marker_y));
 end
 
 local function handle_command(e)
@@ -3258,6 +3684,9 @@ local function handle_command(e)
     elseif (action == 'status') then
         print_status();
         return;
+    elseif (action == 'mapdebug') then
+        print_minimap_debug();
+        return;
     elseif (action == 'reload') then
         load_config();
         seed_chat_log();
@@ -3323,6 +3752,7 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     update_npc_step_auto_advance();
     update_level_step_auto_advance();
     render_npc_world_marker();
+    render_minimap_destination_marker();
     render_guide_window();
     render_valor_window();
     render_casket_window();

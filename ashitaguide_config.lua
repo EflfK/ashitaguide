@@ -10,6 +10,7 @@ return {
         window_height = 540,
         guide_show_step_list = true,
         guide_map_size = 160,
+        minimap_marker_enabled = true,
         guide_opacity = 92,
         config_visible = true,
         config_window_x = 110,

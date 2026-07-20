@@ -24,6 +24,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - manual `<` and `>` step controls
 - single-step guides omit step numbering, the step list, and advancement controls
 - pure-Lua navigation map showing only the player and step destination
+- optional destination marker over the Ashita Minimap `square-minimal` theme
 - world-space arrow above the current step NPC when rendered
 - optional NPC-target auto-advance for find steps
 - optional job-and-level auto-advance for leveling steps
@@ -79,7 +80,12 @@ tab strip because it can contain multiple active guides; the single-view Valor
 and Casket windows do not render tabs.
 The Guides tab also controls whether the all-steps section is shown at the
 bottom of the normal guide window. Map size is configurable from 120 to 260
-pixels and defaults to 160 pixels.
+pixels and defaults to 160 pixels. **Show destination on Minimap** overlays the
+current step destination on the loaded Ashita Minimap plugin when its active
+theme is `square-minimal`. AshitaGuide reads the base theme configuration from
+`config/minimap/` and the active position, scale, zoom, and rotation directly
+from the loaded plugin; distant destinations are held at the edge of the
+visible square until they enter the map view.
 
 An accepted training regime or `Progress x/y` line opens the Pages of Valor window
 automatically. Completion or cancellation closes it. You can close the window
@@ -167,6 +173,7 @@ return {
     settings = {
         -- Each addon display can use a different background opacity.
         guide_opacity = 92,
+        minimap_marker_enabled = true,
         valor_opacity = 92,
         casket_opacity = 92,
         default_active_guides = { 'my_quest' },
@@ -204,6 +211,14 @@ in the step's destination zone and a usable target position is available. Its
 view continuously adjusts its radius based on distance, smoothly zooming in as
 the player approaches while retaining five yalms of framing space. The active
 map radius is shown next to the map.
+
+With `minimap_marker_enabled = true`, that same destination is also drawn as a
+gold dot over the loaded Ashita Minimap plugin. This overlay currently requires
+the `square-minimal` theme so its clipping boundary matches the displayed map.
+It reads the zone's map scale from the local FFXI map table and does not modify
+Minimap, send commands, or require a custom DLL.
+Use `/agguide mapdebug` to print a bounded coordinate snapshot when diagnosing
+marker alignment.
 
 Any step with `npc` displays a world-space arrow above that NPC while it is
 rendered. Set `advance_on_target = true` on find/select steps to advance once
