@@ -193,7 +193,9 @@ that entity is available in memory, its live position takes precedence over
 the configured coordinates. The map is drawn entirely by the Lua addon and
 does not depend on the Minimap plugin. Navigation is display-only and never
 moves or targets the character. The map section is hidden until the player is
-in the step's destination zone and a usable target position is available.
+in the step's destination zone and a usable target position is available. Its
+view automatically zooms out for distant destinations and zooms in during the
+final approach, down to a five-yalm radius at close range.
 
 Any step with `npc` displays a world-space arrow above that NPC while it is
 rendered. Set `advance_on_target = true` on find/select steps to advance once

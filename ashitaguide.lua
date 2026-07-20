@@ -2552,6 +2552,10 @@ local function navigation_context(step)
     };
 end
 
+local function navigation_world_radius(distance)
+    return math.max(5, distance * 1.15);
+end
+
 local function render_navigation_map(step, navigation)
     if (navigation == nil) then
         return;
@@ -2566,7 +2570,7 @@ local function render_navigation_map(step, navigation)
     local distance = navigation.distance;
     local size = bounded_number(state.guide_map_size[1], 160, 120, 260);
     local padding = 14;
-    local world_radius = math.max(20, distance * 1.15);
+    local world_radius = navigation_world_radius(distance);
     local map_scale = ((size / 2) - padding) / world_radius;
     local cursor_x, cursor_y = imgui.GetCursorScreenPos();
     local center_x = cursor_x + (size / 2);

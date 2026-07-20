@@ -33,6 +33,7 @@ $required = @(
     "guide_show_step_list",
     "guide_map_size",
     "navigation_context",
+    "navigation_world_radius",
     "config_dir_path",
     "bootstrap_persistent_config",
     "settings.lua",
@@ -112,6 +113,10 @@ if ($content -notmatch "guide\.origin ~= 'ai'") {
 
 if ($content -notmatch "local sub_active = truthy\(safe_read\(function \(\) return target:GetIsSubTargetActive\(\); end, false\)\)") {
     throw 'Target selection must normalize AshitaCore numeric boolean values.'
+}
+
+if ($content -notmatch "local function navigation_world_radius\(distance\)\s+return math\.max\(5, distance \* 1\.15\);\s+end") {
+    throw 'Navigation map must zoom continuously with a five-yalm close-range radius.'
 }
 
 Write-Host 'ashitaguide validation passed.'
