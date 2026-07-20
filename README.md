@@ -27,6 +27,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - separate Guides and Valor tabs in Guide Config
 - independent frame visibility settings for the Guides and Valor windows
 - configurable all-steps list in the normal guide window
+- balanced navigation layout with configurable map size
 - Pages of Valor progress seeding from the current character chat log
 - live Pages of Valor updates from incoming chat text and appended log lines
 
@@ -49,7 +50,8 @@ controlled from the Valor tab in Guide Config.
 The Guides tab can hide the normal guide window frame, and the Valor tab can
 hide the dedicated Valor window frame independently.
 The Guides tab also controls whether the all-steps section is shown at the
-bottom of the normal guide window.
+bottom of the normal guide window. Map size is configurable from 120 to 260
+pixels and defaults to 160 pixels.
 
 An accepted training regime or `Progress x/y` line opens the Pages of Valor tab
 automatically. Completion or cancellation closes it. You can close the tab

@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguiide';
 addon.author  = 'EflfK';
-addon.version = '0.8.3';
+addon.version = '0.9.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -59,9 +59,10 @@ local DEFAULT_SETTINGS = {
     window_x = 420,
     window_y = 160,
     window_width = 560,
-    window_height = 620,
+    window_height = 540,
     guide_hide_frame = false,
     guide_show_step_list = true,
+    guide_map_size = 160,
     config_visible = true,
     config_window_x = 110,
     config_window_y = 160,
@@ -95,6 +96,7 @@ local state = {
     valor_show_totals = T{ true },
     guide_hide_frame = T{ false },
     guide_show_step_list = T{ true },
+    guide_map_size = T{ 160 },
     valor_hide_frame = T{ false },
     settings = DEFAULT_SETTINGS,
     config_error = nil,
@@ -226,6 +228,18 @@ local function text_colored_wrapped(color, text)
         return;
     end
     imgui.TextColored(color, tostring(text or ''));
+end
+
+local function centered_text_colored(color, value)
+    local text = clean_message(value);
+    if (type(imgui.GetWindowWidth) == 'function'
+        and type(imgui.CalcTextSize) == 'function'
+        and type(imgui.SetCursorPosX) == 'function') then
+        local width = tonumber(imgui.GetWindowWidth()) or 0;
+        local text_width = tonumber(imgui.CalcTextSize(text)) or 0;
+        imgui.SetCursorPosX(math.max(8, (width - text_width) / 2));
+    end
+    imgui.TextColored(color, text);
 end
 
 local function begin_child(id, size, border)
@@ -427,6 +441,7 @@ local function normalize_settings(source)
         window_height = bounded_number(source.window_height, DEFAULT_SETTINGS.window_height, 360, 1000),
         guide_hide_frame = bounded_boolean(source.guide_hide_frame, DEFAULT_SETTINGS.guide_hide_frame),
         guide_show_step_list = bounded_boolean(source.guide_show_step_list, DEFAULT_SETTINGS.guide_show_step_list),
+        guide_map_size = bounded_number(source.guide_map_size, DEFAULT_SETTINGS.guide_map_size, 120, 260),
         config_visible = bounded_boolean(source.config_visible, DEFAULT_SETTINGS.config_visible),
         config_window_x = bounded_number(source.config_window_x, DEFAULT_SETTINGS.config_window_x, 0, 10000),
         config_window_y = bounded_number(source.config_window_y, DEFAULT_SETTINGS.config_window_y, 0, 10000),
@@ -649,6 +664,7 @@ local function load_config()
     state.valor_show_totals[1] = state.settings.valor_show_totals;
     state.guide_hide_frame[1] = state.settings.guide_hide_frame;
     state.guide_show_step_list[1] = state.settings.guide_show_step_list;
+    state.guide_map_size[1] = state.settings.guide_map_size;
     state.valor_hide_frame[1] = state.settings.valor_hide_frame;
 
     local guides_by_key = {};
@@ -1204,6 +1220,9 @@ local function render_guide_selector()
     imgui.TextColored(COLORS.header, 'Guides');
     imgui.Checkbox('Hide guide frame##ashitaguiide_guide_hide_frame', state.guide_hide_frame);
     imgui.Checkbox('Show step list##ashitaguiide_guide_show_step_list', state.guide_show_step_list);
+    imgui.PushItemWidth(220);
+    imgui.SliderInt('Map size##ashitaguiide_guide_map_size', state.guide_map_size, 120, 260, '%d px');
+    imgui.PopItemWidth();
     render_category_filter();
     imgui.PushItemWidth(220);
     imgui.InputText('Search##ashitaguiide_search', state.search_buffer, 64);
@@ -1284,21 +1303,6 @@ local function render_valor_config()
 end
 
 local function render_step_fields(step)
-    if (step.zone ~= '') then
-        imgui.TextColored(COLORS.muted, 'Zone');
-        imgui.SameLine(88, 4);
-        imgui.Text(step.zone);
-    end
-    if (step.location ~= '') then
-        imgui.TextColored(COLORS.muted, 'Location');
-        imgui.SameLine(88, 4);
-        imgui.Text(step.location);
-    end
-    if (step.npc ~= '') then
-        imgui.TextColored(COLORS.muted, 'NPC');
-        imgui.SameLine(88, 4);
-        imgui.Text(step.npc);
-    end
     if (step.answer ~= '') then
         imgui.TextColored(COLORS.muted, 'Answer');
         imgui.SameLine(88, 4);
@@ -1308,6 +1312,27 @@ local function render_step_fields(step)
         imgui.TextColored(COLORS.muted, 'Note');
         imgui.SameLine(88, 4);
         text_wrapped(step.note);
+    end
+end
+
+local function render_destination_strip(step, navigation)
+    local parts = {};
+    if (step.zone ~= '') then
+        table.insert(parts, step.zone);
+    end
+    if (step.location ~= '') then
+        table.insert(parts, step.location);
+    end
+    if (step.npc ~= '') then
+        table.insert(parts, step.npc);
+    end
+    if (navigation ~= nil) then
+        table.insert(parts, navigation.distance <= 2.5
+            and 'Arrived'
+            or string.format('%.1f yalms', navigation.distance));
+    end
+    if (#parts > 0) then
+        imgui.TextColored(COLORS.muted, table.concat(parts, '  |  '));
     end
 end
 
@@ -1486,42 +1511,61 @@ local function render_npc_world_marker()
     imgui.End();
 end
 
-local function render_navigation_map(step)
+local function navigation_context(step)
     if (step == nil or (step.target_x == nil and step.target_y == nil and step.npc == '')) then
-        return;
+        return nil;
     end
 
     local player = current_navigation_player();
     if (player == nil) then
-        return;
+        return nil;
     end
     if (step.zone ~= '' and lower_string(player.zone) ~= lower_string(step.zone)) then
-        return;
+        return nil;
     end
 
     local live_target = find_navigation_target(player.entity, step.npc);
     local target_x = live_target ~= nil and live_target.x or step.target_x;
     local target_y = live_target ~= nil and live_target.y or step.target_y;
     if (target_x == nil or target_y == nil) then
+        return nil;
+    end
+
+    local delta_x = target_x - player.x;
+    local delta_y = target_y - player.y;
+    return {
+        player = player,
+        live_target = live_target,
+        target_x = target_x,
+        target_y = target_y,
+        delta_x = delta_x,
+        delta_y = delta_y,
+        distance = math.sqrt((delta_x * delta_x) + (delta_y * delta_y)),
+        selected = live_target ~= nil and live_target.index == current_target_index(),
+    };
+end
+
+local function render_navigation_map(step, navigation)
+    if (navigation == nil) then
         return;
     end
 
     imgui.Separator();
-    imgui.TextColored(COLORS.accent, 'Navigation Map');
+    imgui.TextColored(COLORS.accent, 'Navigation');
 
-    local delta_x = target_x - player.x;
-    local delta_y = target_y - player.y;
-    local distance = math.sqrt((delta_x * delta_x) + (delta_y * delta_y));
-
-    local size = 176;
+    local player = navigation.player;
+    local target_x = navigation.target_x;
+    local target_y = navigation.target_y;
+    local distance = navigation.distance;
+    local size = bounded_number(state.guide_map_size[1], 160, 120, 260);
     local padding = 14;
     local world_radius = math.max(20, distance * 1.15);
     local map_scale = ((size / 2) - padding) / world_radius;
     local cursor_x, cursor_y = imgui.GetCursorScreenPos();
     local center_x = cursor_x + (size / 2);
     local center_y = cursor_y + (size / 2);
-    local target_screen_x = center_x + (delta_x * map_scale);
-    local target_screen_y = center_y - (delta_y * map_scale);
+    local target_screen_x = center_x + (navigation.delta_x * map_scale);
+    local target_screen_y = center_y - (navigation.delta_y * map_scale);
     local draw_list = imgui.GetWindowDrawList();
     local background = imgui.GetColorU32({ 0.045, 0.055, 0.060, 0.96 });
     local grid = imgui.GetColorU32({ 0.40, 0.48, 0.50, 0.24 });
@@ -1576,9 +1620,12 @@ local function render_navigation_map(step)
     imgui.TextColored(COLORS.muted, 'Target');
     imgui.Text(step.npc ~= '' and step.npc or 'Destination');
     imgui.Text(distance <= 2.5 and 'Arrived' or string.format('%.1f yalms', distance));
-    imgui.TextColored(COLORS.muted, live_target ~= nil and 'Live NPC position' or 'Configured position');
+    if (step.npc ~= '') then
+        imgui.TextColored(
+            navigation.selected and COLORS.accent or COLORS.muted,
+            navigation.selected and 'Selected: Yes' or 'Selected: No');
+    end
     imgui.TextColored(COLORS.muted, string.format('X %.1f  Y %.1f', target_x, target_y));
-    imgui.TextColored(COLORS.muted, string.format('Map radius %.0f', world_radius));
     imgui.EndGroup();
 end
 
@@ -1613,7 +1660,8 @@ local function render_pov_panel(run)
 end
 
 local function render_step_list(run)
-    local child_open, child_visible = begin_child('##ashitaguiide_step_list_' .. run.key, { 0, 132 }, true);
+    local height = math.min(132, 12 + (#run.guide.steps * 20));
+    local child_open, child_visible = begin_child('##ashitaguiide_step_list_' .. run.key, { 0, height }, true);
     if (child_visible) then
         for index, step in ipairs(run.guide.steps) do
             local prefix = index == run.step_index and '> ' or '  ';
@@ -1638,10 +1686,15 @@ local function render_guide_navigation_row(run)
 
     local child_open, child_visible = begin_child(
         '##ashitaguiide_guide_summary_' .. run.key,
-        { -52, 38 },
+        { -52, 46 },
         false);
-    if (child_visible and run.guide.description ~= '') then
-        text_colored_wrapped(COLORS.muted, run.guide.description);
+    if (child_visible) then
+        local step = run.guide.steps[run.step_index] or run.guide.steps[1];
+        local progress = string.format('STEP %d OF %d', run.step_index, #run.guide.steps);
+        centered_text_colored(COLORS.accent, progress);
+        if (step.title ~= '') then
+            centered_text_colored(COLORS.header, step.title);
+        end
     end
     if (child_open) then
         imgui.EndChild();
@@ -1661,7 +1714,6 @@ local function render_active_guide(run)
 
     local guide = run.guide;
     local step = guide.steps[run.step_index] or guide.steps[1];
-    imgui.TextColored(COLORS.header, guide.name);
 
     if (#guide.steps > 1) then
         render_guide_navigation_row(run);
@@ -1669,16 +1721,15 @@ local function render_active_guide(run)
         text_colored_wrapped(COLORS.muted, guide.description);
     end
 
-    if (#guide.steps > 1) then
-        imgui.Separator();
-        imgui.TextColored(COLORS.accent, string.format('Step %d / %d', run.step_index, #guide.steps));
-    end
-    if (step.title ~= '') then
+    imgui.Separator();
+    if (#guide.steps == 1 and step.title ~= '') then
         imgui.TextColored(COLORS.header, step.title);
     end
     text_wrapped(step.text);
+    local navigation = navigation_context(step);
+    render_destination_strip(step, navigation);
     render_step_fields(step);
-    render_navigation_map(step);
+    render_navigation_map(step, navigation);
 
     if (#guide.steps > 1 and state.guide_show_step_list[1] == true) then
         imgui.Separator();

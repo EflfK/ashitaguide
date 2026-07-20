@@ -28,6 +28,8 @@ $required = @(
     "render_valor_config",
     "guide_hide_frame",
     "guide_show_step_list",
+    "guide_map_size",
+    "navigation_context",
     "valor_hide_frame",
     "guide_is_configurable",
     "BeginTabBar",
