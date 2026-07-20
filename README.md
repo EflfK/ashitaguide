@@ -27,6 +27,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - dedicated Pages of Valor window that appears from chat evidence
 - separate Guides and Valor tabs in Guide Config
 - independent frame visibility settings for the Guides and Valor windows
+- AshitaChat-style transparent layout and compact dark tabs when the guide frame is hidden
 - configurable all-steps list in the normal guide window
 - balanced navigation layout with configurable map size
 - Pages of Valor progress seeding from the current character chat log
@@ -49,7 +50,9 @@ The dedicated window stays compact: it shows only the zone and remaining kill
 counts. Its enabled state, zone display, progress totals, and visibility are
 controlled from the Valor tab in Guide Config.
 The Guides tab can hide the normal guide window frame, and the Valor tab can
-hide the dedicated Valor window frame independently.
+hide the dedicated Valor window frame independently. Frameless windows remove
+their background and border; the normal guide also switches to compact dark
+tabs so its presentation matches AshitaChat's frameless mode.
 The Guides tab also controls whether the all-steps section is shown at the
 bottom of the normal guide window. Map size is configurable from 120 to 260
 pixels and defaults to 160 pixels.

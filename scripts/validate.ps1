@@ -27,6 +27,8 @@ $required = @(
     "AshitaGuideValor",
     "render_valor_config",
     "guide_hide_frame",
+    "frameless_tab",
+    "pop_window_style",
     "guide_show_step_list",
     "guide_map_size",
     "navigation_context",

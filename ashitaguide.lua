@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.10.0';
+addon.version = '0.10.1';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -26,6 +26,9 @@ local IMGUI = {
     col_header = imgui_const('ImGuiCol_Header'),
     col_header_hovered = imgui_const('ImGuiCol_HeaderHovered'),
     col_header_active = imgui_const('ImGuiCol_HeaderActive'),
+    style_window_padding = imgui_const('ImGuiStyleVar_WindowPadding'),
+    style_window_border_size = imgui_const('ImGuiStyleVar_WindowBorderSize'),
+    style_frame_padding = imgui_const('ImGuiStyleVar_FramePadding'),
     cond_first_use = imgui_const('ImGuiCond_FirstUseEver'),
     window_no_collapse = imgui_const('ImGuiWindowFlags_NoCollapse'),
     window_no_title_bar = imgui_const('ImGuiWindowFlags_NoTitleBar'),
@@ -52,6 +55,11 @@ local COLORS = {
     active_hover = { 0.28, 0.50, 0.42, 1.00 },
     selected = { 0.24, 0.36, 0.50, 0.94 },
     selected_hover = { 0.30, 0.44, 0.60, 1.00 },
+    frameless_tab = { 0.015, 0.015, 0.018, 0.86 },
+    frameless_tab_hover = { 0.095, 0.095, 0.105, 0.92 },
+    frameless_tab_active = { 0.165, 0.165, 0.180, 0.98 },
+    frameless_tab_text = { 0.78, 0.78, 0.82, 1.00 },
+    frameless_tab_text_active = { 0.98, 0.98, 1.00, 1.00 },
 };
 
 local DEFAULT_SETTINGS = {
@@ -1975,7 +1983,8 @@ local function render_active_tabs()
     end
 
     local close_keys = {};
-    if (type(imgui.BeginTabBar) == 'function'
+    if (state.guide_hide_frame[1] ~= true
+        and type(imgui.BeginTabBar) == 'function'
         and type(imgui.BeginTabItem) == 'function'
         and type(imgui.EndTabItem) == 'function'
         and type(imgui.EndTabBar) == 'function') then
@@ -2011,18 +2020,30 @@ local function render_active_tabs()
                 imgui.SameLine(0, 3);
             end
             local selected = state.selected_active_key == key;
-            if (selected) then
+            local frameless = state.guide_hide_frame[1] == true;
+            if (frameless) then
+                imgui.PushStyleColor(IMGUI.col_button, selected and COLORS.frameless_tab_active or COLORS.frameless_tab);
+                imgui.PushStyleColor(IMGUI.col_button_hovered, COLORS.frameless_tab_hover);
+                imgui.PushStyleColor(IMGUI.col_button_active, COLORS.frameless_tab_active);
+                imgui.PushStyleColor(IMGUI.col_text, selected and COLORS.frameless_tab_text_active or COLORS.frameless_tab_text);
+            elseif (selected) then
                 imgui.PushStyleColor(IMGUI.col_button, COLORS.selected);
                 imgui.PushStyleColor(IMGUI.col_button_hovered, COLORS.selected_hover);
             end
-            if (imgui.Button(run.guide.name .. '##ashitaguide_tab_button_' .. key, { 132, 22 })) then
+            local label_width = type(imgui.CalcTextSize) == 'function'
+                and tonumber(imgui.CalcTextSize(run.guide.name))
+                or 100;
+            local tab_width = math.max(88, math.min(170, (label_width or 100) + 18));
+            if (imgui.Button(run.guide.name .. '##ashitaguide_tab_button_' .. key, { tab_width, 22 })) then
                 state.selected_active_key = key;
             end
             imgui.SameLine(0, 0);
             if (imgui.Button('x##ashitaguide_tab_close_' .. key, { 22, 22 })) then
                 table.insert(close_keys, key);
             end
-            if (selected) then
+            if (frameless) then
+                imgui.PopStyleColor(4);
+            elseif (selected) then
                 imgui.PopStyleColor(2);
             end
         end
@@ -2034,12 +2055,24 @@ local function render_active_tabs()
     render_active_guide(state.active[state.selected_active_key] or state.active[state.active_order[1]]);
 end
 
-local function push_window_style()
+local function push_window_style(frameless)
     local alpha = (tonumber(state.settings.opacity) or 92) / 100;
-    local bg = { COLORS.panel_bg[1], COLORS.panel_bg[2], COLORS.panel_bg[3], alpha };
+    local bg = frameless
+        and { 0.0, 0.0, 0.0, 0.0 }
+        or { COLORS.panel_bg[1], COLORS.panel_bg[2], COLORS.panel_bg[3], alpha };
+    local child_bg = frameless and { 0.0, 0.0, 0.0, 0.0 } or COLORS.child_bg;
+    local border = frameless and { 0.0, 0.0, 0.0, 0.0 } or COLORS.border;
+    imgui.PushStyleVar(IMGUI.style_window_padding, frameless and { 6, 4 } or { 8, 8 });
+    imgui.PushStyleVar(IMGUI.style_window_border_size, frameless and 0.0 or 1.0);
+    imgui.PushStyleVar(IMGUI.style_frame_padding, frameless and { 5, 2 } or { 4, 3 });
     imgui.PushStyleColor(IMGUI.col_window_bg, bg);
-    imgui.PushStyleColor(IMGUI.col_child_bg, COLORS.child_bg);
-    imgui.PushStyleColor(IMGUI.col_border, COLORS.border);
+    imgui.PushStyleColor(IMGUI.col_child_bg, child_bg);
+    imgui.PushStyleColor(IMGUI.col_border, border);
+end
+
+local function pop_window_style()
+    imgui.PopStyleColor(3);
+    imgui.PopStyleVar(3);
 end
 
 local function capture_window_geometry(x_key, y_key, width_key, height_key, min_width, max_width, min_height, max_height)
@@ -2062,7 +2095,7 @@ local function render_guide_window()
 
     imgui.SetNextWindowPos({ state.settings.window_x, state.settings.window_y }, IMGUI.cond_first_use);
     imgui.SetNextWindowSize({ state.settings.window_width, state.settings.window_height }, IMGUI.cond_first_use);
-    push_window_style();
+    push_window_style(state.guide_hide_frame[1] == true);
     local flags = IMGUI.window_no_collapse;
     if (state.guide_hide_frame[1] == true) then
         flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
@@ -2073,7 +2106,7 @@ local function render_guide_window()
         render_active_tabs();
     end
     imgui.End();
-    imgui.PopStyleColor(3);
+    pop_window_style();
 end
 
 local function render_valor_window()
@@ -2090,7 +2123,7 @@ local function render_valor_window()
     imgui.SetNextWindowSize(
         { state.settings.valor_window_width, state.settings.valor_window_height },
         IMGUI.cond_first_use);
-    push_window_style();
+    push_window_style(state.valor_hide_frame[1] == true);
     local flags = IMGUI.window_no_collapse;
     if (state.valor_hide_frame[1] == true) then
         flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
@@ -2109,7 +2142,7 @@ local function render_valor_window()
         render_pov_panel(state.pov_run);
     end
     imgui.End();
-    imgui.PopStyleColor(3);
+    pop_window_style();
 end
 
 local function render_config_window()
@@ -2123,7 +2156,7 @@ local function render_config_window()
     imgui.SetNextWindowSize(
         { state.settings.config_window_width, state.settings.config_window_height },
         IMGUI.cond_first_use);
-    push_window_style();
+    push_window_style(false);
     local visible = imgui.Begin('Guide Config###AshitaGuideConfig', state.config_visible, IMGUI.window_no_collapse);
     capture_window_geometry(
         'config_window_x',
@@ -2161,7 +2194,7 @@ local function render_config_window()
         end
     end
     imgui.End();
-    imgui.PopStyleColor(3);
+    pop_window_style();
 end
 
 local function args_tail(args, start_index)
