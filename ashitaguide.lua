@@ -225,6 +225,10 @@ local function bounded_boolean(value, default)
     return default;
 end
 
+local function truthy(value)
+    return value == true or value == 1;
+end
+
 local function copy_array(values)
     local output = {};
     if (type(values) ~= 'table') then
@@ -2421,7 +2425,7 @@ local function current_target_index()
     end
     local primary = tonumber(safe_read(function () return target:GetTargetIndex(0); end, 0)) or 0;
     local sub = tonumber(safe_read(function () return target:GetTargetIndex(1); end, 0)) or 0;
-    local sub_active = safe_read(function () return target:GetIsSubTargetActive(); end, false);
+    local sub_active = truthy(safe_read(function () return target:GetIsSubTargetActive(); end, false));
     return sub_active and sub or primary;
 end
 

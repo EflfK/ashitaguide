@@ -63,6 +63,7 @@ $required = @(
     "tab_open",
     "AddTriangleFilled",
     "world_to_screen",
+    "truthy",
     "advance_on_target",
     "target_x",
     "Progress"
@@ -107,6 +108,10 @@ if ($content -notmatch "guide\.origin == 'ai'\) then\s+return delete_ai_guide\(k
 
 if ($content -notmatch "guide\.origin ~= 'ai'") {
     throw 'Temporary AI guides are not separated from the normal guide picker.'
+}
+
+if ($content -notmatch "local sub_active = truthy\(safe_read\(function \(\) return target:GetIsSubTargetActive\(\); end, false\)\)") {
+    throw 'Target selection must normalize AshitaCore numeric boolean values.'
 }
 
 Write-Host 'ashitaguide validation passed.'
