@@ -13,6 +13,9 @@ use the manual controls or satisfy an explicitly configured display condition.
 - persistent guide definitions under `config/addons/ashitaguide/`
 - automatically persisted UI settings and window geometry
 - separate guide runner and guide configuration windows
+- live-polled, AI/MCP-authored temporary guides in the normal guide window
+- reinstall-safe AI guide persistence with delete-on-tab-close lifecycle
+- in-game conversion of AI guides into permanent, reusable normal guides
 - free-form categories with an in-game category filter
 - guide name/key/category search
 - multiple active guides at once
@@ -27,7 +30,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - dedicated Pages of Valor window that appears from chat evidence
 - built-in brown treasure casket code helper
 - dedicated Casket Helper window that appears from live casket chat hints
-- separate Guides, Valor, and Casket tabs in Guide Config
+- separate Guides, AI Guides, Valor, and Casket tabs in Guide Config
 - independent 0-100% background opacity for the Guides, Valor, and Casket windows
 - permanent AshitaChat-style titleless frames, dark borders, and transparent child regions
 - compact AshitaChat-style tabs in the Guides window only
@@ -94,8 +97,61 @@ Edit that persistent copy when adding or changing guides. The addon writes UI
 preferences to `Ashita/config/addons/ashitaguide/settings.lua`, including window
 positions and sizes, visibility, map size, Valor settings,
 Casket settings, per-window background opacity, and active normal guides.
-Replacing or reinstalling the addon directory does not overwrite either
-persistent file.
+Replacing or reinstalling the addon directory does not overwrite any of these
+persistent files.
+
+## AI / MCP Guide Contract
+
+An AI or trusted local MCP client publishes temporary guides by replacing:
+
+```text
+Ashita/config/addons/ashitaguide/ai_guides.lua
+```
+
+The addon checks this file once per second. New and updated entries appear as
+tabs in the existing Guides window without an addon reload. The file accepts
+the same guide and step fields as the normal config:
+
+```lua
+return {
+    guides = {
+        {
+            key = 'ai_current_goal',
+            name = 'Current Goal',
+            description = 'Optional temporary context.',
+            categories = { 'Quest', 'AI' },
+            steps = {
+                {
+                    title = 'Talk to the NPC',
+                    text = 'Speak with Mendi.',
+                    zone = 'Lower Jeuno',
+                    location = 'H-8',
+                    npc = 'Mendi',
+                    target_x = -59.961,
+                    target_y = -75.649,
+                    advance_on_target = false,
+                },
+            },
+        },
+    },
+};
+```
+
+Keys must be stable and unique across bundled, configured, permanent, and AI
+guides. MCP writers should replace the complete file atomically rather than
+append partial Lua. This interface only supplies display data; it does not send
+commands or automate gameplay.
+
+Temporary AI guides survive addon reloads and reinstalls because the file is
+outside the addon directory. Clicking the `x` on an AI guide tab removes that
+guide from `ai_guides.lua` and closes it. Closing a normal guide tab only stops
+that guide, preserving the existing normal-guide behavior.
+
+The **AI Guides** configuration tab lets the player supply or revise the title,
+comma-separated categories used by the normal guide filters, and description.
+**Make Permanent** retains all steps and navigation data, moves the guide to
+`permanent_guides.lua`, and makes it available forever in the normal Guides
+picker. Permanent guides are not deleted when their active tabs are closed.
 
 ## Config Shape
 

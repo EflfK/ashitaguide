@@ -50,6 +50,14 @@ $required = @(
     "casket_parse_message",
     "one%s+of%s+the%s+two%s+digits",
     "guide_is_configurable",
+    "ai_guides.lua",
+    "permanent_guides.lua",
+    "poll_ai_guides_file",
+    "delete_ai_guide",
+    "close_guide_tab",
+    "make_ai_guide_permanent",
+    "render_ai_guide_config",
+    "AI Guides##ashitaguide_config_ai_guides",
     "BeginTabBar",
     "AshitaGuideConfig",
     "tab_open",
@@ -87,6 +95,18 @@ foreach ($needle in $blocked) {
     if ($content -like "*$needle*") {
         throw "Read-only boundary violation candidate: $needle"
     }
+}
+
+if ($content -notmatch "for _, key in ipairs\(close_keys\) do\s+close_guide_tab\(key\)") {
+    throw 'Guide tab close controls do not use the lifecycle-aware close handler.'
+}
+
+if ($content -notmatch "guide\.origin == 'ai'\) then\s+return delete_ai_guide\(key\)") {
+    throw 'AI guide tabs are not wired to persistent deletion.'
+}
+
+if ($content -notmatch "guide\.origin ~= 'ai'") {
+    throw 'Temporary AI guides are not separated from the normal guide picker.'
 }
 
 Write-Host 'ashitaguide validation passed.'

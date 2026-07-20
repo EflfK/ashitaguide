@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.14.0';
+addon.version = '0.15.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -146,6 +146,16 @@ local state = {
     settings_pending_at = 0,
     settings_last_poll = 0,
     settings_save_error = nil,
+    ai_guides = {},
+    permanent_guides = {},
+    ai_selected_key = nil,
+    ai_editor_key = nil,
+    ai_name_buffer = T{ '' },
+    ai_categories_buffer = T{ '' },
+    ai_description_buffer = T{ '' },
+    ai_storage_error = nil,
+    ai_observed_text = nil,
+    ai_last_poll = 0,
 };
 
 local function trim_string(value)
@@ -430,7 +440,7 @@ local function normalize_step(source, index)
     };
 end
 
-local function normalize_guide(source, index)
+local function normalize_guide(source, index, origin)
     source = type(source) == 'table' and source or {};
     local name = trim_string(source.name or source.label);
     if (name == '') then
@@ -455,6 +465,7 @@ local function normalize_guide(source, index)
         description = trim_string(source.description),
         categories = normalize_categories(source.categories),
         steps = steps,
+        origin = origin or 'config',
     };
 
     return guide;
@@ -499,7 +510,7 @@ local function normalize_settings(source)
 end
 
 local function guide_is_configurable(guide)
-    return guide ~= nil and guide.type ~= 'pages_of_valor';
+    return guide ~= nil and guide.type ~= 'pages_of_valor' and guide.origin ~= 'ai';
 end
 
 local function category_catalog(guides)
@@ -1015,6 +1026,16 @@ local function settings_file_path()
     return dir ~= nil and path_join(dir, 'settings.lua') or nil;
 end
 
+local function ai_guides_file_path()
+    local dir = config_dir_path();
+    return dir ~= nil and path_join(dir, 'ai_guides.lua') or nil;
+end
+
+local function permanent_guides_file_path()
+    local dir = config_dir_path();
+    return dir ~= nil and path_join(dir, 'permanent_guides.lua') or nil;
+end
+
 local function file_exists(path)
     if (path == nil or path == '') then
         return false;
@@ -1127,6 +1148,83 @@ local function load_persisted_settings()
     return values, nil;
 end
 
+local function load_persisted_guides(path, label)
+    if (not file_exists(path)) then
+        return {}, nil, '';
+    end
+    local contents = read_text_file(path);
+    local chunk, load_error = loadfile(path);
+    if (chunk == nil) then
+        return {}, string.format('%s could not be loaded: %s', label, tostring(load_error or 'unknown error')), contents;
+    end
+    local ok, values = pcall(chunk);
+    if (not ok or type(values) ~= 'table') then
+        return {}, string.format('%s did not return a table: %s', label, tostring(values or 'unknown error')), contents;
+    end
+    if (type(values.guides) == 'table') then
+        values = values.guides;
+    end
+    return values, nil, contents;
+end
+
+local function lua_quoted(value)
+    return string.format('%q', tostring(value or ''));
+end
+
+local function guide_storage_text(guides)
+    local lines = {
+        '-- Persistent AshitaGuide data. This file survives addon reinstalls.',
+        'return {',
+        '    guides = {',
+    };
+    for _, guide in ipairs(guides or {}) do
+        table.insert(lines, '        {');
+        table.insert(lines, string.format('            key = %s,', lua_quoted(guide.key)));
+        table.insert(lines, string.format('            name = %s,', lua_quoted(guide.name)));
+        table.insert(lines, string.format('            type = %s,', lua_quoted(guide.type)));
+        table.insert(lines, string.format('            description = %s,', lua_quoted(guide.description)));
+        table.insert(lines, '            categories = {');
+        for _, category in ipairs(guide.categories or {}) do
+            table.insert(lines, string.format('                %s,', lua_quoted(category)));
+        end
+        table.insert(lines, '            },');
+        table.insert(lines, '            steps = {');
+        for _, step in ipairs(guide.steps or {}) do
+            table.insert(lines, '                {');
+            table.insert(lines, string.format('                    title = %s,', lua_quoted(step.title)));
+            table.insert(lines, string.format('                    text = %s,', lua_quoted(step.text)));
+            table.insert(lines, string.format('                    zone = %s,', lua_quoted(step.zone)));
+            table.insert(lines, string.format('                    location = %s,', lua_quoted(step.location)));
+            table.insert(lines, string.format('                    npc = %s,', lua_quoted(step.npc)));
+            table.insert(lines, string.format('                    answer = %s,', lua_quoted(step.answer)));
+            table.insert(lines, string.format('                    note = %s,', lua_quoted(step.note)));
+            if (step.target_x ~= nil) then
+                table.insert(lines, string.format('                    target_x = %.6f,', step.target_x));
+            end
+            if (step.target_y ~= nil) then
+                table.insert(lines, string.format('                    target_y = %.6f,', step.target_y));
+            end
+            table.insert(lines, string.format('                    advance_on_target = %s,', step.advance_on_target == true and 'true' or 'false'));
+            table.insert(lines, '                },');
+        end
+        table.insert(lines, '            },');
+        table.insert(lines, '        },');
+    end
+    table.insert(lines, '    },');
+    table.insert(lines, '};');
+    table.insert(lines, '');
+    return table.concat(lines, '\n');
+end
+
+local function save_guide_storage(path, guides)
+    local dir_ok, dir_or_error = ensure_config_dir();
+    if (not dir_ok) then
+        return false, tostring(dir_or_error or 'persistent guide directory is unavailable');
+    end
+    local target = path or path_join(dir_or_error, 'unknown_guides.lua');
+    return write_text_file(target, guide_storage_text(guides));
+end
+
 local function merge_tables(base, overrides)
     local output = {};
     for key, value in pairs(type(base) == 'table' and base or {}) do
@@ -1147,7 +1245,10 @@ local function load_config()
 
     local config, config_error = load_raw_config();
     local persisted_settings, settings_error = load_persisted_settings();
-    state.config_error = config_error or settings_error;
+    local permanent_sources, permanent_error = load_persisted_guides(
+        permanent_guides_file_path(), 'permanent_guides.lua');
+    local ai_sources, ai_error, ai_text = load_persisted_guides(ai_guides_file_path(), 'ai_guides.lua');
+    state.config_error = config_error or settings_error or permanent_error or ai_error;
     state.settings = normalize_settings(merge_tables(config.settings, persisted_settings));
     state.visible[1] = state.settings.visible;
     state.config_visible[1] = state.settings.config_visible;
@@ -1175,7 +1276,7 @@ local function load_config()
     local guides = {};
     if (config.disable_builtins ~= true) then
         for index, source in ipairs(builtin_guides()) do
-            local guide = normalize_guide(source, index);
+            local guide = normalize_guide(source, index, 'builtin');
             guides_by_key[guide.key] = guide;
             table.insert(guides, guide);
         end
@@ -1183,7 +1284,7 @@ local function load_config()
 
     if (type(config.guides) == 'table') then
         for index, source in ipairs(config.guides) do
-            local guide = normalize_guide(source, index + #guides);
+            local guide = normalize_guide(source, index + #guides, 'config');
             if (guides_by_key[guide.key] == nil) then
                 table.insert(guides, guide);
             else
@@ -1198,6 +1299,31 @@ local function load_config()
         end
     end
 
+    local permanent_guides = {};
+    for index, source in ipairs(permanent_sources) do
+        local guide = normalize_guide(source, index + #guides, 'permanent');
+        if (guides_by_key[guide.key] == nil) then
+            guides_by_key[guide.key] = guide;
+            table.insert(guides, guide);
+            table.insert(permanent_guides, guide);
+        end
+    end
+
+    local ai_guides = {};
+    for index, source in ipairs(ai_sources) do
+        local guide = normalize_guide(source, index + #guides, 'ai');
+        if (guides_by_key[guide.key] == nil) then
+            guides_by_key[guide.key] = guide;
+            table.insert(guides, guide);
+            table.insert(ai_guides, guide);
+        end
+    end
+
+    state.permanent_guides = permanent_guides;
+    state.ai_guides = ai_guides;
+    state.ai_storage_error = permanent_error or ai_error;
+    state.ai_observed_text = ai_text or '';
+
     state.guides = guides;
     state.guide_by_key = guides_by_key;
     state.categories = category_catalog(guides);
@@ -1210,6 +1336,9 @@ local function load_config()
         if (guide ~= nil and guide.type ~= 'pages_of_valor') then
             start_guide(guide, previous_active[key]);
         end
+    end
+    for _, guide in ipairs(state.ai_guides) do
+        start_guide(guide, previous_active[guide.key]);
     end
 
     local pov_guide = state.guide_by_key.pages_of_valor;
@@ -1244,6 +1373,12 @@ local function load_config()
     end
     if (filter_exists ~= true) then
         state.category_filter = 'all';
+    end
+
+    if (state.ai_selected_key == nil or state.guide_by_key[state.ai_selected_key] == nil
+        or state.guide_by_key[state.ai_selected_key].origin ~= 'ai') then
+        state.ai_selected_key = state.ai_guides[1] ~= nil and state.ai_guides[1].key or nil;
+        state.ai_editor_key = nil;
     end
 end
 
@@ -1746,6 +1881,135 @@ local function poll_chat_log()
     file:close();
 end
 
+local function poll_ai_guides_file()
+    local now = os.time();
+    if (now - state.ai_last_poll < 1.0) then
+        return;
+    end
+    state.ai_last_poll = now;
+    local path = ai_guides_file_path();
+    local contents = '';
+    if (file_exists(path)) then
+        contents = read_text_file(path) or '';
+    end
+    if (state.ai_observed_text ~= nil and contents ~= state.ai_observed_text) then
+        load_config();
+    end
+end
+
+local function guides_without_key(guides, key)
+    local output = {};
+    for _, guide in ipairs(guides or {}) do
+        if (guide.key ~= key) then
+            table.insert(output, guide);
+        end
+    end
+    return output;
+end
+
+local function delete_ai_guide(key)
+    local guide = state.guide_by_key[key];
+    if (guide == nil or guide.origin ~= 'ai') then
+        stop_guide(key);
+        return true;
+    end
+
+    local remaining = guides_without_key(state.ai_guides, key);
+    local ok, error_message = save_guide_storage(ai_guides_file_path(), remaining);
+    if (not ok) then
+        state.ai_storage_error = tostring(error_message or 'AI guide could not be deleted');
+        log_warn('AI guide delete failed: ' .. state.ai_storage_error);
+        return false;
+    end
+
+    state.ai_storage_error = nil;
+    load_config();
+    return true;
+end
+
+local function close_guide_tab(key)
+    local guide = state.guide_by_key[key];
+    if (guide ~= nil and guide.origin == 'ai') then
+        return delete_ai_guide(key);
+    end
+    stop_guide(key);
+    return true;
+end
+
+local function comma_list(value)
+    local output = {};
+    local seen = {};
+    for part in tostring(value or ''):gmatch('[^,]+') do
+        local label = trim_string(part);
+        local key = label:lower();
+        if (label ~= '' and seen[key] ~= true) then
+            seen[key] = true;
+            table.insert(output, label);
+        end
+    end
+    if (#output == 0) then
+        table.insert(output, 'Uncategorized');
+    end
+    return output;
+end
+
+local function sync_ai_editor(guide)
+    if (guide == nil or guide.origin ~= 'ai') then
+        state.ai_editor_key = nil;
+        state.ai_name_buffer[1] = '';
+        state.ai_categories_buffer[1] = '';
+        state.ai_description_buffer[1] = '';
+        return;
+    end
+    if (state.ai_editor_key == guide.key) then
+        return;
+    end
+    state.ai_editor_key = guide.key;
+    state.ai_name_buffer[1] = guide.name;
+    state.ai_categories_buffer[1] = table.concat(guide.categories or {}, ', ');
+    state.ai_description_buffer[1] = guide.description or '';
+end
+
+local function make_ai_guide_permanent(guide)
+    if (guide == nil or guide.origin ~= 'ai') then
+        return false;
+    end
+    local name = trim_string(state.ai_name_buffer[1]);
+    if (name == '') then
+        state.ai_storage_error = 'A permanent guide needs a title.';
+        return false;
+    end
+
+    local permanent = normalize_guide({
+        key = guide.key,
+        name = name,
+        type = guide.type,
+        description = state.ai_description_buffer[1],
+        categories = comma_list(state.ai_categories_buffer[1]),
+        steps = guide.steps,
+    }, #state.permanent_guides + 1, 'permanent');
+
+    local new_permanent = copy_array(state.permanent_guides);
+    table.insert(new_permanent, permanent);
+    local new_ai = guides_without_key(state.ai_guides, guide.key);
+    local permanent_ok, permanent_error = save_guide_storage(permanent_guides_file_path(), new_permanent);
+    if (not permanent_ok) then
+        state.ai_storage_error = tostring(permanent_error or 'permanent guide could not be saved');
+        return false;
+    end
+    local ai_ok, ai_error = save_guide_storage(ai_guides_file_path(), new_ai);
+    if (not ai_ok) then
+        save_guide_storage(permanent_guides_file_path(), state.permanent_guides);
+        state.ai_storage_error = tostring(ai_error or 'temporary AI guide could not be removed');
+        return false;
+    end
+
+    state.ai_storage_error = nil;
+    state.selected_guide_key = permanent.key;
+    load_config();
+    return true;
+end
+
 local function guide_matches_category(guide)
     if (state.category_filter == 'all') then
         return true;
@@ -1878,6 +2142,74 @@ local function render_guide_selector()
         if (imgui.Button('Start##ashitaguide_start_selected', { 158, 0 })) then
             start_guide(selected);
         end
+    end
+end
+
+local function render_ai_guide_config()
+    imgui.TextColored(COLORS.header, 'AI Guides');
+    text_colored_wrapped(
+        COLORS.muted,
+        'AI-created guides stay open across reloads and reinstalls. Closing an AI guide with its tab x deletes it permanently.');
+
+    if (state.ai_storage_error ~= nil) then
+        text_colored_wrapped(COLORS.warning, 'Storage warning: ' .. state.ai_storage_error);
+    end
+
+    if (#state.ai_guides == 0) then
+        imgui.Separator();
+        imgui.TextColored(COLORS.muted, 'No temporary AI guides are open.');
+        return;
+    end
+
+    local child_open, child_visible = begin_child('##ashitaguide_ai_guides', { 250, 120 }, true);
+    if (child_visible) then
+        for index, guide in ipairs(state.ai_guides) do
+            local selected = state.ai_selected_key == guide.key;
+            local label = string.format('%d. %s##ashitaguide_ai_guide_%s', index, guide.name, guide.key);
+            if (type(imgui.Selectable) == 'function') then
+                if (imgui.Selectable(label, selected)) then
+                    state.ai_selected_key = guide.key;
+                end
+            elseif (imgui.Button((selected and '> ' or '') .. label, { 230, 0 })) then
+                state.ai_selected_key = guide.key;
+            end
+        end
+    end
+    if (child_open) then
+        imgui.EndChild();
+    end
+
+    local selected = state.ai_selected_key ~= nil and state.guide_by_key[state.ai_selected_key] or nil;
+    if (selected == nil or selected.origin ~= 'ai') then
+        state.ai_selected_key = state.ai_guides[1].key;
+        selected = state.ai_guides[1];
+    end
+    sync_ai_editor(selected);
+
+    imgui.Separator();
+    imgui.TextColored(COLORS.accent, 'Make permanent');
+    imgui.PushItemWidth(220);
+    imgui.InputText('Title##ashitaguide_ai_title', state.ai_name_buffer, 128);
+    imgui.InputText('Categories##ashitaguide_ai_categories', state.ai_categories_buffer, 256);
+    if (type(imgui.InputTextMultiline) == 'function') then
+        imgui.InputTextMultiline(
+            'Description##ashitaguide_ai_description',
+            state.ai_description_buffer,
+            1024,
+            { 220, 72 });
+    else
+        imgui.InputText('Description##ashitaguide_ai_description', state.ai_description_buffer, 1024);
+    end
+    imgui.PopItemWidth();
+    text_colored_wrapped(COLORS.muted, 'Separate categories with commas. The AI-created steps and navigation data are retained.');
+
+    if (imgui.Button('Make Permanent##ashitaguide_ai_permanent', { 158, 0 })) then
+        make_ai_guide_permanent(selected);
+    end
+    imgui.SameLine(0, 6);
+    if (imgui.Button('Focus##ashitaguide_ai_focus', { 76, 0 })) then
+        state.selected_active_key = selected.key;
+        state.visible[1] = true;
     end
 end
 
@@ -2444,7 +2776,7 @@ local function render_active_tabs()
         end
     end
     for _, key in ipairs(close_keys) do
-        stop_guide(key);
+        close_guide_tab(key);
     end
     imgui.Separator();
     render_active_guide(state.active[state.selected_active_key] or state.active[state.active_order[1]]);
@@ -2689,6 +3021,10 @@ local function render_config_window()
                     render_guide_selector();
                     imgui.EndTabItem();
                 end
+                if (imgui.BeginTabItem('AI Guides##ashitaguide_config_ai_guides')) then
+                    render_ai_guide_config();
+                    imgui.EndTabItem();
+                end
                 if (imgui.BeginTabItem('Valor##ashitaguide_config_valor')) then
                     render_valor_config();
                     imgui.EndTabItem();
@@ -2701,6 +3037,8 @@ local function render_config_window()
             end
         else
             render_guide_selector();
+            imgui.Separator();
+            render_ai_guide_config();
             imgui.Separator();
             render_valor_config();
             imgui.Separator();
@@ -2882,6 +3220,7 @@ end);
 
 ashita.events.register('d3d_present', 'present_cb', function ()
     poll_chat_log();
+    poll_ai_guides_file();
     update_npc_step_auto_advance();
     render_npc_world_marker();
     render_guide_window();
