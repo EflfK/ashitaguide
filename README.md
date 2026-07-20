@@ -194,8 +194,9 @@ the configured coordinates. The map is drawn entirely by the Lua addon and
 does not depend on the Minimap plugin. Navigation is display-only and never
 moves or targets the character. The map section is hidden until the player is
 in the step's destination zone and a usable target position is available. Its
-view automatically zooms out for distant destinations and zooms in during the
-final approach, down to a five-yalm radius at close range.
+view automatically selects a 5, 10, 20, 40, or larger yalm radius based on
+distance, visibly zooming in as the player approaches. The active map radius is
+shown next to the map.
 
 Any step with `npc` displays a world-space arrow above that NPC while it is
 rendered. Set `advance_on_target = true` on find/select steps to advance once
