@@ -41,6 +41,7 @@ $required = @(
     "casket_enabled",
     "casket_hide_frame",
     "casket_stale_seconds",
+    "background_opacity",
     "process_casket_text",
     "AshitaGuideCasket",
     "render_casket_config",

@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.11.0';
+addon.version = '0.12.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -124,6 +124,7 @@ local state = {
     valor_hide_frame = T{ false },
     casket_hide_frame = T{ false },
     casket_stale_seconds = T{ 210 },
+    background_opacity = T{ 92 },
     settings = DEFAULT_SETTINGS,
     config_error = nil,
     guides = {},
@@ -494,7 +495,7 @@ local function normalize_settings(source)
         casket_window_width = bounded_number(source.casket_window_width, DEFAULT_SETTINGS.casket_window_width, 430, 900),
         casket_window_height = bounded_number(source.casket_window_height, DEFAULT_SETTINGS.casket_window_height, 280, 800),
         casket_stale_seconds = bounded_number(source.casket_stale_seconds, DEFAULT_SETTINGS.casket_stale_seconds, 0, 900),
-        opacity = bounded_number(source.opacity, DEFAULT_SETTINGS.opacity, 20, 100),
+        opacity = bounded_number(source.opacity, DEFAULT_SETTINGS.opacity, 0, 100),
         chat_log_seed_lines = bounded_number(source.chat_log_seed_lines, DEFAULT_SETTINGS.chat_log_seed_lines, 0, 5000),
         poll_chat_log = bounded_boolean(source.poll_chat_log, DEFAULT_SETTINGS.poll_chat_log),
         default_active_guides = copy_array(source.default_active_guides or DEFAULT_SETTINGS.default_active_guides),
@@ -1164,6 +1165,7 @@ local function load_config()
     state.valor_hide_frame[1] = state.settings.valor_hide_frame;
     state.casket_hide_frame[1] = state.settings.casket_hide_frame;
     state.casket_stale_seconds[1] = state.settings.casket_stale_seconds;
+    state.background_opacity[1] = state.settings.opacity;
     state.casket = state.casket or new_casket_state();
     if (state.casket_enabled[1] ~= true) then
         state.casket_visible[1] = false;
@@ -1294,7 +1296,7 @@ local function settings_text()
         string.format('    casket_window_width = %d,', bounded_number(values.casket_window_width, DEFAULT_SETTINGS.casket_window_width, 430, 900)),
         string.format('    casket_window_height = %d,', bounded_number(values.casket_window_height, DEFAULT_SETTINGS.casket_window_height, 280, 800)),
         string.format('    casket_stale_seconds = %d,', bounded_number(state.casket_stale_seconds[1], DEFAULT_SETTINGS.casket_stale_seconds, 0, 900)),
-        string.format('    opacity = %d,', bounded_number(values.opacity, DEFAULT_SETTINGS.opacity, 20, 100)),
+        string.format('    opacity = %d,', bounded_number(state.background_opacity[1], DEFAULT_SETTINGS.opacity, 0, 100)),
         string.format('    chat_log_seed_lines = %d,', bounded_number(values.chat_log_seed_lines, DEFAULT_SETTINGS.chat_log_seed_lines, 0, 5000)),
         string.format('    poll_chat_log = %s,', lua_boolean(values.poll_chat_log)),
         string.format('    default_active_guides = %s,', lua_string_list(state.active_order)),
@@ -1881,6 +1883,19 @@ local function render_guide_selector()
             start_guide(selected);
         end
     end
+end
+
+local function render_appearance_config()
+    imgui.TextColored(COLORS.header, 'Window Appearance');
+    imgui.PushItemWidth(220);
+    imgui.SliderInt(
+        'Background opacity##ashitaguide_background_opacity',
+        state.background_opacity,
+        0,
+        100,
+        '%d%%');
+    imgui.PopItemWidth();
+    imgui.TextColored(COLORS.muted, 'Applies to Guides, Config, Valor, and Casket windows.');
 end
 
 local function render_valor_config()
@@ -2489,11 +2504,13 @@ local function render_active_tabs()
 end
 
 local function push_window_style(frameless)
-    local alpha = (tonumber(state.settings.opacity) or 92) / 100;
+    local alpha = bounded_number(state.background_opacity[1], DEFAULT_SETTINGS.opacity, 0, 100) / 100;
     local bg = frameless
         and { 0.0, 0.0, 0.0, 0.0 }
         or { COLORS.panel_bg[1], COLORS.panel_bg[2], COLORS.panel_bg[3], alpha };
-    local child_bg = frameless and { 0.0, 0.0, 0.0, 0.0 } or COLORS.child_bg;
+    local child_bg = frameless
+        and { 0.0, 0.0, 0.0, 0.0 }
+        or { COLORS.child_bg[1], COLORS.child_bg[2], COLORS.child_bg[3], math.min(COLORS.child_bg[4], alpha) };
     local border = frameless and { 0.0, 0.0, 0.0, 0.0 } or COLORS.border;
     imgui.PushStyleVar(IMGUI.style_window_padding, frameless and { 6, 4 } or { 8, 8 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, frameless and 0.0 or 1.0);
@@ -2723,6 +2740,10 @@ local function render_config_window()
             and type(imgui.EndTabItem) == 'function'
             and type(imgui.EndTabBar) == 'function') then
             if (imgui.BeginTabBar('##ashitaguide_config_tabs')) then
+                if (imgui.BeginTabItem('Appearance##ashitaguide_config_appearance')) then
+                    render_appearance_config();
+                    imgui.EndTabItem();
+                end
                 if (imgui.BeginTabItem('Guides##ashitaguide_config_guides')) then
                     render_guide_selector();
                     imgui.EndTabItem();
@@ -2738,6 +2759,8 @@ local function render_config_window()
                 imgui.EndTabBar();
             end
         else
+            render_appearance_config();
+            imgui.Separator();
             render_guide_selector();
             imgui.Separator();
             render_valor_config();

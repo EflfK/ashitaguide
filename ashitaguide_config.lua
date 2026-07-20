@@ -31,6 +31,7 @@ return {
         casket_window_width = 430,
         casket_window_height = 360,
         casket_stale_seconds = 210,
+        -- Background opacity for all addon windows and child panels (0-100).
         opacity = 92,
         chat_log_seed_lines = 700,
         poll_chat_log = true,
