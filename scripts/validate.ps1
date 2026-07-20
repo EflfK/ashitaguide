@@ -1,8 +1,8 @@
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
-$addon = Join-Path $root 'ashitaguiide.lua'
-$config = Join-Path $root 'ashitaguiide_config.lua'
+$addon = Join-Path $root 'ashitaguide.lua'
+$config = Join-Path $root 'ashitaguide_config.lua'
 
 if (-not (Test-Path -LiteralPath $addon)) {
     throw "Missing addon file: $addon"
@@ -15,7 +15,7 @@ if (-not (Test-Path -LiteralPath $config)) {
 $content = Get-Content -LiteralPath $addon -Raw
 
 $required = @(
-    "addon.name    = 'ashitaguiide'",
+    "addon.name    = 'ashitaguide'",
     "ashita.events.register('d3d_present'",
     "ashita.events.register('command'",
     "ashita.events.register('text_in'",
@@ -24,7 +24,7 @@ $required = @(
     "capture_pov_transcript",
     "extract_designated_progress",
     "active_regime",
-    "AshitaGuiideValor",
+    "AshitaGuideValor",
     "render_valor_config",
     "guide_hide_frame",
     "guide_show_step_list",
@@ -33,7 +33,7 @@ $required = @(
     "valor_hide_frame",
     "guide_is_configurable",
     "BeginTabBar",
-    "AshitaGuiideConfig",
+    "AshitaGuideConfig",
     "tab_open",
     "AddTriangleFilled",
     "world_to_screen",
@@ -71,4 +71,4 @@ foreach ($needle in $blocked) {
     }
 }
 
-Write-Host 'ashitaguiide validation passed.'
+Write-Host 'ashitaguide validation passed.'

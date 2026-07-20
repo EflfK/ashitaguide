@@ -1,4 +1,4 @@
-# ashitaguiide
+# ashitaguide
 
 Experimental Ashita v4 guide helper for manual, configuration-driven quest
 walkthroughs.
@@ -10,7 +10,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 
 ## Current Features
 
-- guide definitions in `ashitaguiide_config.lua`
+- guide definitions in `ashitaguide_config.lua`
 - separate guide runner and guide configuration windows
 - free-form categories with an in-game category filter
 - guide name/key/category search
@@ -118,7 +118,7 @@ so keeping the NPC selected does not skip later instructions.
 /agguide status
 ```
 
-`/ashitaguiide` is also accepted.
+`/ashitaguide` is also accepted.
 
 ## Testing
 
@@ -134,9 +134,9 @@ If PowerShell blocks local scripts:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate.ps1
 ```
 
-For an in-game test, copy the `ashitaguiide` folder into the Ashita addons
+For an in-game test, copy the `ashitaguide` folder into the Ashita addons
 folder and load it:
 
 ```text
-/addon load ashitaguiide
+/addon load ashitaguide
 ```

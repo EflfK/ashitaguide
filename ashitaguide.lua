@@ -1,4 +1,4 @@
-addon.name    = 'ashitaguiide';
+addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
 addon.version = '0.9.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
@@ -84,7 +84,7 @@ local DEFAULT_SETTINGS = {
 
 local commands = {
     ['/agguide'] = true,
-    ['/ashitaguiide'] = true,
+    ['/ashitaguide'] = true,
 };
 
 local state = {
@@ -629,7 +629,7 @@ local function previous_step(run)
 end
 
 local function config_file_path()
-    return path_join(addon.path or '', 'ashitaguiide_config.lua');
+    return path_join(addon.path or '', 'ashitaguide_config.lua');
 end
 
 local function load_raw_config()
@@ -1192,7 +1192,7 @@ end
 local function render_category_filter()
     if (type(imgui.BeginCombo) == 'function' and type(imgui.Selectable) == 'function') then
         imgui.PushItemWidth(220);
-        if (imgui.BeginCombo('Category##ashitaguiide_category', category_label(state.category_filter))) then
+        if (imgui.BeginCombo('Category##ashitaguide_category', category_label(state.category_filter))) then
             for _, category in ipairs(state.categories) do
                 if (imgui.Selectable(category.label, state.category_filter == category.key)) then
                     state.category_filter = category.key;
@@ -1210,7 +1210,7 @@ local function render_category_filter()
             imgui.SameLine(0, 4);
         end
         local selected = state.category_filter == category.key;
-        if (imgui.Button((selected and '* ' or '') .. category.label .. '##ashitaguiide_category_' .. category.key)) then
+        if (imgui.Button((selected and '* ' or '') .. category.label .. '##ashitaguide_category_' .. category.key)) then
             state.category_filter = category.key;
         end
     end
@@ -1218,17 +1218,17 @@ end
 
 local function render_guide_selector()
     imgui.TextColored(COLORS.header, 'Guides');
-    imgui.Checkbox('Hide guide frame##ashitaguiide_guide_hide_frame', state.guide_hide_frame);
-    imgui.Checkbox('Show step list##ashitaguiide_guide_show_step_list', state.guide_show_step_list);
+    imgui.Checkbox('Hide guide frame##ashitaguide_guide_hide_frame', state.guide_hide_frame);
+    imgui.Checkbox('Show step list##ashitaguide_guide_show_step_list', state.guide_show_step_list);
     imgui.PushItemWidth(220);
-    imgui.SliderInt('Map size##ashitaguiide_guide_map_size', state.guide_map_size, 120, 260, '%d px');
+    imgui.SliderInt('Map size##ashitaguide_guide_map_size', state.guide_map_size, 120, 260, '%d px');
     imgui.PopItemWidth();
     render_category_filter();
     imgui.PushItemWidth(220);
-    imgui.InputText('Search##ashitaguiide_search', state.search_buffer, 64);
+    imgui.InputText('Search##ashitaguide_search', state.search_buffer, 64);
     imgui.PopItemWidth();
 
-    local child_open, child_visible = begin_child('##ashitaguiide_guides', { 250, 250 }, true);
+    local child_open, child_visible = begin_child('##ashitaguide_guides', { 250, 250 }, true);
     if (child_visible) then
         local visible_index = 0;
         for _, guide in ipairs(state.guides) do
@@ -1237,7 +1237,7 @@ local function render_guide_selector()
                 and guide_matches_search(guide)) then
                 visible_index = visible_index + 1;
                 local selected = state.selected_guide_key == guide.key;
-                local label = string.format('%d. %s##ashitaguiide_guide_%s', visible_index, guide.name, guide.key);
+                local label = string.format('%d. %s##ashitaguide_guide_%s', visible_index, guide.name, guide.key);
                 if (type(imgui.Selectable) == 'function') then
                     if (imgui.Selectable(label, selected)) then
                         state.selected_guide_key = guide.key;
@@ -1268,15 +1268,15 @@ local function render_guide_selector()
     end
 
     if (state.active[selected.key] ~= nil) then
-        if (imgui.Button('Stop##ashitaguiide_stop_selected', { 76, 0 })) then
+        if (imgui.Button('Stop##ashitaguide_stop_selected', { 76, 0 })) then
             stop_guide(selected.key);
         end
         imgui.SameLine(0, 6);
-        if (imgui.Button('Focus##ashitaguiide_focus_selected', { 76, 0 })) then
+        if (imgui.Button('Focus##ashitaguide_focus_selected', { 76, 0 })) then
             state.selected_active_key = selected.key;
         end
     else
-        if (imgui.Button('Start##ashitaguiide_start_selected', { 158, 0 })) then
+        if (imgui.Button('Start##ashitaguide_start_selected', { 158, 0 })) then
             start_guide(selected);
         end
     end
@@ -1284,7 +1284,7 @@ end
 
 local function render_valor_config()
     imgui.TextColored(COLORS.header, 'Pages of Valor');
-    local enabled_changed = imgui.Checkbox('Enabled##ashitaguiide_valor_enabled', state.valor_enabled);
+    local enabled_changed = imgui.Checkbox('Enabled##ashitaguide_valor_enabled', state.valor_enabled);
     if (enabled_changed) then
         if (state.valor_enabled[1] == true and state.pov_active) then
             state.valor_visible[1] = true;
@@ -1292,11 +1292,11 @@ local function render_valor_config()
             state.valor_visible[1] = false;
         end
     end
-    imgui.Checkbox('Show zone##ashitaguiide_valor_zone', state.valor_show_zone);
-    imgui.Checkbox('Show progress totals##ashitaguiide_valor_totals', state.valor_show_totals);
-    imgui.Checkbox('Hide Valor frame##ashitaguiide_valor_hide_frame', state.valor_hide_frame);
+    imgui.Checkbox('Show zone##ashitaguide_valor_zone', state.valor_show_zone);
+    imgui.Checkbox('Show progress totals##ashitaguide_valor_totals', state.valor_show_totals);
+    imgui.Checkbox('Hide Valor frame##ashitaguide_valor_hide_frame', state.valor_hide_frame);
     if (state.pov_active) then
-        imgui.Checkbox('Window visible##ashitaguiide_valor_visible', state.valor_visible);
+        imgui.Checkbox('Window visible##ashitaguide_valor_visible', state.valor_visible);
     else
         imgui.TextColored(COLORS.muted, 'Status: inactive');
     end
@@ -1493,7 +1493,7 @@ local function render_npc_world_marker()
     if (type(imgui.SetNextWindowBgAlpha) == 'function') then
         imgui.SetNextWindowBgAlpha(0.0);
     end
-    if (imgui.Begin('##ashitaguiide_npc_world_marker', true, flags)) then
+    if (imgui.Begin('##ashitaguide_npc_world_marker', true, flags)) then
         local draw_list = imgui.GetWindowDrawList();
         local shadow = imgui.GetColorU32({ 0.02, 0.02, 0.02, 0.78 });
         local color = imgui.GetColorU32(COLORS.header);
@@ -1661,7 +1661,7 @@ end
 
 local function render_step_list(run)
     local height = math.min(132, 12 + (#run.guide.steps * 20));
-    local child_open, child_visible = begin_child('##ashitaguiide_step_list_' .. run.key, { 0, height }, true);
+    local child_open, child_visible = begin_child('##ashitaguide_step_list_' .. run.key, { 0, height }, true);
     if (child_visible) then
         for index, step in ipairs(run.guide.steps) do
             local prefix = index == run.step_index and '> ' or '  ';
@@ -1679,13 +1679,13 @@ local function render_step_list(run)
 end
 
 local function render_guide_navigation_row(run)
-    if (imgui.Button('<##ashitaguiide_back_' .. run.key, { 36, 0 })) then
+    if (imgui.Button('<##ashitaguide_back_' .. run.key, { 36, 0 })) then
         previous_step(run);
     end
     imgui.SameLine(0, 8);
 
     local child_open, child_visible = begin_child(
-        '##ashitaguiide_guide_summary_' .. run.key,
+        '##ashitaguide_guide_summary_' .. run.key,
         { -52, 46 },
         false);
     if (child_visible) then
@@ -1701,7 +1701,7 @@ local function render_guide_navigation_row(run)
     end
 
     imgui.SameLine(0, 8);
-    if (imgui.Button('>##ashitaguiide_next_' .. run.key, { 36, 0 })) then
+    if (imgui.Button('>##ashitaguide_next_' .. run.key, { 36, 0 })) then
         next_step(run);
     end
 end
@@ -1740,7 +1740,7 @@ end
 local function render_active_tabs()
     if (#state.active_order == 0) then
         imgui.TextColored(COLORS.muted, 'No active guides. Open Guide Config to start one.');
-        if (imgui.Button('Open Guide Config##ashitaguiide_open_config', { 150, 0 })) then
+        if (imgui.Button('Open Guide Config##ashitaguide_open_config', { 150, 0 })) then
             state.config_visible[1] = true;
         end
         return;
@@ -1751,12 +1751,12 @@ local function render_active_tabs()
         and type(imgui.BeginTabItem) == 'function'
         and type(imgui.EndTabItem) == 'function'
         and type(imgui.EndTabBar) == 'function') then
-        if (imgui.BeginTabBar('##ashitaguiide_active_tabs', IMGUI.tabbar_no_close)) then
+        if (imgui.BeginTabBar('##ashitaguide_active_tabs', IMGUI.tabbar_no_close)) then
             for _, key in ipairs(state.active_order) do
                 local run = state.active[key];
                 if (run ~= nil) then
                     local visible = imgui.BeginTabItem(
-                        run.guide.name .. '##ashitaguiide_tab_' .. key,
+                        run.guide.name .. '##ashitaguide_tab_' .. key,
                         run.tab_open);
                     if (visible) then
                         state.selected_active_key = key;
@@ -1787,11 +1787,11 @@ local function render_active_tabs()
                 imgui.PushStyleColor(IMGUI.col_button, COLORS.selected);
                 imgui.PushStyleColor(IMGUI.col_button_hovered, COLORS.selected_hover);
             end
-            if (imgui.Button(run.guide.name .. '##ashitaguiide_tab_button_' .. key, { 132, 22 })) then
+            if (imgui.Button(run.guide.name .. '##ashitaguide_tab_button_' .. key, { 132, 22 })) then
                 state.selected_active_key = key;
             end
             imgui.SameLine(0, 0);
-            if (imgui.Button('x##ashitaguiide_tab_close_' .. key, { 22, 22 })) then
+            if (imgui.Button('x##ashitaguide_tab_close_' .. key, { 22, 22 })) then
                 table.insert(close_keys, key);
             end
             if (selected) then
@@ -1826,7 +1826,7 @@ local function render_guide_window()
     if (state.guide_hide_frame[1] == true) then
         flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
     end
-    if (imgui.Begin(string.format('Guides v%s###AshitaGuiideGuides', addon.version), state.visible, flags)) then
+    if (imgui.Begin(string.format('Guides v%s###AshitaGuideGuides', addon.version), state.visible, flags)) then
         render_active_tabs();
     end
     imgui.End();
@@ -1852,7 +1852,7 @@ local function render_valor_window()
     if (state.valor_hide_frame[1] == true) then
         flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
     end
-    if (imgui.Begin('Pages of Valor###AshitaGuiideValor', state.valor_visible, flags)) then
+    if (imgui.Begin('Pages of Valor###AshitaGuideValor', state.valor_visible, flags)) then
         render_pov_panel(state.pov_run);
     end
     imgui.End();
@@ -1871,7 +1871,7 @@ local function render_config_window()
         { state.settings.config_window_width, state.settings.config_window_height },
         IMGUI.cond_first_use);
     push_window_style();
-    if (imgui.Begin('Guide Config###AshitaGuiideConfig', state.config_visible, IMGUI.window_no_collapse)) then
+    if (imgui.Begin('Guide Config###AshitaGuideConfig', state.config_visible, IMGUI.window_no_collapse)) then
         if (state.config_error ~= nil) then
             text_colored_wrapped(COLORS.warning, 'Config warning: ' .. state.config_error);
             imgui.Separator();
@@ -1880,12 +1880,12 @@ local function render_config_window()
             and type(imgui.BeginTabItem) == 'function'
             and type(imgui.EndTabItem) == 'function'
             and type(imgui.EndTabBar) == 'function') then
-            if (imgui.BeginTabBar('##ashitaguiide_config_tabs')) then
-                if (imgui.BeginTabItem('Guides##ashitaguiide_config_guides')) then
+            if (imgui.BeginTabBar('##ashitaguide_config_tabs')) then
+                if (imgui.BeginTabItem('Guides##ashitaguide_config_guides')) then
                     render_guide_selector();
                     imgui.EndTabItem();
                 end
-                if (imgui.BeginTabItem('Valor##ashitaguiide_config_valor')) then
+                if (imgui.BeginTabItem('Valor##ashitaguide_config_valor')) then
                     render_valor_config();
                     imgui.EndTabItem();
                 end
@@ -2014,7 +2014,7 @@ local function handle_command(e)
     elseif (action == 'reload') then
         load_config();
         seed_chat_log();
-        log_info('Reloaded ashitaguiide_config.lua.');
+        log_info('Reloaded ashitaguide_config.lua.');
         if (state.config_error ~= nil) then
             log_warn('Config warning: ' .. state.config_error);
         end
