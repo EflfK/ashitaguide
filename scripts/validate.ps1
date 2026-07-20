@@ -115,11 +115,11 @@ if ($content -notmatch "local sub_active = truthy\(safe_read\(function \(\) retu
     throw 'Target selection must normalize AshitaCore numeric boolean values.'
 }
 
-if ($content -notmatch "local zoom_radii = \{ 5, 10, 20, 40, 80, 160, 320, 640, 1280 \}") {
-    throw 'Navigation map must use visible stepped zoom radii.'
+if ($content -notmatch "local function navigation_world_radius\(distance\)\s+return math\.max\(5, distance \+ 5\);\s+end") {
+    throw 'Navigation map must zoom smoothly with a five-yalm framing margin.'
 }
 
-if ($content -notmatch "Map radius: %.0f yalms") {
+if ($content -notmatch "Map radius: %.1f yalms") {
     throw 'Navigation map must display its active zoom radius.'
 }
 

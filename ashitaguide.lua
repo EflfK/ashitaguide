@@ -2553,14 +2553,7 @@ local function navigation_context(step)
 end
 
 local function navigation_world_radius(distance)
-    local required_radius = math.max(0, distance) * 1.25;
-    local zoom_radii = { 5, 10, 20, 40, 80, 160, 320, 640, 1280 };
-    for _, radius in ipairs(zoom_radii) do
-        if (required_radius <= radius) then
-            return radius;
-        end
-    end
-    return required_radius;
+    return math.max(5, distance + 5);
 end
 
 local function render_navigation_map(step, navigation)
@@ -2638,7 +2631,7 @@ local function render_navigation_map(step, navigation)
     imgui.TextColored(COLORS.muted, 'Target');
     imgui.Text(step.npc ~= '' and step.npc or 'Destination');
     imgui.Text(distance <= 2.5 and 'Arrived' or string.format('%.1f yalms', distance));
-    imgui.TextColored(COLORS.muted, string.format('Map radius: %.0f yalms', world_radius));
+    imgui.TextColored(COLORS.muted, string.format('Map radius: %.1f yalms', world_radius));
     if (step.npc ~= '') then
         imgui.TextColored(
             navigation.selected and COLORS.accent or COLORS.muted,
