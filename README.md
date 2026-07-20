@@ -28,7 +28,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - built-in brown treasure casket code helper
 - dedicated Casket Helper window that appears from live casket chat hints
 - separate Guides, Valor, and Casket tabs in Guide Config
-- configurable 0-100% background opacity shared by every addon window
+- independent 0-100% background opacity for the Guides, Valor, and Casket windows
 - independent frame visibility settings for the Guides, Valor, and Casket windows
 - AshitaChat-style transparent layout and compact dark tabs when the guide frame is hidden
 - configurable all-steps list in the normal guide window
@@ -93,7 +93,7 @@ Ashita/config/addons/ashitaguide/ashitaguide_config.lua
 Edit that persistent copy when adding or changing guides. The addon writes UI
 preferences to `Ashita/config/addons/ashitaguide/settings.lua`, including window
 positions and sizes, visibility, frame settings, map size, Valor settings,
-Casket settings, shared background opacity, and active normal guides. Replacing
+Casket settings, per-window background opacity, and active normal guides. Replacing
 or reinstalling the addon directory does not overwrite either persistent file.
 
 ## Config Shape
@@ -101,8 +101,10 @@ or reinstalling the addon directory does not overwrite either persistent file.
 ```lua
 return {
     settings = {
-        -- 0 is fully transparent; 100 is fully opaque.
-        opacity = 92,
+        -- Each addon display can use a different background opacity.
+        guide_opacity = 92,
+        valor_opacity = 92,
+        casket_opacity = 92,
         default_active_guides = { 'my_quest' },
     },
     guides = {

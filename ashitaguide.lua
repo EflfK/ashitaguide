@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.12.0';
+addon.version = '0.13.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -78,6 +78,7 @@ local DEFAULT_SETTINGS = {
     guide_hide_frame = false,
     guide_show_step_list = true,
     guide_map_size = 160,
+    guide_opacity = 92,
     config_visible = true,
     config_window_x = 110,
     config_window_y = 160,
@@ -87,18 +88,19 @@ local DEFAULT_SETTINGS = {
     valor_show_zone = true,
     valor_show_totals = true,
     valor_hide_frame = false,
+    valor_opacity = 92,
     valor_window_x = 990,
     valor_window_y = 160,
     valor_window_width = 300,
     valor_window_height = 110,
     casket_enabled = true,
     casket_hide_frame = false,
+    casket_opacity = 92,
     casket_window_x = 990,
     casket_window_y = 290,
     casket_window_width = 430,
     casket_window_height = 360,
     casket_stale_seconds = 210,
-    opacity = 92,
     chat_log_seed_lines = 700,
     poll_chat_log = true,
     default_active_guides = {},
@@ -121,10 +123,12 @@ local state = {
     guide_hide_frame = T{ false },
     guide_show_step_list = T{ true },
     guide_map_size = T{ 160 },
+    guide_opacity = T{ 92 },
     valor_hide_frame = T{ false },
+    valor_opacity = T{ 92 },
     casket_hide_frame = T{ false },
+    casket_opacity = T{ 92 },
     casket_stale_seconds = T{ 210 },
-    background_opacity = T{ 92 },
     settings = DEFAULT_SETTINGS,
     config_error = nil,
     guides = {},
@@ -466,6 +470,7 @@ end
 
 local function normalize_settings(source)
     source = type(source) == 'table' and source or {};
+    local legacy_opacity = bounded_number(source.opacity, DEFAULT_SETTINGS.guide_opacity, 0, 100);
     return {
         visible = bounded_boolean(source.visible, DEFAULT_SETTINGS.visible),
         window_x = bounded_number(source.window_x, DEFAULT_SETTINGS.window_x, 0, 10000),
@@ -475,6 +480,7 @@ local function normalize_settings(source)
         guide_hide_frame = bounded_boolean(source.guide_hide_frame, DEFAULT_SETTINGS.guide_hide_frame),
         guide_show_step_list = bounded_boolean(source.guide_show_step_list, DEFAULT_SETTINGS.guide_show_step_list),
         guide_map_size = bounded_number(source.guide_map_size, DEFAULT_SETTINGS.guide_map_size, 120, 260),
+        guide_opacity = bounded_number(source.guide_opacity, legacy_opacity, 0, 100),
         config_visible = bounded_boolean(source.config_visible, DEFAULT_SETTINGS.config_visible),
         config_window_x = bounded_number(source.config_window_x, DEFAULT_SETTINGS.config_window_x, 0, 10000),
         config_window_y = bounded_number(source.config_window_y, DEFAULT_SETTINGS.config_window_y, 0, 10000),
@@ -484,18 +490,19 @@ local function normalize_settings(source)
         valor_show_zone = bounded_boolean(source.valor_show_zone, DEFAULT_SETTINGS.valor_show_zone),
         valor_show_totals = bounded_boolean(source.valor_show_totals, DEFAULT_SETTINGS.valor_show_totals),
         valor_hide_frame = bounded_boolean(source.valor_hide_frame, DEFAULT_SETTINGS.valor_hide_frame),
+        valor_opacity = bounded_number(source.valor_opacity, legacy_opacity, 0, 100),
         valor_window_x = bounded_number(source.valor_window_x, DEFAULT_SETTINGS.valor_window_x, 0, 10000),
         valor_window_y = bounded_number(source.valor_window_y, DEFAULT_SETTINGS.valor_window_y, 0, 10000),
         valor_window_width = bounded_number(source.valor_window_width, DEFAULT_SETTINGS.valor_window_width, 220, 600),
         valor_window_height = bounded_number(source.valor_window_height, DEFAULT_SETTINGS.valor_window_height, 80, 400),
         casket_enabled = bounded_boolean(source.casket_enabled, DEFAULT_SETTINGS.casket_enabled),
         casket_hide_frame = bounded_boolean(source.casket_hide_frame, DEFAULT_SETTINGS.casket_hide_frame),
+        casket_opacity = bounded_number(source.casket_opacity, legacy_opacity, 0, 100),
         casket_window_x = bounded_number(source.casket_window_x, DEFAULT_SETTINGS.casket_window_x, 0, 10000),
         casket_window_y = bounded_number(source.casket_window_y, DEFAULT_SETTINGS.casket_window_y, 0, 10000),
         casket_window_width = bounded_number(source.casket_window_width, DEFAULT_SETTINGS.casket_window_width, 430, 900),
         casket_window_height = bounded_number(source.casket_window_height, DEFAULT_SETTINGS.casket_window_height, 280, 800),
         casket_stale_seconds = bounded_number(source.casket_stale_seconds, DEFAULT_SETTINGS.casket_stale_seconds, 0, 900),
-        opacity = bounded_number(source.opacity, DEFAULT_SETTINGS.opacity, 0, 100),
         chat_log_seed_lines = bounded_number(source.chat_log_seed_lines, DEFAULT_SETTINGS.chat_log_seed_lines, 0, 5000),
         poll_chat_log = bounded_boolean(source.poll_chat_log, DEFAULT_SETTINGS.poll_chat_log),
         default_active_guides = copy_array(source.default_active_guides or DEFAULT_SETTINGS.default_active_guides),
@@ -1162,10 +1169,12 @@ local function load_config()
     state.guide_hide_frame[1] = state.settings.guide_hide_frame;
     state.guide_show_step_list[1] = state.settings.guide_show_step_list;
     state.guide_map_size[1] = state.settings.guide_map_size;
+    state.guide_opacity[1] = state.settings.guide_opacity;
     state.valor_hide_frame[1] = state.settings.valor_hide_frame;
+    state.valor_opacity[1] = state.settings.valor_opacity;
     state.casket_hide_frame[1] = state.settings.casket_hide_frame;
+    state.casket_opacity[1] = state.settings.casket_opacity;
     state.casket_stale_seconds[1] = state.settings.casket_stale_seconds;
-    state.background_opacity[1] = state.settings.opacity;
     state.casket = state.casket or new_casket_state();
     if (state.casket_enabled[1] ~= true) then
         state.casket_visible[1] = false;
@@ -1276,6 +1285,7 @@ local function settings_text()
         string.format('    guide_hide_frame = %s,', lua_boolean(state.guide_hide_frame[1])),
         string.format('    guide_show_step_list = %s,', lua_boolean(state.guide_show_step_list[1])),
         string.format('    guide_map_size = %d,', bounded_number(state.guide_map_size[1], DEFAULT_SETTINGS.guide_map_size, 120, 260)),
+        string.format('    guide_opacity = %d,', bounded_number(state.guide_opacity[1], DEFAULT_SETTINGS.guide_opacity, 0, 100)),
         string.format('    config_visible = %s,', lua_boolean(state.config_visible[1])),
         string.format('    config_window_x = %d,', bounded_number(values.config_window_x, DEFAULT_SETTINGS.config_window_x, 0, 10000)),
         string.format('    config_window_y = %d,', bounded_number(values.config_window_y, DEFAULT_SETTINGS.config_window_y, 0, 10000)),
@@ -1285,18 +1295,19 @@ local function settings_text()
         string.format('    valor_show_zone = %s,', lua_boolean(state.valor_show_zone[1])),
         string.format('    valor_show_totals = %s,', lua_boolean(state.valor_show_totals[1])),
         string.format('    valor_hide_frame = %s,', lua_boolean(state.valor_hide_frame[1])),
+        string.format('    valor_opacity = %d,', bounded_number(state.valor_opacity[1], DEFAULT_SETTINGS.valor_opacity, 0, 100)),
         string.format('    valor_window_x = %d,', bounded_number(values.valor_window_x, DEFAULT_SETTINGS.valor_window_x, 0, 10000)),
         string.format('    valor_window_y = %d,', bounded_number(values.valor_window_y, DEFAULT_SETTINGS.valor_window_y, 0, 10000)),
         string.format('    valor_window_width = %d,', bounded_number(values.valor_window_width, DEFAULT_SETTINGS.valor_window_width, 220, 600)),
         string.format('    valor_window_height = %d,', bounded_number(values.valor_window_height, DEFAULT_SETTINGS.valor_window_height, 80, 400)),
         string.format('    casket_enabled = %s,', lua_boolean(state.casket_enabled[1])),
         string.format('    casket_hide_frame = %s,', lua_boolean(state.casket_hide_frame[1])),
+        string.format('    casket_opacity = %d,', bounded_number(state.casket_opacity[1], DEFAULT_SETTINGS.casket_opacity, 0, 100)),
         string.format('    casket_window_x = %d,', bounded_number(values.casket_window_x, DEFAULT_SETTINGS.casket_window_x, 0, 10000)),
         string.format('    casket_window_y = %d,', bounded_number(values.casket_window_y, DEFAULT_SETTINGS.casket_window_y, 0, 10000)),
         string.format('    casket_window_width = %d,', bounded_number(values.casket_window_width, DEFAULT_SETTINGS.casket_window_width, 430, 900)),
         string.format('    casket_window_height = %d,', bounded_number(values.casket_window_height, DEFAULT_SETTINGS.casket_window_height, 280, 800)),
         string.format('    casket_stale_seconds = %d,', bounded_number(state.casket_stale_seconds[1], DEFAULT_SETTINGS.casket_stale_seconds, 0, 900)),
-        string.format('    opacity = %d,', bounded_number(state.background_opacity[1], DEFAULT_SETTINGS.opacity, 0, 100)),
         string.format('    chat_log_seed_lines = %d,', bounded_number(values.chat_log_seed_lines, DEFAULT_SETTINGS.chat_log_seed_lines, 0, 5000)),
         string.format('    poll_chat_log = %s,', lua_boolean(values.poll_chat_log)),
         string.format('    default_active_guides = %s,', lua_string_list(state.active_order)),
@@ -1822,6 +1833,9 @@ end
 local function render_guide_selector()
     imgui.TextColored(COLORS.header, 'Guides');
     imgui.Checkbox('Hide guide frame##ashitaguide_guide_hide_frame', state.guide_hide_frame);
+    imgui.PushItemWidth(220);
+    imgui.SliderInt('Background opacity##ashitaguide_guide_opacity', state.guide_opacity, 0, 100, '%d%%');
+    imgui.PopItemWidth();
     imgui.Checkbox('Show step list##ashitaguide_guide_show_step_list', state.guide_show_step_list);
     imgui.PushItemWidth(220);
     imgui.SliderInt('Map size##ashitaguide_guide_map_size', state.guide_map_size, 120, 260, '%d px');
@@ -1885,19 +1899,6 @@ local function render_guide_selector()
     end
 end
 
-local function render_appearance_config()
-    imgui.TextColored(COLORS.header, 'Window Appearance');
-    imgui.PushItemWidth(220);
-    imgui.SliderInt(
-        'Background opacity##ashitaguide_background_opacity',
-        state.background_opacity,
-        0,
-        100,
-        '%d%%');
-    imgui.PopItemWidth();
-    imgui.TextColored(COLORS.muted, 'Applies to Guides, Config, Valor, and Casket windows.');
-end
-
 local function render_valor_config()
     imgui.TextColored(COLORS.header, 'Pages of Valor');
     local enabled_changed = imgui.Checkbox('Enabled##ashitaguide_valor_enabled', state.valor_enabled);
@@ -1911,6 +1912,9 @@ local function render_valor_config()
     imgui.Checkbox('Show zone##ashitaguide_valor_zone', state.valor_show_zone);
     imgui.Checkbox('Show progress totals##ashitaguide_valor_totals', state.valor_show_totals);
     imgui.Checkbox('Hide Valor frame##ashitaguide_valor_hide_frame', state.valor_hide_frame);
+    imgui.PushItemWidth(220);
+    imgui.SliderInt('Background opacity##ashitaguide_valor_opacity', state.valor_opacity, 0, 100, '%d%%');
+    imgui.PopItemWidth();
     if (state.pov_active) then
         imgui.Checkbox('Window visible##ashitaguide_valor_visible', state.valor_visible);
     else
@@ -1967,6 +1971,9 @@ local function render_casket_config()
     end
 
     imgui.Checkbox('Hide Casket frame##ashitaguide_casket_hide_frame', state.casket_hide_frame);
+    imgui.PushItemWidth(220);
+    imgui.SliderInt('Background opacity##ashitaguide_casket_opacity', state.casket_opacity, 0, 100, '%d%%');
+    imgui.PopItemWidth();
     imgui.SliderInt('Stale timeout##ashitaguide_casket_stale_seconds', state.casket_stale_seconds, 0, 900, '%d sec');
 
     if (state.casket.active == true) then
@@ -2503,8 +2510,10 @@ local function render_active_tabs()
     render_active_guide(state.active[state.selected_active_key] or state.active[state.active_order[1]]);
 end
 
-local function push_window_style(frameless)
-    local alpha = bounded_number(state.background_opacity[1], DEFAULT_SETTINGS.opacity, 0, 100) / 100;
+local function push_window_style(frameless, opacity)
+    local alpha = opacity ~= nil
+        and (bounded_number(opacity[1], 92, 0, 100) / 100)
+        or COLORS.panel_bg[4];
     local bg = frameless
         and { 0.0, 0.0, 0.0, 0.0 }
         or { COLORS.panel_bg[1], COLORS.panel_bg[2], COLORS.panel_bg[3], alpha };
@@ -2545,7 +2554,7 @@ local function render_guide_window()
 
     imgui.SetNextWindowPos({ state.settings.window_x, state.settings.window_y }, IMGUI.cond_first_use);
     imgui.SetNextWindowSize({ state.settings.window_width, state.settings.window_height }, IMGUI.cond_first_use);
-    push_window_style(state.guide_hide_frame[1] == true);
+    push_window_style(state.guide_hide_frame[1] == true, state.guide_opacity);
     local flags = IMGUI.window_no_collapse;
     if (state.guide_hide_frame[1] == true) then
         flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
@@ -2573,7 +2582,7 @@ local function render_valor_window()
     imgui.SetNextWindowSize(
         { state.settings.valor_window_width, state.settings.valor_window_height },
         IMGUI.cond_first_use);
-    push_window_style(state.valor_hide_frame[1] == true);
+    push_window_style(state.valor_hide_frame[1] == true, state.valor_opacity);
     local flags = IMGUI.window_no_collapse;
     if (state.valor_hide_frame[1] == true) then
         flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
@@ -2677,7 +2686,7 @@ local function render_casket_window()
     imgui.SetNextWindowSize(
         { state.settings.casket_window_width, state.settings.casket_window_height },
         IMGUI.cond_first_use);
-    push_window_style(state.casket_hide_frame[1] == true);
+    push_window_style(state.casket_hide_frame[1] == true, state.casket_opacity);
     local flags = IMGUI.window_no_collapse;
     if (state.casket_hide_frame[1] == true) then
         flags = bit.bor(flags, IMGUI.window_no_title_bar, IMGUI.window_no_background);
@@ -2719,7 +2728,7 @@ local function render_config_window()
     imgui.SetNextWindowSize(
         { state.settings.config_window_width, state.settings.config_window_height },
         IMGUI.cond_first_use);
-    push_window_style(false);
+    push_window_style(false, nil);
     local visible = imgui.Begin('Guide Config###AshitaGuideConfig', state.config_visible, IMGUI.window_no_collapse);
     capture_window_geometry(
         'config_window_x',
@@ -2740,10 +2749,6 @@ local function render_config_window()
             and type(imgui.EndTabItem) == 'function'
             and type(imgui.EndTabBar) == 'function') then
             if (imgui.BeginTabBar('##ashitaguide_config_tabs')) then
-                if (imgui.BeginTabItem('Appearance##ashitaguide_config_appearance')) then
-                    render_appearance_config();
-                    imgui.EndTabItem();
-                end
                 if (imgui.BeginTabItem('Guides##ashitaguide_config_guides')) then
                     render_guide_selector();
                     imgui.EndTabItem();
@@ -2759,8 +2764,6 @@ local function render_config_window()
                 imgui.EndTabBar();
             end
         else
-            render_appearance_config();
-            imgui.Separator();
             render_guide_selector();
             imgui.Separator();
             render_valor_config();
