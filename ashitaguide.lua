@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.18.1';
+addon.version = '0.19.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -35,6 +35,8 @@ local IMGUI = {
     window_no_resize = imgui_const('ImGuiWindowFlags_NoResize'),
     window_no_move = imgui_const('ImGuiWindowFlags_NoMove'),
     window_no_scrollbar = imgui_const('ImGuiWindowFlags_NoScrollbar'),
+    window_no_scroll_with_mouse = imgui_const('ImGuiWindowFlags_NoScrollWithMouse'),
+    window_always_auto_resize = imgui_const('ImGuiWindowFlags_AlwaysAutoResize'),
     window_no_saved_settings = imgui_const('ImGuiWindowFlags_NoSavedSettings'),
     window_no_inputs = imgui_const('ImGuiWindowFlags_NoInputs'),
     window_no_background = imgui_const('ImGuiWindowFlags_NoBackground'),
@@ -71,8 +73,7 @@ local DEFAULT_SETTINGS = {
     visible = true,
     window_x = 420,
     window_y = 160,
-    window_width = 560,
-    window_height = 540,
+    guide_anchor_corner = 'top_left',
     guide_show_step_list = true,
     guide_map_size = 160,
     minimap_marker_enabled = true,
@@ -218,6 +219,8 @@ local state = {
     auction_sale_storage_error = nil,
     auction_sale_observed_text = nil,
     auction_sale_last_poll = 0,
+    guide_window_width = nil,
+    guide_window_height = nil,
 };
 
 local function trim_string(value)
@@ -285,6 +288,17 @@ local function bounded_boolean(value, default)
         return value;
     end
     return default;
+end
+
+local function normalize_guide_anchor_corner(value)
+    local corner = trim_string(value):lower():gsub('[%s%-]+', '_');
+    if (corner == 'top_left'
+        or corner == 'top_right'
+        or corner == 'bottom_left'
+        or corner == 'bottom_right') then
+        return corner;
+    end
+    return DEFAULT_SETTINGS.guide_anchor_corner;
 end
 
 local function truthy(value)
@@ -594,8 +608,7 @@ local function normalize_settings(source)
         visible = bounded_boolean(source.visible, DEFAULT_SETTINGS.visible),
         window_x = bounded_number(source.window_x, DEFAULT_SETTINGS.window_x, 0, 10000),
         window_y = bounded_number(source.window_y, DEFAULT_SETTINGS.window_y, 0, 10000),
-        window_width = bounded_number(source.window_width, DEFAULT_SETTINGS.window_width, 520, 1400),
-        window_height = bounded_number(source.window_height, DEFAULT_SETTINGS.window_height, 360, 1000),
+        guide_anchor_corner = normalize_guide_anchor_corner(source.guide_anchor_corner),
         guide_show_step_list = bounded_boolean(source.guide_show_step_list, DEFAULT_SETTINGS.guide_show_step_list),
         guide_map_size = bounded_number(source.guide_map_size, DEFAULT_SETTINGS.guide_map_size, 120, 260),
         minimap_marker_enabled = bounded_boolean(
@@ -1835,8 +1848,7 @@ local function settings_text()
         string.format('    visible = %s,', lua_boolean(state.visible[1])),
         string.format('    window_x = %d,', bounded_number(values.window_x, DEFAULT_SETTINGS.window_x, 0, 10000)),
         string.format('    window_y = %d,', bounded_number(values.window_y, DEFAULT_SETTINGS.window_y, 0, 10000)),
-        string.format('    window_width = %d,', bounded_number(values.window_width, DEFAULT_SETTINGS.window_width, 520, 1400)),
-        string.format('    window_height = %d,', bounded_number(values.window_height, DEFAULT_SETTINGS.window_height, 360, 1000)),
+        string.format('    guide_anchor_corner = %q,', normalize_guide_anchor_corner(values.guide_anchor_corner)),
         string.format('    guide_show_step_list = %s,', lua_boolean(state.guide_show_step_list[1])),
         string.format('    guide_map_size = %d,', bounded_number(state.guide_map_size[1], DEFAULT_SETTINGS.guide_map_size, 120, 260)),
         string.format('    minimap_marker_enabled = %s,', lua_boolean(state.minimap_marker_enabled[1])),
@@ -3404,21 +3416,14 @@ local function render_pov_panel(run)
 end
 
 local function render_step_list(run)
-    local height = math.min(132, 12 + (#run.guide.steps * 20));
-    local child_open, child_visible = begin_child('##ashitaguide_step_list_' .. run.key, { 0, height }, true);
-    if (child_visible) then
-        for index, step in ipairs(run.guide.steps) do
-            local prefix = index == run.step_index and '> ' or '  ';
-            local label = step.title ~= '' and step.title or step.text;
-            if (index == run.step_index) then
-                imgui.TextColored(COLORS.accent, string.format('%s%d. %s', prefix, index, label));
-            else
-                imgui.TextColored(COLORS.muted, string.format('%s%d. %s', prefix, index, label));
-            end
+    for index, step in ipairs(run.guide.steps) do
+        local prefix = index == run.step_index and '> ' or '  ';
+        local label = step.title ~= '' and step.title or step.text;
+        if (index == run.step_index) then
+            imgui.TextColored(COLORS.accent, string.format('%s%d. %s', prefix, index, label));
+        else
+            imgui.TextColored(COLORS.muted, string.format('%s%d. %s', prefix, index, label));
         end
-    end
-    if (child_open) then
-        imgui.EndChild();
     end
 end
 
@@ -3618,17 +3623,84 @@ local function capture_window_geometry(x_key, y_key, width_key, height_key, min_
     end
 end
 
+local function guide_window_top_left(width, height)
+    local x = state.settings.window_x;
+    local y = state.settings.window_y;
+    local corner = normalize_guide_anchor_corner(state.settings.guide_anchor_corner);
+    if (corner == 'top_right' or corner == 'bottom_right') then
+        x = x - width;
+    end
+    if (corner == 'bottom_left' or corner == 'bottom_right') then
+        y = y - height;
+    end
+    return x, y;
+end
+
+local function set_next_guide_window_position(width, height)
+    local window_x, window_y = guide_window_top_left(width, height);
+    imgui.SetNextWindowPos({ window_x, window_y }, 0);
+    return window_x, window_y;
+end
+
+local function capture_guide_window_anchor(expected_x, expected_y)
+    if (type(imgui.GetWindowPos) ~= 'function' or type(imgui.GetWindowSize) ~= 'function') then
+        return;
+    end
+
+    local x, y = imgui.GetWindowPos();
+    local width, height = imgui.GetWindowSize();
+    x = tonumber(x) or expected_x;
+    y = tonumber(y) or expected_y;
+    width = tonumber(width) or state.guide_window_width or 0;
+    height = tonumber(height) or state.guide_window_height or 0;
+
+    -- Preserve the configured anchor while auto-resize changes the opposite edges.
+    -- A position delta means the player dragged or ImGui clamped the window, so
+    -- capture the newly chosen anchor using the freshly measured size.
+    if (math.abs(x - expected_x) > 0.5 or math.abs(y - expected_y) > 0.5) then
+        local corner = normalize_guide_anchor_corner(state.settings.guide_anchor_corner);
+        state.settings.window_x = bounded_number(
+            x + ((corner == 'top_right' or corner == 'bottom_right') and width or 0),
+            state.settings.window_x,
+            0,
+            10000);
+        state.settings.window_y = bounded_number(
+            y + ((corner == 'bottom_left' or corner == 'bottom_right') and height or 0),
+            state.settings.window_y,
+            0,
+            10000);
+    end
+
+    -- Correct the position during the same frame that auto-resize changes the
+    -- measured size. This keeps the configured corner visually stationary.
+    if (type(imgui.SetWindowPos) == 'function') then
+        local anchored_x, anchored_y = guide_window_top_left(width, height);
+        pcall(imgui.SetWindowPos, { anchored_x, anchored_y }, 0);
+    end
+
+    state.guide_window_width = width;
+    state.guide_window_height = height;
+end
+
 local function render_guide_window()
     if (state.visible[1] ~= true) then
         return;
     end
 
-    imgui.SetNextWindowPos({ state.settings.window_x, state.settings.window_y }, IMGUI.cond_first_use);
-    imgui.SetNextWindowSize({ state.settings.window_width, state.settings.window_height }, IMGUI.cond_first_use);
+    local width = state.guide_window_width or 0;
+    local height = state.guide_window_height or 0;
+    local window_x, window_y = set_next_guide_window_position(width, height);
     push_display_window_style(state.guide_opacity);
-    local flags = bit.bor(IMGUI.window_no_title_bar, IMGUI.window_no_collapse);
+    local flags = bit.bor(
+        IMGUI.window_no_title_bar,
+        IMGUI.window_no_collapse,
+        IMGUI.window_no_resize,
+        IMGUI.window_no_scrollbar,
+        IMGUI.window_no_scroll_with_mouse,
+        IMGUI.window_always_auto_resize,
+        IMGUI.window_no_saved_settings);
     local visible = imgui.Begin(string.format('Guides v%s###AshitaGuideGuides', addon.version), state.visible, flags);
-    capture_window_geometry('window_x', 'window_y', 'window_width', 'window_height', 520, 1400, 360, 1000);
+    capture_guide_window_anchor(window_x, window_y);
     if (visible) then
         render_active_tabs();
     end

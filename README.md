@@ -37,6 +37,8 @@ use the manual controls or satisfy an explicitly configured display condition.
 - independent 0-100% background opacity for the Guides, Valor, and Casket windows
 - permanent AshitaChat-style titleless frames, dark borders, and transparent child regions
 - compact AshitaChat-style tabs in the Guides window only
+- content-sized Guides window with no resize handles or scrollbars
+- configurable stationary Guides-window corner (`top_left`, `top_right`, `bottom_left`, or `bottom_right`)
 - configurable all-steps list in the normal guide window
 - balanced navigation layout with configurable map size
 - Pages of Valor progress seeding from the current character chat log
@@ -106,7 +108,7 @@ Ashita/config/addons/ashitaguide/ashitaguide_config.lua
 
 Edit that persistent copy when adding or changing guides. The addon writes UI
 preferences to `Ashita/config/addons/ashitaguide/settings.lua`, including window
-positions and sizes, visibility, map size, Valor settings,
+positions and sizes, the Guides-window anchor corner, visibility, map size, Valor settings,
 Casket settings, per-window background opacity, and active normal guides.
 Replacing or reinstalling the addon directory does not overwrite any of these
 persistent files.
@@ -248,6 +250,8 @@ return {
     settings = {
         -- Each addon display can use a different background opacity.
         guide_opacity = 92,
+        -- window_x/window_y are the screen coordinates of this stationary corner.
+        guide_anchor_corner = 'top_left',
         minimap_marker_enabled = true,
         valor_opacity = 92,
         casket_opacity = 92,

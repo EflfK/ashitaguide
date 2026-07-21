@@ -6,8 +6,9 @@ return {
         visible = true,
         window_x = 420,
         window_y = 160,
-        window_width = 560,
-        window_height = 540,
+        -- window_x/window_y identify this corner of the auto-sized Guides window.
+        -- Valid values: top_left, top_right, bottom_left, bottom_right.
+        guide_anchor_corner = 'top_left',
         guide_show_step_list = true,
         guide_map_size = 160,
         minimap_marker_enabled = true,

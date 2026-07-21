@@ -43,6 +43,10 @@ $required = @(
     "settings.lua",
     "save_settings_if_needed",
     "capture_window_geometry",
+    "guide_anchor_corner",
+    "capture_guide_window_anchor",
+    "window_always_auto_resize",
+    "window_no_scroll_with_mouse",
     "casket_enabled",
     "casket_stale_seconds",
     "guide_opacity",
@@ -178,6 +182,14 @@ if ($content -notmatch "local sub_active = truthy\(safe_read\(function \(\) retu
 
 if ($content -notmatch "local function navigation_world_radius\(distance\)\s+return math\.max\(5, distance \+ 5\);\s+end") {
     throw 'Navigation map must zoom smoothly with a five-yalm framing margin.'
+}
+
+if ($content -notmatch "(?s)local function render_guide_window\(\).+window_no_resize.+window_no_scrollbar.+window_always_auto_resize") {
+    throw 'Guides window must auto-size without resize handles or scrollbars.'
+}
+
+if ($content -match "capture_window_geometry\('window_x', 'window_y', 'window_width', 'window_height'") {
+    throw 'Guides window must not persist a user-resized size.'
 }
 
 if ($content -notmatch "Map radius: %.1f yalms") {
