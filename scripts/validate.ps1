@@ -44,6 +44,8 @@ $required = @(
     "save_settings_if_needed",
     "capture_window_geometry",
     "guide_anchor_corner",
+    "render_guide_anchor_selector",
+    "Anchor corner##ashitaguide_anchor_corner",
     "capture_guide_window_anchor",
     "window_always_auto_resize",
     "window_no_scroll_with_mouse",

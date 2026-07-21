@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.19.0';
+addon.version = '0.19.1';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -67,6 +67,13 @@ local COLORS = {
     tab_active = { 0.165, 0.165, 0.180, 0.98 },
     tab_text = { 0.78, 0.78, 0.82, 1.00 },
     tab_text_active = { 0.98, 0.98, 1.00, 1.00 },
+};
+
+local GUIDE_ANCHOR_CORNERS = {
+    { key = 'top_left', label = 'Top left' },
+    { key = 'top_right', label = 'Top right' },
+    { key = 'bottom_left', label = 'Bottom left' },
+    { key = 'bottom_right', label = 'Bottom right' },
 };
 
 local DEFAULT_SETTINGS = {
@@ -299,6 +306,43 @@ local function normalize_guide_anchor_corner(value)
         return corner;
     end
     return DEFAULT_SETTINGS.guide_anchor_corner;
+end
+
+local function guide_anchor_corner_label(value)
+    local corner = normalize_guide_anchor_corner(value);
+    for _, option in ipairs(GUIDE_ANCHOR_CORNERS) do
+        if (option.key == corner) then
+            return option.label;
+        end
+    end
+    return GUIDE_ANCHOR_CORNERS[1].label;
+end
+
+local function set_guide_anchor_corner(value)
+    local old_corner = normalize_guide_anchor_corner(state.settings.guide_anchor_corner);
+    local new_corner = normalize_guide_anchor_corner(value);
+    if (old_corner == new_corner) then
+        return;
+    end
+
+    local width = tonumber(state.guide_window_width) or 0;
+    local height = tonumber(state.guide_window_height) or 0;
+    local top_left_x = state.settings.window_x
+        - ((old_corner == 'top_right' or old_corner == 'bottom_right') and width or 0);
+    local top_left_y = state.settings.window_y
+        - ((old_corner == 'bottom_left' or old_corner == 'bottom_right') and height or 0);
+
+    state.settings.guide_anchor_corner = new_corner;
+    state.settings.window_x = bounded_number(
+        top_left_x + ((new_corner == 'top_right' or new_corner == 'bottom_right') and width or 0),
+        state.settings.window_x,
+        0,
+        10000);
+    state.settings.window_y = bounded_number(
+        top_left_y + ((new_corner == 'bottom_left' or new_corner == 'bottom_right') and height or 0),
+        state.settings.window_y,
+        0,
+        10000);
 end
 
 local function truthy(value)
@@ -2545,6 +2589,29 @@ local function category_label(key)
     return 'All Categories';
 end
 
+local function render_guide_anchor_selector()
+    if (type(imgui.BeginCombo) ~= 'function' or type(imgui.Selectable) ~= 'function') then
+        imgui.Text('Anchor corner: ' .. guide_anchor_corner_label(state.settings.guide_anchor_corner));
+        return;
+    end
+
+    imgui.PushItemWidth(220);
+    if (imgui.BeginCombo(
+        'Anchor corner##ashitaguide_anchor_corner',
+        guide_anchor_corner_label(state.settings.guide_anchor_corner))) then
+        local current = normalize_guide_anchor_corner(state.settings.guide_anchor_corner);
+        for _, option in ipairs(GUIDE_ANCHOR_CORNERS) do
+            if (imgui.Selectable(
+                option.label .. '##ashitaguide_anchor_corner_' .. option.key,
+                current == option.key)) then
+                set_guide_anchor_corner(option.key);
+            end
+        end
+        imgui.EndCombo();
+    end
+    imgui.PopItemWidth();
+end
+
 local function render_category_filter()
     if (type(imgui.BeginCombo) == 'function' and type(imgui.Selectable) == 'function') then
         imgui.PushItemWidth(220);
@@ -2577,6 +2644,7 @@ local function render_guide_selector()
     imgui.PushItemWidth(220);
     imgui.SliderInt('Background opacity##ashitaguide_guide_opacity', state.guide_opacity, 0, 100, '%d%%');
     imgui.PopItemWidth();
+    render_guide_anchor_selector();
     imgui.Checkbox('Show step list##ashitaguide_guide_show_step_list', state.guide_show_step_list);
     imgui.Checkbox('Show destination on Minimap##ashitaguide_minimap_marker', state.minimap_marker_enabled);
     imgui.PushItemWidth(220);
