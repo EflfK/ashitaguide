@@ -55,9 +55,12 @@ the full parsed hint list, and renders a 10-99 grid:
 The helper is display-only. It does not enter numbers, send commands, inject
 packets, click menus, or automate casket interaction. Historical chat-log
 seeding is ignored for caskets so stale casket hints do not reopen the window
-on login. The Casket tab in Guide Config controls whether the helper is enabled,
-its background opacity, and how long an inactive casket session is kept before
-new hints start a fresh session.
+on login. Player chat is ignored, including speaker-tagged lines read through
+the chat-log fallback, so players quoting hint phrases cannot alter the candidate
+list. Reset is available directly in the Casket Helper window. The Casket tab in
+Guide Config controls whether the helper is enabled, its background opacity, and
+how long an inactive casket session is kept before new hints start a fresh
+session.
 
 ## Pages of Valor
 

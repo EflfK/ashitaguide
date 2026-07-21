@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.18.0';
+addon.version = '0.18.1';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -142,6 +142,13 @@ local JOB_ALIASES = {
 local commands = {
     ['/agguide'] = true,
     ['/ashitaguide'] = true,
+};
+
+local PLAYER_CHAT_MODES = {
+    [1] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true,
+    [8] = true, [9] = true, [10] = true, [11] = true, [12] = true, [13] = true,
+    [14] = true, [205] = true, [210] = true, [212] = true, [213] = true,
+    [214] = true, [217] = true, [220] = true, [222] = true,
 };
 
 local state = {
@@ -896,6 +903,20 @@ local function casket_parse_message(message)
     return nil;
 end
 
+local function casket_is_player_chat(text, mode, alternate_mode)
+    local normalized_mode = bit.band(tonumber(mode) or 0, 0x000000FF);
+    local normalized_alternate_mode = bit.band(tonumber(alternate_mode) or 0, 0x000000FF);
+    if (PLAYER_CHAT_MODES[normalized_mode] == true
+        or PLAYER_CHAT_MODES[normalized_alternate_mode] == true) then
+        return true;
+    end
+
+    -- Polled chat-log lines do not include event metadata, but player messages
+    -- retain their early <Name> speaker tag after timestamps/channel markers.
+    local prefix = clean_message(text):sub(1, 128);
+    return prefix:find('<[^<>]+>%s') ~= nil;
+end
+
 local function casket_apply_event(casket, event)
     local filtered = {};
     local set = event.kind == 'digit_set' and casket_digit_set(event.digits) or nil;
@@ -965,8 +986,12 @@ local function casket_is_stale(casket, now)
     return ((now or os.clock()) - (tonumber(casket.updated_at) or 0)) > stale_seconds;
 end
 
-local function process_casket_text(text, source)
+local function process_casket_text(text, source, mode, alternate_mode)
     if (state.casket_enabled[1] ~= true or source == 'seed') then
+        return false;
+    end
+
+    if (casket_is_player_chat(text, mode, alternate_mode)) then
         return false;
     end
 
@@ -2171,13 +2196,13 @@ local function handle_pov_text(run, text)
     return false;
 end
 
-local function process_observed_text(text, source)
+local function process_observed_text(text, source, mode, alternate_mode)
     local cleaned = clean_message(text);
     if (cleaned == '') then
         return false;
     end
 
-    local handled = process_casket_text(cleaned, source);
+    local handled = process_casket_text(cleaned, source, mode, alternate_mode);
     local guide = state.guide_by_key.pages_of_valor;
     if (guide ~= nil) then
         local run = state.pov_run;
@@ -2806,11 +2831,7 @@ local function render_casket_config()
 
     if (state.casket.active == true) then
         imgui.Checkbox('Window visible##ashitaguide_casket_visible', state.casket_visible);
-        if (imgui.Button('Reset##ashitaguide_casket_reset', { 86, 0 })) then
-            reset_casket_inactive();
-        end
         local analysis = casket_analyze(state.casket);
-        imgui.SameLine(0, 8);
         imgui.TextColored(COLORS.muted, string.format('%d possible', analysis.count));
     else
         imgui.TextColored(COLORS.muted, 'Status: inactive');
@@ -3746,13 +3767,18 @@ local function render_casket_window()
     if (visible) then
         local analysis = casket_analyze(state.casket);
         imgui.TextColored(COLORS.header, 'Brown Casket');
-        imgui.Text(casket_best_summary(analysis));
-        imgui.Text(string.format('Possible: %d', analysis.count));
-        imgui.Separator();
-        render_casket_grid(analysis);
-        imgui.Separator();
-        imgui.TextColored(COLORS.header, 'Hints');
-        render_casket_hints();
+        imgui.SameLine(0, 12);
+        if (imgui.Button('Reset##ashitaguide_casket_reset', { 86, 0 })) then
+            reset_casket_inactive();
+        else
+            imgui.Text(casket_best_summary(analysis));
+            imgui.Text(string.format('Possible: %d', analysis.count));
+            imgui.Separator();
+            render_casket_grid(analysis);
+            imgui.Separator();
+            imgui.TextColored(COLORS.header, 'Hints');
+            render_casket_hints();
+        end
     end
     imgui.End();
     pop_window_style();
@@ -4010,7 +4036,7 @@ local function handle_text_in(e)
         local text = clean_message(message);
         if (text ~= '' and seen[text] ~= true) then
             seen[text] = true;
-            process_observed_text(text, 'text');
+            process_observed_text(text, 'text', e.mode, e.mode_modified);
         end
     end
 end

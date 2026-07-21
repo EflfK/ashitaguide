@@ -53,6 +53,8 @@ $required = @(
     "render_casket_config",
     "render_casket_window",
     "casket_parse_message",
+    "casket_is_player_chat",
+    "PLAYER_CHAT_MODES",
     "one%s+of%s+the%s+two%s+digits",
     "guide_is_configurable",
     "ai_guides.lua",
@@ -165,6 +167,25 @@ if ($content -notmatch "local function navigation_world_radius\(distance\)\s+ret
 
 if ($content -notmatch "Map radius: %.1f yalms") {
     throw 'Navigation map must display its active zoom radius.'
+}
+
+if ($content -notmatch "(?s)PLAYER_CHAT_MODES\[normalized_mode\].+PLAYER_CHAT_MODES\[normalized_alternate_mode\]") {
+    throw 'Casket player-chat filtering must check original and modified chat modes.'
+}
+
+if ($content -notmatch "(?s)local prefix = clean_message\(text\):sub\(1, 128\).+prefix:find\('<\[\^<>\]\+>%s'\)") {
+    throw 'Casket player-chat filtering must reject speaker-tagged chat-log lines.'
+}
+
+$configStart = $content.IndexOf('local function render_casket_config()')
+$windowStart = $content.IndexOf('local function render_casket_window()')
+$configSection = $content.Substring($configStart, $windowStart - $configStart)
+$windowSection = $content.Substring($windowStart)
+if ($configSection -like '*ashitaguide_casket_reset*') {
+    throw 'Casket reset must not be rendered in Guide Config.'
+}
+if ($windowSection -notlike '*ashitaguide_casket_reset*') {
+    throw 'Casket reset must be rendered in the Casket Helper window.'
 }
 
 Write-Host 'ashitaguide validation passed.'
