@@ -49,7 +49,8 @@ $required = @(
     "capture_guide_window_anchor",
     "window_always_auto_resize",
     "window_no_scroll_with_mouse",
-    "GUIDE_TEXT_WRAP_WIDTH",
+    "GUIDE_WINDOW_MAX_WIDTH",
+    "SetNextWindowSizeConstraints",
     "casket_enabled",
     "casket_stale_seconds",
     "guide_opacity",
@@ -191,8 +192,12 @@ if ($content -notmatch "(?s)local function render_guide_window\(\).+window_no_re
     throw 'Guides window must auto-size without resize handles or scrollbars.'
 }
 
-if ($content -notmatch "PushTextWrapPos\(cursor_x \+ GUIDE_TEXT_WRAP_WIDTH\)") {
+if ($content -notmatch "PushTextWrapPos\(math\.max\(cursor_x \+ 1, GUIDE_TEXT_WRAP_POS_X\)\)") {
     throw 'Guide text must use a stable maximum wrap width during auto-resize.'
+}
+
+if ($content -notmatch "SetNextWindowSizeConstraints\(\{ 0, 0 \}, \{ GUIDE_WINDOW_MAX_WIDTH, 10000 \}\)") {
+    throw 'Guides window must enforce its auto-fit width ceiling before Begin.'
 }
 
 if ($content -match "capture_window_geometry\('window_x', 'window_y', 'window_width', 'window_height'") {

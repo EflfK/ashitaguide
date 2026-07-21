@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.19.2';
+addon.version = '0.19.3';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -76,7 +76,8 @@ local GUIDE_ANCHOR_CORNERS = {
     { key = 'bottom_right', label = 'Bottom right' },
 };
 
-local GUIDE_TEXT_WRAP_WIDTH = 520;
+local GUIDE_WINDOW_MAX_WIDTH = 560;
+local GUIDE_TEXT_WRAP_POS_X = GUIDE_WINDOW_MAX_WIDTH - 12;
 
 local DEFAULT_SETTINGS = {
     visible = true,
@@ -376,7 +377,7 @@ local function text_wrapped(text)
         local cursor_x = type(imgui.GetCursorPosX) == 'function'
             and (tonumber(imgui.GetCursorPosX()) or 0)
             or 0;
-        imgui.PushTextWrapPos(cursor_x + GUIDE_TEXT_WRAP_WIDTH);
+        imgui.PushTextWrapPos(math.max(cursor_x + 1, GUIDE_TEXT_WRAP_POS_X));
         imgui.Text(text);
         imgui.PopTextWrapPos();
         return;
@@ -393,7 +394,7 @@ local function text_colored_wrapped(color, text)
         local cursor_x = type(imgui.GetCursorPosX) == 'function'
             and (tonumber(imgui.GetCursorPosX()) or 0)
             or 0;
-        imgui.PushTextWrapPos(cursor_x + GUIDE_TEXT_WRAP_WIDTH);
+        imgui.PushTextWrapPos(math.max(cursor_x + 1, GUIDE_TEXT_WRAP_POS_X));
         imgui.TextColored(color, tostring(text or ''));
         imgui.PopTextWrapPos();
         return;
@@ -2960,7 +2961,7 @@ local function render_destination_strip(step, navigation)
             or string.format('%.1f yalms', navigation.distance));
     end
     if (#parts > 0) then
-        imgui.TextColored(COLORS.muted, table.concat(parts, '  |  '));
+        text_colored_wrapped(COLORS.muted, table.concat(parts, '  |  '));
     end
 end
 
@@ -3496,9 +3497,9 @@ local function render_step_list(run)
         local prefix = index == run.step_index and '> ' or '  ';
         local label = step.title ~= '' and step.title or step.text;
         if (index == run.step_index) then
-            imgui.TextColored(COLORS.accent, string.format('%s%d. %s', prefix, index, label));
+            text_colored_wrapped(COLORS.accent, string.format('%s%d. %s', prefix, index, label));
         else
-            imgui.TextColored(COLORS.muted, string.format('%s%d. %s', prefix, index, label));
+            text_colored_wrapped(COLORS.muted, string.format('%s%d. %s', prefix, index, label));
         end
     end
 end
@@ -3549,7 +3550,7 @@ local function render_auction_sale_items(step)
 
     imgui.Separator();
     for index, item in ipairs(items) do
-        imgui.TextColored(COLORS.header, string.format('%d. %s', index, item.name));
+        text_colored_wrapped(COLORS.header, string.format('%d. %s', index, item.name));
         local listing_quantity = math.max(1, tonumber(item.listing_quantity) or 1);
         local listing_count = math.floor((tonumber(item.quantity_owned) or 1) / listing_quantity);
         local listing_label = listing_quantity == 1
@@ -3562,7 +3563,7 @@ local function render_auction_sale_items(step)
                 item.quantity_owned,
                 listing_label,
                 listing_count));
-        imgui.TextColored(
+        text_colored_wrapped(
             COLORS.accent,
             'Suggested listing price: ' .. format_gil(item.suggested_price_gil));
         if (state.auction_sale_show_price_basis[1] == true and item.price_basis ~= '') then
@@ -3766,6 +3767,9 @@ local function render_guide_window()
     local width = state.guide_window_width or 0;
     local height = state.guide_window_height or 0;
     local window_x, window_y = set_next_guide_window_position(width, height);
+    if (type(imgui.SetNextWindowSizeConstraints) == 'function') then
+        imgui.SetNextWindowSizeConstraints({ 0, 0 }, { GUIDE_WINDOW_MAX_WIDTH, 10000 });
+    end
     push_display_window_style(state.guide_opacity);
     local flags = bit.bor(
         IMGUI.window_no_title_bar,

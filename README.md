@@ -38,7 +38,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - permanent AshitaChat-style titleless frames, dark borders, and transparent child regions
 - compact AshitaChat-style tabs in the Guides window only
 - content-sized Guides window with no resize handles or scrollbars
-- bounded guide-text wrapping that prevents transient wide-window resizing between steps
+- a hard auto-fit width ceiling plus bounded text wrapping to prevent transient wide-window resizing between steps
 - Guides-tab selector for a stationary window corner (`top_left`, `top_right`, `bottom_left`, or `bottom_right`)
 - configurable all-steps list in the normal guide window
 - balanced navigation layout with configurable map size
