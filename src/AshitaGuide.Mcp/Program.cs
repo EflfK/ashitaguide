@@ -7,6 +7,7 @@ using ModelContextProtocol.Server;
 if (args.Contains("--self-test", StringComparer.OrdinalIgnoreCase))
 {
     AuctionSaleGuideStorage.RunSelfTest();
+    TemporaryGuideStorage.RunSelfTest();
     Console.WriteLine("AshitaGuide MCP self-test passed.");
     return;
 }

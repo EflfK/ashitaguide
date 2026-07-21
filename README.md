@@ -155,9 +155,17 @@ return {
 ```
 
 Keys must be stable and unique across bundled, configured, permanent, and AI
-guides. MCP writers should replace the complete file atomically rather than
+guides. Raw file writers should replace the complete file atomically rather than
 append partial Lua. This interface only supplies display data; it does not send
 commands or automate gameplay.
+
+`AshitaGuide.Mcp` exposes `publish_temporary_guide` as the preferred typed
+interface. It validates and safely renders one structured guide, atomically
+upserts it by stable key, and preserves every other temporary guide already in
+the file. `temporary_guides_status` lists the currently published keys, titles,
+step counts, and file update time. Neither tool accepts raw Lua or a destination
+path. If `ai_guides.lua` contains executable or malformed Lua instead of the
+documented data-only table, the MCP publisher refuses to change it.
 
 Temporary AI guides survive addon reloads and reinstalls because the file is
 outside the addon directory. Clicking the `x` on an AI guide tab removes that

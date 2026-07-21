@@ -135,7 +135,9 @@ if ($content -notmatch "poll_ai_guides_file\(\);\s+poll_auction_sale_guide_file\
 $mcpProject = Join-Path $root 'src\AshitaGuide.Mcp\AshitaGuide.Mcp.csproj'
 $mcpTools = Join-Path $root 'src\AshitaGuide.Mcp\AuctionSaleGuideTools.cs'
 $mcpStorage = Join-Path $root 'src\AshitaGuide.Mcp\AuctionSaleGuideStorage.cs'
-foreach ($path in @($mcpProject, $mcpTools, $mcpStorage)) {
+$temporaryTools = Join-Path $root 'src\AshitaGuide.Mcp\TemporaryGuideTools.cs'
+$temporaryStorage = Join-Path $root 'src\AshitaGuide.Mcp\TemporaryGuideStorage.cs'
+foreach ($path in @($mcpProject, $mcpTools, $mcpStorage, $temporaryTools, $temporaryStorage)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing AshitaGuide MCP surface: $path"
     }
@@ -151,6 +153,19 @@ if ($storageContent -notlike '*File.Move(tempPath, targetPath, true)*') {
 }
 if ($storageContent -match 'QueueCommand|InjectPacket|SendPacket|SetTarget') {
     throw 'AshitaGuide MCP crossed the display-only safety boundary.'
+}
+
+$temporaryToolsContent = Get-Content -LiteralPath $temporaryTools -Raw
+$temporaryStorageContent = Get-Content -LiteralPath $temporaryStorage -Raw
+if ($temporaryToolsContent -notlike '*publish_temporary_guide*' -or
+    $temporaryToolsContent -notlike '*temporary_guides_status*') {
+    throw 'AshitaGuide generic temporary guide MCP tools are missing.'
+}
+if ($temporaryStorageContent -notlike '*File.Move(tempPath, path, true)*') {
+    throw 'Temporary guide MCP publication must replace the fixed file atomically.'
+}
+if ($temporaryStorageContent -match 'QueueCommand|InjectPacket|SendPacket|SetTarget') {
+    throw 'Temporary guide MCP crossed the display-only safety boundary.'
 }
 
 if ($content -notmatch "guide\.origin ~= 'ai'") {
