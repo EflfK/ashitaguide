@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.19.1';
+addon.version = '0.19.2';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -75,6 +75,8 @@ local GUIDE_ANCHOR_CORNERS = {
     { key = 'bottom_left', label = 'Bottom left' },
     { key = 'bottom_right', label = 'Bottom right' },
 };
+
+local GUIDE_TEXT_WRAP_WIDTH = 520;
 
 local DEFAULT_SETTINGS = {
     visible = true,
@@ -370,22 +372,28 @@ end
 
 local function text_wrapped(text)
     text = tostring(text or '');
-    if (type(imgui.TextWrapped) == 'function') then
-        imgui.TextWrapped(text);
-        return;
-    end
     if (type(imgui.PushTextWrapPos) == 'function' and type(imgui.PopTextWrapPos) == 'function') then
-        imgui.PushTextWrapPos(0.0);
+        local cursor_x = type(imgui.GetCursorPosX) == 'function'
+            and (tonumber(imgui.GetCursorPosX()) or 0)
+            or 0;
+        imgui.PushTextWrapPos(cursor_x + GUIDE_TEXT_WRAP_WIDTH);
         imgui.Text(text);
         imgui.PopTextWrapPos();
         return;
     end
-    imgui.Text(text);
+    if (type(imgui.TextWrapped) == 'function') then
+        imgui.TextWrapped(text);
+    else
+        imgui.Text(text);
+    end
 end
 
 local function text_colored_wrapped(color, text)
     if (type(imgui.PushTextWrapPos) == 'function' and type(imgui.PopTextWrapPos) == 'function') then
-        imgui.PushTextWrapPos(0.0);
+        local cursor_x = type(imgui.GetCursorPosX) == 'function'
+            and (tonumber(imgui.GetCursorPosX()) or 0)
+            or 0;
+        imgui.PushTextWrapPos(cursor_x + GUIDE_TEXT_WRAP_WIDTH);
         imgui.TextColored(color, tostring(text or ''));
         imgui.PopTextWrapPos();
         return;
