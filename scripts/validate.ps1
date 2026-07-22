@@ -100,6 +100,7 @@ $required = @(
     "AddTriangleFilled",
     "truthy",
     "advance_on_target",
+    "advance_on_text",
     "update_level_step_auto_advance",
     "minimum_level",
     "required_job",

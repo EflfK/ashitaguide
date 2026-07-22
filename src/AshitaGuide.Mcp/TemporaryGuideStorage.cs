@@ -92,6 +92,7 @@ public static partial class TemporaryGuideStorage
                         Npc = "Mendi",
                         TargetX = -59.961,
                         TargetY = -75.649,
+                        AdvanceOnText = "You have undertaken All for One",
                     },
                 },
             });
@@ -126,6 +127,7 @@ public static partial class TemporaryGuideStorage
                 || !contents.Contains("name = \"Updated Goal\"", StringComparison.Ordinal)
                 || !contents.Contains("key = \"ai_level_goal\"", StringComparison.Ordinal)
                 || !contents.Contains("name = \"Fire Crystal\"", StringComparison.Ordinal)
+                || !contents.Contains("advance_on_text = \"You have undertaken All for One\"", StringComparison.Ordinal)
                 || contents.Contains("name = \"Current Goal\"", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Temporary guide upsert self-test failed.");
@@ -233,6 +235,7 @@ public static partial class TemporaryGuideStorage
             input.MinimumLevel,
             requiredJob,
             input.AdvanceOnTarget,
+            CleanOptionalText(input.AdvanceOnText, 256, $"guide.steps[{index}].advanceOnText"),
             Array.Empty<StoredSaleItem>());
     }
 
@@ -321,6 +324,7 @@ public static partial class TemporaryGuideStorage
             value.GetInt("minimum_level"),
             value.GetString("required_job") ?? string.Empty,
             value.GetBool("advance_on_target") ?? false,
+            value.GetString("advance_on_text") ?? string.Empty,
             saleItems);
     }
 
@@ -397,6 +401,10 @@ public static partial class TemporaryGuideStorage
                     output.AppendLine($"                    required_job = {LuaQuote(step.RequiredJob)},");
                 }
                 output.AppendLine($"                    advance_on_target = {(step.AdvanceOnTarget ? "true" : "false")},");
+                if (step.AdvanceOnText.Length > 0)
+                {
+                    output.AppendLine($"                    advance_on_text = {LuaQuote(step.AdvanceOnText)},");
+                }
                 if (step.SaleItems.Count > 0)
                 {
                     output.AppendLine("                    sale_items = {");
@@ -512,6 +520,7 @@ public static partial class TemporaryGuideStorage
         int? MinimumLevel,
         string RequiredJob,
         bool AdvanceOnTarget,
+        string AdvanceOnText,
         IReadOnlyList<StoredSaleItem> SaleItems);
 
     private sealed record StoredSaleItem(

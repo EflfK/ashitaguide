@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.19.6';
+addon.version = '0.19.7';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -607,6 +607,7 @@ local function normalize_step(source, index)
         advance_on_target = bounded_boolean(
             source.advance_on_target or source.auto_advance_on_target,
             false),
+        advance_on_text = trim_string(source.advance_on_text),
         sale_items = normalize_sale_items(source.sale_items or source.items),
     };
 end
@@ -1810,6 +1811,9 @@ local function guide_storage_text(guides)
                 table.insert(lines, string.format('                    required_job = %s,', lua_quoted(step.required_job)));
             end
             table.insert(lines, string.format('                    advance_on_target = %s,', step.advance_on_target == true and 'true' or 'false'));
+            if (step.advance_on_text ~= '') then
+                table.insert(lines, string.format('                    advance_on_text = %s,', lua_quoted(step.advance_on_text)));
+            end
             if (type(step.sale_items) == 'table' and #step.sale_items > 0) then
                 table.insert(lines, '                    sale_items = {');
                 for _, item in ipairs(step.sale_items) do
@@ -2514,6 +2518,19 @@ local function process_observed_text(text, source, mode, alternate_mode)
     end
 
     local handled = process_casket_text(cleaned, source, mode, alternate_mode);
+    if (source == 'text') then
+        local run = state.active[state.selected_active_key];
+        local step = run ~= nil and run.guide.steps[run.step_index] or nil;
+        local trigger = step ~= nil and trim_string(step.advance_on_text) or '';
+        if (trigger ~= '' and run.step_index < #run.guide.steps) then
+            local normalized_text = trim_string(cleaned:lower():gsub('[^%w]+', ' '));
+            local normalized_trigger = trim_string(trigger:lower():gsub('[^%w]+', ' '));
+            if (normalized_trigger ~= '' and normalized_text:find(normalized_trigger, 1, true) ~= nil) then
+                next_step(run);
+                handled = true;
+            end
+        end
+    end
     local guide = state.guide_by_key.pages_of_valor;
     if (guide ~= nil) then
         local run = state.pov_run;

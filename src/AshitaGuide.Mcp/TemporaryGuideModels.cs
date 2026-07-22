@@ -57,4 +57,7 @@ public sealed class TemporaryGuideStepInput
 
     [Description("When true, selecting the named NPC advances this display guide. No target or game command is sent.")]
     public bool AdvanceOnTarget { get; init; }
+
+    [Description("Optional exact phrase that advances this step when it appears in a new incoming chat event. Matching ignores case, punctuation, and repeated whitespace; no chat-log polling is added.")]
+    public string? AdvanceOnText { get; init; }
 }

@@ -321,6 +321,12 @@ the NPC selected does not skip later instructions. NPC destinations remain on
 the guide navigation map and Minimap overlay; AshitaGuide intentionally does
 not draw world-space markers over NPC models.
 
+Set `advance_on_text` to a specific confirmation phrase to advance when that
+phrase appears in a new incoming chat event. Matching ignores case,
+punctuation, and repeated whitespace, so typographic quotation marks do not
+make a reliable confirmation fail. This is event-driven and does not add a
+chat-log polling loop; historical messages are intentionally not replayed.
+
 Set `minimum_level` on a step to advance automatically when the active main job
 reaches that level. Add `required_job` to restrict completion to one job. Job
 abbreviations and full names are accepted, so `BST` and `Beastmaster` are
