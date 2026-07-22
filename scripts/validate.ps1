@@ -271,6 +271,10 @@ if ($content -notmatch "(?s)function decision\.render\(\).+window_no_resize.+win
     throw 'Decision window must auto-size from its configured anchor without scrollbars.'
 }
 
+if ($content -notmatch "(?s)function decision\.render\(\).+SetNextWindowPos\(\{ window_x, window_y \}, IMGUI\.cond_first_use\)") {
+    throw 'Decision window must remain draggable after applying its initial configured position.'
+}
+
 if ($content -notmatch "(?s)function decision\.capture_anchor\(expected_x, expected_y\).+decision\.top_left\(width, height\)") {
     throw 'Decision window must preserve its configured corner while its content size changes.'
 }

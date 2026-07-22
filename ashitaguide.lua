@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.20.0';
+addon.version = '0.20.1';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -4344,7 +4344,7 @@ function decision.render()
     local width = state.decision_window_width or 0;
     local height = state.decision_window_height or 0;
     local window_x, window_y = decision.top_left(width, height);
-    imgui.SetNextWindowPos({ window_x, window_y }, 0);
+    imgui.SetNextWindowPos({ window_x, window_y }, IMGUI.cond_first_use);
     if (type(imgui.SetNextWindowSizeConstraints) == 'function') then
         imgui.SetNextWindowSizeConstraints({ 0, 0 }, { 620, 10000 });
     end
