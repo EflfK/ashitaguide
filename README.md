@@ -12,6 +12,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 
 - persistent guide definitions under `config/addons/ashitaguide/`
 - automatically persisted UI settings and window geometry
+- per-guide step progress that survives tab closes, config reopens, and game restarts
 - separate guide runner and guide configuration windows
 - live-polled, AI/MCP-authored temporary guides in the normal guide window
 - typed MCP publication of a structured, one-step Auction House sale list
@@ -112,7 +113,9 @@ Ashita/config/addons/ashitaguide/ashitaguide_config.lua
 Edit that persistent copy when adding or changing guides. The addon writes UI
 preferences to `Ashita/config/addons/ashitaguide/settings.lua`, including window
 positions and sizes, the Guides-window anchor corner, visibility, map size, Valor settings,
-Casket settings, per-window background opacity, and active normal guides.
+Casket settings, per-window background opacity, active normal guides, and each guide's
+last selected step. A normal guide resumes that step even after its tab is closed and
+reopened or the game is restarted.
 Replacing or reinstalling the addon directory does not overwrite any of these
 persistent files.
 

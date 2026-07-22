@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.19.3';
+addon.version = '0.19.4';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -114,6 +114,7 @@ local DEFAULT_SETTINGS = {
     chat_log_seed_lines = 700,
     poll_chat_log = true,
     default_active_guides = {},
+    guide_steps = {},
 };
 
 local JOB_NAMES = {
@@ -378,6 +379,19 @@ local function copy_array(values)
     end
     for _, value in ipairs(values) do
         table.insert(output, value);
+    end
+    return output;
+end
+
+local function copy_step_map(values)
+    local output = {};
+    if (type(values) ~= 'table') then
+        return output;
+    end
+    for key, value in pairs(values) do
+        if (type(key) == 'string' and trim_string(key) ~= '' and tonumber(value) ~= nil) then
+            output[key] = bounded_number(value, 1, 1, 100000);
+        end
     end
     return output;
 end
@@ -731,6 +745,7 @@ local function normalize_settings(source)
         chat_log_seed_lines = bounded_number(source.chat_log_seed_lines, DEFAULT_SETTINGS.chat_log_seed_lines, 0, 5000),
         poll_chat_log = bounded_boolean(source.poll_chat_log, DEFAULT_SETTINGS.poll_chat_log),
         default_active_guides = copy_array(source.default_active_guides or DEFAULT_SETTINGS.default_active_guides),
+        guide_steps = copy_step_map(source.guide_steps or DEFAULT_SETTINGS.guide_steps),
     };
 end
 
@@ -1141,7 +1156,13 @@ local function create_run(guide, previous)
     run.guide = guide;
     run.tab_open = run.tab_open or T{ true };
     run.tab_open[1] = true;
+    if (previous == nil and guide.type ~= 'pages_of_valor') then
+        run.step_index = state.settings.guide_steps[guide.key];
+    end
     run.step_index = bounded_number(run.step_index, 1, 1, #guide.steps);
+    if (guide.type ~= 'pages_of_valor') then
+        state.settings.guide_steps[guide.key] = run.step_index;
+    end
     if (guide.type == 'pages_of_valor') then
         run.pov = run.pov or new_pov_state();
     else
@@ -1236,6 +1257,9 @@ local function next_step(run)
         return;
     end
     run.step_index = math.min(#run.guide.steps, (tonumber(run.step_index) or 1) + 1);
+    if (run.guide.type ~= 'pages_of_valor') then
+        state.settings.guide_steps[run.key] = run.step_index;
+    end
 end
 
 local function previous_step(run)
@@ -1243,6 +1267,9 @@ local function previous_step(run)
         return;
     end
     run.step_index = math.max(1, (tonumber(run.step_index) or 1) - 1);
+    if (run.guide.type ~= 'pages_of_valor') then
+        state.settings.guide_steps[run.key] = run.step_index;
+    end
 end
 
 local function ashita_install_path()
@@ -2100,6 +2127,21 @@ local function lua_string_list(values)
     return #pieces > 0 and ('{ ' .. table.concat(pieces, ', ') .. ' }') or '{}';
 end
 
+local function lua_number_map(values)
+    local keys = {};
+    for key, value in pairs(type(values) == 'table' and values or {}) do
+        if (type(key) == 'string' and tonumber(value) ~= nil) then
+            table.insert(keys, key);
+        end
+    end
+    table.sort(keys);
+    local pieces = {};
+    for _, key in ipairs(keys) do
+        table.insert(pieces, string.format('[%q] = %d', key, bounded_number(values[key], 1, 1, 100000)));
+    end
+    return #pieces > 0 and ('{ ' .. table.concat(pieces, ', ') .. ' }') or '{}';
+end
+
 local function settings_text()
     local values = state.settings;
     local lines = {
@@ -2138,6 +2180,7 @@ local function settings_text()
         string.format('    chat_log_seed_lines = %d,', bounded_number(values.chat_log_seed_lines, DEFAULT_SETTINGS.chat_log_seed_lines, 0, 5000)),
         string.format('    poll_chat_log = %s,', lua_boolean(values.poll_chat_log)),
         string.format('    default_active_guides = %s,', lua_string_list(state.active_order)),
+        string.format('    guide_steps = %s,', lua_number_map(values.guide_steps)),
         '};',
         '',
     };

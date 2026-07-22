@@ -42,6 +42,8 @@ $required = @(
     "bootstrap_persistent_config",
     "settings.lua",
     "save_settings_if_needed",
+    "guide_steps",
+    "lua_number_map",
     "valor_state.lua",
     "state.save_pov_state_if_needed",
     "state.load_persisted_pov_state",
@@ -134,6 +136,18 @@ foreach ($needle in $blocked) {
 
 if ($content -notmatch "for _, key in ipairs\(close_keys\) do\s+close_guide_tab\(key\)") {
     throw 'Guide tab close controls do not use the lifecycle-aware close handler.'
+}
+
+if ($content -notmatch "(?s)previous == nil and guide\.type ~= 'pages_of_valor'.+state\.settings\.guide_steps\[guide\.key\]") {
+    throw 'Normal guides do not restore their persisted step when reopened.'
+}
+
+if ($content -notmatch "(?s)local function next_step\(run\).+state\.settings\.guide_steps\[run\.key\] = run\.step_index") {
+    throw 'Forward guide navigation does not persist the selected step.'
+}
+
+if ($content -notmatch "(?s)local function previous_step\(run\).+state\.settings\.guide_steps\[run\.key\] = run\.step_index") {
+    throw 'Backward guide navigation does not persist the selected step.'
 }
 
 if ($content -notmatch "guide\.origin == 'ai'\) then\s+return delete_ai_guide\(key\)") {
