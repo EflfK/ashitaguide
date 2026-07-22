@@ -106,7 +106,21 @@ $required = @(
     "required_job",
     "GetMainJobLevel",
     "target_x",
-    "Progress"
+    "Progress",
+    "ReadProcessMemory",
+    "guarded_read_bytes",
+    "function decision.active_state",
+    "function decision.read_menu",
+    "function decision.update",
+    "function decision.render",
+    "function decision.recommended_index",
+    "function decision.capture_anchor",
+    "function decision.render_config",
+    "Decision Window##ashitaguide_config_decision",
+    "decision_anchor_corner",
+    "decision_window_x",
+    "decision_window_y",
+    "decision_opacity"
 )
 
 foreach ($needle in $required) {
@@ -120,6 +134,7 @@ $blocked = @(
     'InjectPacket',
     'SendPacket',
     'SetTarget',
+    'ashita.memory.write',
     '/target',
     '/targetnpc',
     '/attack',
@@ -246,6 +261,14 @@ if ($content -notmatch "PushTextWrapPos\(math\.max\(cursor_x \+ 1, GUIDE_TEXT_WR
 
 if ($content -notmatch "SetNextWindowSizeConstraints\(\{ 0, 0 \}, \{ GUIDE_WINDOW_MAX_WIDTH, 10000 \}\)") {
     throw 'Guides window must enforce its auto-fit width ceiling before Begin.'
+}
+
+if ($content -notmatch "(?s)function decision\.render\(\).+window_no_resize.+window_no_scrollbar.+window_no_scroll_with_mouse.+window_always_auto_resize.+window_no_saved_settings") {
+    throw 'Decision window must auto-size from its configured anchor without scrollbars.'
+}
+
+if ($content -notmatch "(?s)function decision\.capture_anchor\(expected_x, expected_y\).+decision\.top_left\(width, height\)") {
+    throw 'Decision window must preserve its configured corner while its content size changes.'
 }
 
 if ($content -match "capture_window_geometry\('window_x', 'window_y', 'window_width', 'window_height'") {

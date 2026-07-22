@@ -34,18 +34,36 @@ use the manual controls or satisfy an explicitly configured display condition.
 - dedicated Pages of Valor window that appears from chat evidence
 - built-in brown treasure casket code helper
 - dedicated Casket Helper window that appears from live casket chat hints
-- separate Guides, AI Guides, Auction Sales, Valor, and Casket tabs in Guide Config
-- independent 0-100% background opacity for the Guides, Valor, and Casket windows
+- movable, display-only native decision-menu companion with guide answer highlighting
+- separate Guides, Decision Window, AI Guides, Auction Sales, Valor, and Casket tabs in Guide Config
+- independent 0-100% background opacity for the Guides, Decision, Valor, and Casket windows
 - permanent AshitaChat-style titleless frames, dark borders, and transparent child regions
 - compact AshitaChat-style tabs in the Guides window only
 - content-sized Guides window with no resize handles or scrollbars
 - a hard auto-fit width ceiling plus bounded text wrapping to prevent transient wide-window resizing between steps
 - Guides-tab selector for a stationary window corner (`top_left`, `top_right`, `bottom_left`, or `bottom_right`)
+- Decision Window selector for the same four anchored auto-expansion directions
 - configurable all-steps list in the normal guide window
 - balanced navigation layout with configurable map size
 - Pages of Valor progress seeding from the current character chat log
 - live Pages of Valor updates from incoming chat text and appended log lines
 - character-scoped Pages of Valor state that survives game reloads and addon reinstalls
+
+## Decision Window
+
+When the game opens a native NPC choice menu, AshitaGuide displays a compact,
+movable copy using the same titleless translucent style as the Guides window.
+The cyan `>` follows the native game cursor. If the active guide step's
+`answer` matches one of the visible choices, a separate gold `*` marks that
+recommended row. Matching ignores case and punctuation and accepts instructions
+such as `Select Other settings.`
+
+The window is display-only. It does not select a choice, send input, inject a
+packet, or advance the guide. The original game menu remains visible and all
+interaction continues through the normal game controls. The Decision Window
+configuration tab controls whether the companion is enabled, its background
+opacity, and which corner remains stationary as differently sized menus expand.
+The window auto-sizes without resize handles or scrollbars.
 
 ## Casket Helper
 
@@ -112,7 +130,7 @@ Ashita/config/addons/ashitaguide/ashitaguide_config.lua
 
 Edit that persistent copy when adding or changing guides. The addon writes UI
 preferences to `Ashita/config/addons/ashitaguide/settings.lua`, including window
-positions and sizes, the Guides-window anchor corner, visibility, map size, Valor settings,
+positions and sizes, the Guides and Decision anchor corners, visibility, map size, Valor settings,
 Casket settings, per-window background opacity, active normal guides, and each guide's
 last selected step. A normal guide resumes that step even after its tab is closed and
 reopened or the game is restarted.
@@ -264,6 +282,11 @@ return {
         guide_opacity = 92,
         -- window_x/window_y are the screen coordinates of this stationary corner.
         guide_anchor_corner = 'top_left',
+        decision_enabled = true,
+        decision_anchor_corner = 'top_left',
+        decision_window_x = 80,
+        decision_window_y = 180,
+        decision_opacity = 96,
         minimap_marker_enabled = true,
         valor_opacity = 92,
         casket_opacity = 92,

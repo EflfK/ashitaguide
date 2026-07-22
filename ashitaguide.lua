@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.19.7';
+addon.version = '0.20.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -8,7 +8,94 @@ require('common');
 local chat  = require('chat');
 local imgui = require('imgui');
 local d3d8  = require('d3d8');
+local decision = { ffi = require('ffi') };
 local d3d8_device = d3d8.get_device();
+
+pcall(decision.ffi.cdef, 'void* __stdcall GetCurrentProcess(void);');
+pcall(decision.ffi.cdef, 'int __stdcall ReadProcessMemory(void*, const void*, void*, unsigned long, unsigned long*);');
+
+decision.process_handle = decision.ffi.C.GetCurrentProcess();
+
+function decision.guarded_read_bytes(address, size)
+    address = tonumber(address) or 0;
+    size = tonumber(size) or 0;
+    if (address <= 0 or size <= 0 or size > 4096) then
+        return nil;
+    end
+
+    local buffer = decision.ffi.new('uint8_t[?]', size);
+    local bytes_read = decision.ffi.new('unsigned long[1]', 0);
+    local ok, result = pcall(function ()
+        return decision.ffi.C.ReadProcessMemory(
+            decision.process_handle,
+            decision.ffi.cast('const void*', address),
+            buffer,
+            size,
+            bytes_read);
+    end);
+    if (not ok or result == 0 or tonumber(bytes_read[0]) ~= size) then
+        return nil;
+    end
+
+    return buffer;
+end
+
+function decision.read_uint8(address)
+    local bytes = decision.guarded_read_bytes(address, 1);
+    return bytes ~= nil and tonumber(bytes[0]) or nil;
+end
+
+function decision.read_uint16(address)
+    local bytes = decision.guarded_read_bytes(address, 2);
+    if (bytes == nil) then
+        return nil;
+    end
+    return tonumber(bytes[0]) + (tonumber(bytes[1]) * 0x100);
+end
+
+function decision.read_uint32(address)
+    local bytes = decision.guarded_read_bytes(address, 4);
+    if (bytes == nil) then
+        return nil;
+    end
+    return tonumber(bytes[0])
+        + (tonumber(bytes[1]) * 0x100)
+        + (tonumber(bytes[2]) * 0x10000)
+        + (tonumber(bytes[3]) * 0x1000000);
+end
+
+function decision.read_string(address, size)
+    local bytes = decision.guarded_read_bytes(address, size);
+    if (bytes == nil) then
+        return nil;
+    end
+
+    local characters = {};
+    for index = 0, size - 1 do
+        local value = tonumber(bytes[index]);
+        if (value == 0) then
+            break;
+        end
+        characters[#characters + 1] = string.char(value);
+    end
+    return table.concat(characters);
+end
+
+function decision.menu_uint8(address)
+    return decision.read_uint8(address) or 0;
+end
+
+function decision.menu_uint16(address)
+    return decision.read_uint16(address) or 0;
+end
+
+function decision.menu_uint32(address)
+    return decision.read_uint32(address) or 0;
+end
+
+function decision.menu_string(address, size)
+    return decision.read_string(address, size) or '';
+end
 
 local function imgui_const(name)
     return rawget(_G, name) or 0;
@@ -54,6 +141,9 @@ local COLORS = {
     muted = { 0.62, 0.65, 0.70, 1.00 },
     warning = { 1.00, 0.66, 0.36, 1.00 },
     error = { 1.00, 0.38, 0.34, 1.00 },
+    decision_selected = { 0.45, 0.92, 1.00, 1.00 },
+    decision_recommended = { 1.00, 0.78, 0.30, 1.00 },
+    decision_normal = { 0.91, 0.93, 0.97, 1.00 },
     casket_best = { 0.18, 0.86, 0.34, 0.94 },
     casket_best_hover = { 0.28, 0.96, 0.44, 1.00 },
     casket_possible = { 0.92, 0.74, 0.18, 0.88 },
@@ -87,6 +177,11 @@ local DEFAULT_SETTINGS = {
     guide_map_size = 160,
     minimap_marker_enabled = true,
     guide_opacity = 92,
+    decision_enabled = true,
+    decision_anchor_corner = 'top_left',
+    decision_window_x = 80,
+    decision_window_y = 180,
+    decision_opacity = 96,
     config_visible = true,
     config_window_x = 110,
     config_window_y = 160,
@@ -175,6 +270,8 @@ local state = {
     guide_map_size = T{ 160 },
     minimap_marker_enabled = T{ true },
     guide_opacity = T{ 92 },
+    decision_enabled = T{ true },
+    decision_opacity = T{ 96 },
     valor_opacity = T{ 92 },
     casket_opacity = T{ 92 },
     casket_stale_seconds = T{ 210 },
@@ -251,6 +348,12 @@ local state = {
     auction_sale_storage_error = nil,
     auction_sale_observed_text = nil,
     auction_sale_last_poll = 0,
+    decision_menu = nil,
+    decision_menu_candidate = 0,
+    decision_menu_stable_frames = 0,
+    decision_menu_open = T{ true },
+    decision_window_width = nil,
+    decision_window_height = nil,
     guide_window_width = nil,
     guide_window_height = nil,
 };
@@ -366,6 +469,54 @@ local function set_guide_anchor_corner(value)
     state.settings.window_y = bounded_number(
         top_left_y + ((new_corner == 'bottom_left' or new_corner == 'bottom_right') and height or 0),
         state.settings.window_y,
+        0,
+        10000);
+end
+
+function decision.normalize_anchor(value)
+    local corner = trim_string(value):lower():gsub('[%s%-]+', '_');
+    if (corner == 'top_left'
+        or corner == 'top_right'
+        or corner == 'bottom_left'
+        or corner == 'bottom_right') then
+        return corner;
+    end
+    return DEFAULT_SETTINGS.decision_anchor_corner;
+end
+
+function decision.anchor_label(value)
+    local corner = decision.normalize_anchor(value);
+    for _, option in ipairs(GUIDE_ANCHOR_CORNERS) do
+        if (option.key == corner) then
+            return option.label;
+        end
+    end
+    return GUIDE_ANCHOR_CORNERS[1].label;
+end
+
+function decision.set_anchor(value)
+    local old_corner = decision.normalize_anchor(state.settings.decision_anchor_corner);
+    local new_corner = decision.normalize_anchor(value);
+    if (old_corner == new_corner) then
+        return;
+    end
+
+    local width = tonumber(state.decision_window_width) or 0;
+    local height = tonumber(state.decision_window_height) or 0;
+    local top_left_x = state.settings.decision_window_x
+        - ((old_corner == 'top_right' or old_corner == 'bottom_right') and width or 0);
+    local top_left_y = state.settings.decision_window_y
+        - ((old_corner == 'bottom_left' or old_corner == 'bottom_right') and height or 0);
+
+    state.settings.decision_anchor_corner = new_corner;
+    state.settings.decision_window_x = bounded_number(
+        top_left_x + ((new_corner == 'top_right' or new_corner == 'bottom_right') and width or 0),
+        state.settings.decision_window_x,
+        0,
+        10000);
+    state.settings.decision_window_y = bounded_number(
+        top_left_y + ((new_corner == 'bottom_left' or new_corner == 'bottom_right') and height or 0),
+        state.settings.decision_window_y,
         0,
         10000);
 end
@@ -612,6 +763,188 @@ local function normalize_step(source, index)
     };
 end
 
+function decision.is_pointer(value)
+    return value >= 0x00010000 and value < 0x80000000;
+end
+
+function decision.active_state()
+    local pointer_manager = AshitaCore:GetPointerManager();
+    if (pointer_manager == nil) then
+        return '', 0;
+    end
+
+    local root = tonumber(pointer_manager:Get('menu')) or 0;
+    if (root == 0) then
+        return '', 0;
+    end
+
+    local holder = decision.menu_uint32(root);
+    local object = holder ~= 0 and decision.menu_uint32(holder) or 0;
+    if (object == 0) then
+        return '', 0;
+    end
+
+    local header = decision.menu_uint32(object + 0x04);
+    if (header == 0) then
+        return '', object;
+    end
+
+    local name = decision.menu_string(header + 0x46, 16)
+        :gsub('\x00', '')
+        :gsub('^%s+', '')
+        :gsub('%s+$', '');
+    return name, object;
+end
+
+function decision.decode_text(pointer, byte_count)
+    if (pointer == 0) then
+        return '';
+    end
+
+    local characters = {};
+    local started = false;
+    local zero_count = 0;
+    local first_character = true;
+    for offset = 0, byte_count - 2, 2 do
+        local value = decision.menu_uint16(pointer + offset);
+        if (value >= 32 and value <= 126) then
+            local character = string.char(value);
+            local previous = characters[#characters];
+            local shifted_uppercase = value >= 0x21 and value <= 0x3A
+                and value ~= 0x27
+                and value ~= 0x2D
+                and (first_character
+                    or (value == 0x2F and previous == "'")
+                    or (value == 0x2C and previous == ' '));
+            if (shifted_uppercase) then
+                character = string.char(value + 0x20);
+            end
+            characters[#characters + 1] = character;
+            started = true;
+            zero_count = 0;
+            first_character = false;
+        elseif (value == 0) then
+            zero_count = zero_count + 1;
+            if (started and zero_count >= 4) then
+                break;
+            end
+            if (started and characters[#characters] ~= ' ') then
+                characters[#characters + 1] = ' ';
+            end
+        elseif (started and value > 0 and value < 0x20) then
+            local character = string.char(value + 0x20);
+            characters[#characters + 1] = character;
+            zero_count = 0;
+            if (character == '.' or character == '?' or character == '!') then
+                break;
+            end
+        end
+    end
+
+    return trim_string(table.concat(characters):gsub('%s+', ' '));
+end
+
+function decision.read_menu()
+    local name, object = decision.active_state();
+    if (object == 0 or name:lower():find('query', 1, true) == nil) then
+        return nil;
+    end
+
+    local menu_data = decision.menu_uint32(object + 0x0C);
+    if (menu_data == 0) then
+        return nil;
+    end
+
+    local total = decision.menu_uint32(menu_data + 0x24);
+    if (total < 1 or total > 64) then
+        return nil;
+    end
+
+    local choices = {};
+    local node = decision.menu_uint32(menu_data + 0x14);
+    local visited = {};
+    for index = 1, total do
+        if (not decision.is_pointer(node) or visited[node] == true) then
+            break;
+        end
+        visited[node] = true;
+        local content = decision.menu_uint32(node + 0x10);
+        local text = decision.decode_text(content, 256);
+        choices[#choices + 1] = text ~= '' and text or string.format('Choice %d', index);
+        node = decision.menu_uint32(node + 0x00);
+    end
+    if (#choices == 0) then
+        return nil;
+    end
+
+    local final_name, final_object = decision.active_state();
+    if (final_object ~= object or final_name:lower():find('query', 1, true) == nil) then
+        return nil;
+    end
+
+    local selected = decision.menu_uint8(menu_data + 0x30) + 1;
+    return {
+        object = object,
+        menu_data = menu_data,
+        prompt = decision.decode_text(menu_data + 0x30, 256),
+        choices = choices,
+        selected = math.max(1, math.min(#choices, selected)),
+    };
+end
+
+function decision.update()
+    if (state.decision_enabled[1] ~= true) then
+        state.decision_menu = nil;
+        state.decision_menu_candidate = 0;
+        state.decision_menu_stable_frames = 0;
+        return;
+    end
+
+    local name, object = decision.active_state();
+    if (object == 0 or name:lower():find('query', 1, true) == nil) then
+        state.decision_menu = nil;
+        state.decision_menu_candidate = 0;
+        state.decision_menu_stable_frames = 0;
+        return;
+    end
+
+    local current = state.decision_menu;
+    if (current == nil or current.object ~= object) then
+        if (state.decision_menu_candidate ~= object) then
+            state.decision_menu_candidate = object;
+            state.decision_menu_stable_frames = 1;
+            return;
+        end
+
+        state.decision_menu_stable_frames = state.decision_menu_stable_frames + 1;
+        if (state.decision_menu_stable_frames < 45) then
+            return;
+        end
+
+        local captured = decision.read_menu();
+        state.decision_menu_candidate = 0;
+        state.decision_menu_stable_frames = 0;
+        if (captured ~= nil) then
+            state.decision_menu = captured;
+            state.decision_menu_open[1] = true;
+        end
+        return;
+    end
+
+    local menu_data = decision.menu_uint32(object + 0x0C);
+    if (menu_data == 0 or menu_data ~= current.menu_data) then
+        state.decision_menu = nil;
+        state.decision_menu_candidate = object;
+        state.decision_menu_stable_frames = 1;
+        return;
+    end
+
+    local selected = decision.menu_uint8(menu_data + 0x30) + 1;
+    if (selected >= 1 and selected <= #current.choices) then
+        current.selected = selected;
+    end
+end
+
 local function normalize_guide(source, index, origin)
     source = type(source) == 'table' and source or {};
     local name = trim_string(source.name or source.label);
@@ -657,6 +990,23 @@ local function normalize_settings(source)
             source.minimap_marker_enabled,
             DEFAULT_SETTINGS.minimap_marker_enabled),
         guide_opacity = bounded_number(source.guide_opacity, legacy_opacity, 0, 100),
+        decision_enabled = bounded_boolean(source.decision_enabled, DEFAULT_SETTINGS.decision_enabled),
+        decision_anchor_corner = decision.normalize_anchor(source.decision_anchor_corner),
+        decision_window_x = bounded_number(
+            source.decision_window_x,
+            DEFAULT_SETTINGS.decision_window_x,
+            0,
+            10000),
+        decision_window_y = bounded_number(
+            source.decision_window_y,
+            DEFAULT_SETTINGS.decision_window_y,
+            0,
+            10000),
+        decision_opacity = bounded_number(
+            source.decision_opacity,
+            DEFAULT_SETTINGS.decision_opacity,
+            0,
+            100),
         config_visible = bounded_boolean(source.config_visible, DEFAULT_SETTINGS.config_visible),
         config_window_x = bounded_number(source.config_window_x, DEFAULT_SETTINGS.config_window_x, 0, 10000),
         config_window_y = bounded_number(source.config_window_y, DEFAULT_SETTINGS.config_window_y, 0, 10000),
@@ -1890,6 +2240,8 @@ local function load_config()
     state.guide_map_size[1] = state.settings.guide_map_size;
     state.minimap_marker_enabled[1] = state.settings.minimap_marker_enabled;
     state.guide_opacity[1] = state.settings.guide_opacity;
+    state.decision_enabled[1] = state.settings.decision_enabled;
+    state.decision_opacity[1] = state.settings.decision_opacity;
     state.valor_opacity[1] = state.settings.valor_opacity;
     state.casket_opacity[1] = state.settings.casket_opacity;
     state.casket_stale_seconds[1] = state.settings.casket_stale_seconds;
@@ -2099,6 +2451,11 @@ local function settings_text()
         string.format('    guide_map_size = %d,', bounded_number(state.guide_map_size[1], DEFAULT_SETTINGS.guide_map_size, 120, 260)),
         string.format('    minimap_marker_enabled = %s,', lua_boolean(state.minimap_marker_enabled[1])),
         string.format('    guide_opacity = %d,', bounded_number(state.guide_opacity[1], DEFAULT_SETTINGS.guide_opacity, 0, 100)),
+        string.format('    decision_enabled = %s,', lua_boolean(state.decision_enabled[1])),
+        string.format('    decision_anchor_corner = %q,', decision.normalize_anchor(values.decision_anchor_corner)),
+        string.format('    decision_window_x = %d,', bounded_number(values.decision_window_x, DEFAULT_SETTINGS.decision_window_x, 0, 10000)),
+        string.format('    decision_window_y = %d,', bounded_number(values.decision_window_y, DEFAULT_SETTINGS.decision_window_y, 0, 10000)),
+        string.format('    decision_opacity = %d,', bounded_number(state.decision_opacity[1], DEFAULT_SETTINGS.decision_opacity, 0, 100)),
         string.format('    config_visible = %s,', lua_boolean(state.config_visible[1])),
         string.format('    config_window_x = %d,', bounded_number(values.config_window_x, DEFAULT_SETTINGS.config_window_x, 0, 10000)),
         string.format('    config_window_y = %d,', bounded_number(values.config_window_y, DEFAULT_SETTINGS.config_window_y, 0, 10000)),
@@ -2883,6 +3240,45 @@ local function render_guide_anchor_selector()
         imgui.EndCombo();
     end
     imgui.PopItemWidth();
+end
+
+function decision.render_anchor_selector()
+    if (type(imgui.BeginCombo) ~= 'function' or type(imgui.Selectable) ~= 'function') then
+        imgui.Text('Anchor corner: ' .. decision.anchor_label(state.settings.decision_anchor_corner));
+        return;
+    end
+
+    imgui.PushItemWidth(220);
+    if (imgui.BeginCombo(
+        'Anchor corner##ashitaguide_decision_anchor_corner',
+        decision.anchor_label(state.settings.decision_anchor_corner))) then
+        local current = decision.normalize_anchor(state.settings.decision_anchor_corner);
+        for _, option in ipairs(GUIDE_ANCHOR_CORNERS) do
+            if (imgui.Selectable(
+                option.label .. '##ashitaguide_decision_anchor_corner_' .. option.key,
+                current == option.key)) then
+                decision.set_anchor(option.key);
+            end
+        end
+        imgui.EndCombo();
+    end
+    imgui.PopItemWidth();
+end
+
+function decision.render_config()
+    imgui.TextColored(COLORS.header, 'Decision Window');
+    imgui.Checkbox('Enabled##ashitaguide_decision_enabled', state.decision_enabled);
+    imgui.PushItemWidth(220);
+    imgui.SliderInt(
+        'Background opacity##ashitaguide_decision_opacity',
+        state.decision_opacity,
+        0,
+        100,
+        '%d%%');
+    imgui.PopItemWidth();
+    decision.render_anchor_selector();
+    imgui.TextColored(COLORS.muted, 'The selected corner stays fixed while menu content expands.');
+    imgui.TextColored(COLORS.muted, 'Open an NPC decision menu to drag the window into position.');
 end
 
 local function render_category_filter()
@@ -3851,6 +4247,155 @@ local function render_active_guide(run)
     end
 end
 
+function decision.guide_answer()
+    local run = state.active[state.selected_active_key] or state.active[state.active_order[1]];
+    if (run == nil or run.guide == nil) then
+        return '';
+    end
+    local step = run.guide.steps[run.step_index] or run.guide.steps[1];
+    return step ~= nil and trim_string(step.answer) or '';
+end
+
+function decision.normalize_match(value)
+    return trim_string(tostring(value or '')
+        :upper()
+        :gsub('[^A-Z0-9]+', ' ')
+        :gsub('%s+', ' '));
+end
+
+function decision.recommended_index(menu, answer)
+    local requested = decision.normalize_match(answer)
+        :gsub('^SELECT%s+', '')
+        :gsub('^CHOOSE%s+', '')
+        :gsub('^PICK%s+', '');
+    if (requested == '') then
+        return nil;
+    end
+
+    for index, choice in ipairs(menu.choices) do
+        local candidate = decision.normalize_match(choice);
+        if (candidate ~= '' and (requested == candidate
+            or requested:find(candidate, 1, true) ~= nil
+            or candidate:find(requested, 1, true) ~= nil)) then
+            return index;
+        end
+    end
+    return nil;
+end
+
+function decision.top_left(width, height)
+    local x = state.settings.decision_window_x;
+    local y = state.settings.decision_window_y;
+    local corner = decision.normalize_anchor(state.settings.decision_anchor_corner);
+    if (corner == 'top_right' or corner == 'bottom_right') then
+        x = x - width;
+    end
+    if (corner == 'bottom_left' or corner == 'bottom_right') then
+        y = y - height;
+    end
+    return x, y;
+end
+
+function decision.capture_anchor(expected_x, expected_y)
+    if (type(imgui.GetWindowPos) ~= 'function' or type(imgui.GetWindowSize) ~= 'function') then
+        return;
+    end
+
+    local x, y = imgui.GetWindowPos();
+    local width, height = imgui.GetWindowSize();
+    x = tonumber(x) or expected_x;
+    y = tonumber(y) or expected_y;
+    width = tonumber(width) or state.decision_window_width or 0;
+    height = tonumber(height) or state.decision_window_height or 0;
+
+    if (math.abs(x - expected_x) > 0.5 or math.abs(y - expected_y) > 0.5) then
+        local corner = decision.normalize_anchor(state.settings.decision_anchor_corner);
+        state.settings.decision_window_x = bounded_number(
+            x + ((corner == 'top_right' or corner == 'bottom_right') and width or 0),
+            state.settings.decision_window_x,
+            0,
+            10000);
+        state.settings.decision_window_y = bounded_number(
+            y + ((corner == 'bottom_left' or corner == 'bottom_right') and height or 0),
+            state.settings.decision_window_y,
+            0,
+            10000);
+    end
+
+    if (type(imgui.SetWindowPos) == 'function') then
+        local anchored_x, anchored_y = decision.top_left(width, height);
+        pcall(imgui.SetWindowPos, { anchored_x, anchored_y }, 0);
+    end
+
+    state.decision_window_width = width;
+    state.decision_window_height = height;
+end
+
+function decision.render()
+    local menu = state.decision_menu;
+    if (state.decision_enabled[1] ~= true
+        or menu == nil
+        or state.decision_menu_open[1] ~= true) then
+        return;
+    end
+
+    local answer = decision.guide_answer();
+    local recommended = decision.recommended_index(menu, answer);
+    local width = state.decision_window_width or 0;
+    local height = state.decision_window_height or 0;
+    local window_x, window_y = decision.top_left(width, height);
+    imgui.SetNextWindowPos({ window_x, window_y }, 0);
+    if (type(imgui.SetNextWindowSizeConstraints) == 'function') then
+        imgui.SetNextWindowSizeConstraints({ 0, 0 }, { 620, 10000 });
+    end
+    imgui.PushStyleVar(IMGUI.style_window_padding, { 8, 6 });
+    imgui.PushStyleVar(IMGUI.style_window_border_size, 1.0);
+    imgui.PushStyleColor(IMGUI.col_window_bg, {
+        COLORS.display_bg[1],
+        COLORS.display_bg[2],
+        COLORS.display_bg[3],
+        bounded_number(state.decision_opacity[1], DEFAULT_SETTINGS.decision_opacity, 0, 100) / 100,
+    });
+    imgui.PushStyleColor(IMGUI.col_border, COLORS.display_border);
+
+    local flags = bit.bor(
+        IMGUI.window_no_title_bar,
+        IMGUI.window_no_collapse,
+        IMGUI.window_no_resize,
+        IMGUI.window_no_scrollbar,
+        IMGUI.window_no_scroll_with_mouse,
+        IMGUI.window_always_auto_resize,
+        IMGUI.window_no_saved_settings);
+    local visible = imgui.Begin('Guide Decision###AshitaGuideDecisionMenu', state.decision_menu_open, flags);
+    decision.capture_anchor(window_x, window_y);
+    if (visible) then
+        imgui.TextColored(COLORS.header, menu.prompt ~= '' and menu.prompt or 'Choose an option');
+        imgui.Separator();
+        for index, choice in ipairs(menu.choices) do
+            local selected = index == menu.selected;
+            local suggested = index == recommended;
+            local choice_color = selected and COLORS.decision_selected
+                or suggested and COLORS.decision_recommended
+                or COLORS.decision_normal;
+            imgui.TextColored(
+                selected and COLORS.decision_selected or COLORS.decision_normal,
+                selected and '>' or ' ');
+            imgui.SameLine(0, 4);
+            imgui.TextColored(
+                suggested and COLORS.decision_recommended or COLORS.decision_normal,
+                suggested and '*' or ' ');
+            imgui.SameLine(0, 6);
+            imgui.TextColored(
+                choice_color,
+                choice);
+        end
+    end
+
+    imgui.End();
+    imgui.PopStyleColor(2);
+    imgui.PopStyleVar(2);
+end
+
 local function render_active_tabs()
     if (#state.active_order == 0) then
         imgui.TextColored(COLORS.muted, 'No active guides. Open Guide Config to start one.');
@@ -4207,6 +4752,10 @@ local function render_config_window()
                     render_guide_selector();
                     imgui.EndTabItem();
                 end
+                if (imgui.BeginTabItem('Decision Window##ashitaguide_config_decision')) then
+                    decision.render_config();
+                    imgui.EndTabItem();
+                end
                 if (imgui.BeginTabItem('AI Guides##ashitaguide_config_ai_guides')) then
                     render_ai_guide_config();
                     imgui.EndTabItem();
@@ -4227,6 +4776,8 @@ local function render_config_window()
             end
         else
             render_guide_selector();
+            imgui.Separator();
+            decision.render_config();
             imgui.Separator();
             render_ai_guide_config();
             imgui.Separator();
@@ -4459,8 +5010,10 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     poll_auction_sale_guide_file();
     update_npc_step_auto_advance();
     update_level_step_auto_advance();
+    decision.update();
     render_minimap_destination_marker();
     render_guide_window();
+    decision.render();
     render_valor_window();
     render_casket_window();
     render_config_window();
