@@ -206,12 +206,31 @@ local state = {
     },
     pov_run = nil,
     pov_active = false,
+    pov_recovery_pages = {
+        {
+            key = 'crawlers_nest_page_1',
+            name = "Crawlers' Nest Page 1",
+            number = 1,
+            zone = "Crawlers' Nest",
+            notes = 'Target level range: 40-44',
+            targets = {
+                { name = 'Worker Crawler', count = 3 },
+                { name = 'Death Jacket', count = 3 },
+            },
+        },
+    },
     casket = nil,
     settings_observed_text = nil,
     settings_saved_text = nil,
     settings_pending_at = 0,
     settings_last_poll = 0,
     settings_save_error = nil,
+    pov_state_observed_text = nil,
+    pov_state_saved_text = nil,
+    pov_state_pending_at = 0,
+    pov_state_last_poll = 0,
+    pov_state_save_error = nil,
+    pov_state_restore_pending = true,
     ai_guides = {},
     permanent_guides = {},
     ai_selected_key = nil,
@@ -494,13 +513,27 @@ local function world_to_screen(x, z, y)
     return screen_x, screen_y;
 end
 
-local function current_chat_log_path()
+state.current_character_name = function ()
     local memory = safe_read(function () return AshitaCore:GetMemoryManager(); end, nil);
     local party = memory ~= nil and safe_read(function () return memory:GetParty(); end, nil) or nil;
     local character = party ~= nil and clean_message(safe_read(function () return party:GetMemberName(0); end, '')) or '';
-    if (character == '') then
-        return nil;
-    end
+    return character ~= '' and character or nil;
+end
+
+state.current_zone_name = function ()
+    local memory = safe_read(function () return AshitaCore:GetMemoryManager(); end, nil);
+    local party = memory ~= nil and safe_read(function () return memory:GetParty(); end, nil) or nil;
+    local zone_id = party ~= nil and tonumber(safe_read(function () return party:GetMemberZone(0); end, nil)) or nil;
+    local resources = safe_read(function () return AshitaCore:GetResourceManager(); end, nil);
+    local zone = resources ~= nil and zone_id ~= nil
+        and clean_message(safe_read(function () return resources:GetString('zones.names', zone_id); end, ''))
+        or '';
+    return zone ~= '' and zone or nil;
+end
+
+local function current_chat_log_path()
+    local character = state.current_character_name();
+    if (character == nil) then return nil; end
 
     local install_path = clean_message(safe_read(function () return AshitaCore:GetInstallPath(); end, ''));
     if (install_path == '') then
@@ -1239,6 +1272,14 @@ local function settings_file_path()
     return dir ~= nil and path_join(dir, 'settings.lua') or nil;
 end
 
+state.pov_state_file_path = function ()
+    local dir = config_dir_path();
+    local character = state.current_character_name();
+    if (dir == nil or character == nil) then return nil; end
+    local character_key = character:lower():gsub('[^%a%d_-]', '_');
+    return path_join(dir, string.format('valor_state_%s.lua', character_key));
+end
+
 local function ai_guides_file_path()
     local dir = config_dir_path();
     return dir ~= nil and path_join(dir, 'ai_guides.lua') or nil;
@@ -1618,6 +1659,149 @@ local function lua_quoted(value)
     return string.format('%q', tostring(value or ''));
 end
 
+state.normalize_pov_runtime_page = function (source)
+    if (type(source) ~= 'table') then return nil; end
+    local targets = {};
+    for _, candidate in ipairs(type(source.targets) == 'table' and source.targets or {}) do
+        if (type(candidate) == 'table') then
+            local name = trim_string(candidate.name);
+            local count = bounded_number(candidate.count, 0, 0, 1000);
+            if (name ~= '' and count > 0) then
+                table.insert(targets, {
+                    name = name,
+                    count = count,
+                    progress = bounded_number(candidate.progress, 0, 0, count),
+                });
+            end
+        end
+    end
+    if (#targets == 0) then return nil; end
+    return {
+        key = trim_string(source.key) ~= '' and trim_string(source.key) or 'active_regime',
+        name = trim_string(source.name) ~= '' and trim_string(source.name) or 'Active training regime',
+        number = tonumber(source.number),
+        zone = trim_string(source.zone),
+        notes = trim_string(source.notes),
+        targets = targets,
+    };
+end
+
+state.load_persisted_pov_state = function ()
+    local path = state.pov_state_file_path();
+    if (not file_exists(path)) then return nil, nil; end
+    local chunk, load_error = loadfile(path);
+    if (chunk == nil) then
+        return nil, tostring(load_error or 'valor_state.lua could not be loaded');
+    end
+    local ok, values = pcall(chunk);
+    if (not ok or type(values) ~= 'table') then
+        return nil, tostring(values or 'valor_state.lua did not return a table');
+    end
+    local character = state.current_character_name();
+    if (character == nil or trim_string(values.character):lower() ~= character:lower()) then
+        return nil, nil;
+    end
+
+    local source = type(values.pov) == 'table' and values.pov or {};
+    local pov = new_pov_state();
+    pov.zone = trim_string(source.zone);
+    pov.progress = bounded_number(source.progress, 0, 0, 100000);
+    pov.total = bounded_number(source.total, 0, 0, 100000);
+    pov.completed = source.completed == true;
+    pov.completion_count = bounded_number(source.completion_count, 0, 0, 100000);
+    pov.cycle = bounded_number(source.cycle, 1, 1, 100000);
+    pov.runtime_page = state.normalize_pov_runtime_page(source.runtime_page);
+    if (pov.runtime_page ~= nil) then
+        pov.total = page_total(pov.runtime_page);
+        local aggregate = 0;
+        for _, target in ipairs(pov.runtime_page.targets) do
+            aggregate = aggregate + target.progress;
+        end
+        pov.progress = aggregate;
+    end
+    return {
+        active = values.active == true,
+        visible = values.visible ~= false,
+        pov = pov,
+    }, nil;
+end
+
+state.pov_state_text = function ()
+    local character = state.current_character_name();
+    if (character == nil) then return nil; end
+    local pov = state.pov_run ~= nil and state.pov_run.pov or new_pov_state();
+    local lines = {
+        '-- Persistent Pages of Valor state. This file survives addon reinstalls.',
+        'return {',
+        string.format('    character = %s,', lua_quoted(character)),
+        string.format('    active = %s,', state.pov_active == true and 'true' or 'false'),
+        string.format('    visible = %s,', state.valor_visible[1] == true and 'true' or 'false'),
+        '    pov = {',
+        string.format('        zone = %s,', lua_quoted(pov.zone)),
+        string.format('        progress = %d,', bounded_number(pov.progress, 0, 0, 100000)),
+        string.format('        total = %d,', bounded_number(pov.total, 0, 0, 100000)),
+        string.format('        completed = %s,', pov.completed == true and 'true' or 'false'),
+        string.format('        completion_count = %d,', bounded_number(pov.completion_count, 0, 0, 100000)),
+        string.format('        cycle = %d,', bounded_number(pov.cycle, 1, 1, 100000)),
+    };
+    local page = pov.runtime_page;
+    if (page ~= nil) then
+        table.insert(lines, '        runtime_page = {');
+        table.insert(lines, string.format('            key = %s,', lua_quoted(page.key)));
+        table.insert(lines, string.format('            name = %s,', lua_quoted(page.name)));
+        if (tonumber(page.number) ~= nil) then
+            table.insert(lines, string.format('            number = %d,', math.floor(page.number)));
+        end
+        table.insert(lines, string.format('            zone = %s,', lua_quoted(page.zone)));
+        table.insert(lines, string.format('            notes = %s,', lua_quoted(page.notes)));
+        table.insert(lines, '            targets = {');
+        for _, target in ipairs(page.targets or {}) do
+            table.insert(lines, string.format(
+                '                { name = %s, count = %d, progress = %d },',
+                lua_quoted(target.name),
+                bounded_number(target.count, 0, 0, 1000),
+                bounded_number(target.progress, 0, 0, 1000)));
+        end
+        table.insert(lines, '            },');
+        table.insert(lines, '        },');
+    end
+    table.insert(lines, '    },');
+    table.insert(lines, '};');
+    table.insert(lines, '');
+    return table.concat(lines, '\n');
+end
+
+state.save_pov_state_if_needed = function (force)
+    local now = os.clock();
+    if (not force and now - state.pov_state_last_poll < 0.25) then return; end
+    state.pov_state_last_poll = now;
+    local current_text = state.pov_state_text();
+    if (current_text == nil) then return; end
+    if (current_text ~= state.pov_state_observed_text) then
+        state.pov_state_observed_text = current_text;
+        state.pov_state_pending_at = now;
+    end
+    if (not force and (current_text == state.pov_state_saved_text or now - state.pov_state_pending_at < 0.75)) then
+        return;
+    end
+    local dir_ok, dir_or_error = ensure_config_dir();
+    if (not dir_ok) then
+        state.pov_state_save_error = tostring(dir_or_error or 'persistent Valor state directory is unavailable');
+        return;
+    end
+    local path = state.pov_state_file_path();
+    if (path == nil) then return; end
+    local write_ok, write_error = write_text_file(path, current_text);
+    if (not write_ok) then
+        local message = tostring(write_error or 'Valor state file could not be written');
+        if (state.pov_state_save_error ~= message) then log_warn('Valor state save failed: ' .. message); end
+        state.pov_state_save_error = message;
+        return;
+    end
+    state.pov_state_saved_text = current_text;
+    state.pov_state_save_error = nil;
+end
+
 local function guide_storage_text(guides)
     local lines = {
         '-- Persistent AshitaGuide data. This file survives addon reinstalls.',
@@ -1720,7 +1904,9 @@ local function load_config()
         permanent_guides_file_path(), 'permanent_guides.lua');
     local ai_sources, ai_error, ai_text = load_persisted_guides(ai_guides_file_path(), 'ai_guides.lua');
     local auction_sale_source, auction_sale_error, auction_sale_text = load_persisted_auction_sale();
-    state.config_error = config_error or settings_error or permanent_error or ai_error or auction_sale_error;
+    local persisted_pov_state, pov_state_error = state.load_persisted_pov_state();
+    state.pov_state_restore_pending = state.current_character_name() == nil;
+    state.config_error = config_error or settings_error or permanent_error or ai_error or auction_sale_error or pov_state_error;
     state.settings = normalize_settings(merge_tables(config.settings, persisted_settings));
     state.visible[1] = state.settings.visible;
     state.config_visible[1] = state.settings.config_visible;
@@ -1840,7 +2026,13 @@ local function load_config()
 
     local pov_guide = state.guide_by_key.pages_of_valor;
     if (pov_guide ~= nil) then
-        state.pov_run = create_run(pov_guide, previous_pov_run);
+        local restored_run = previous_pov_run;
+        if (restored_run == nil and persisted_pov_state ~= nil) then
+            restored_run = { pov = persisted_pov_state.pov, step_index = 1 };
+            state.pov_active = persisted_pov_state.active;
+            state.valor_visible[1] = persisted_pov_state.active and persisted_pov_state.visible;
+        end
+        state.pov_run = create_run(pov_guide, restored_run);
     else
         state.pov_run = nil;
     end
@@ -1880,6 +2072,20 @@ local function load_config()
         state.ai_selected_key = state.ai_guides[1] ~= nil and state.ai_guides[1].key or nil;
         state.ai_editor_key = nil;
     end
+end
+
+state.restore_persisted_pov_state_if_needed = function ()
+    if (state.pov_state_restore_pending ~= true or state.current_character_name() == nil) then return; end
+    state.pov_state_restore_pending = false;
+    local persisted, restore_error = state.load_persisted_pov_state();
+    if (restore_error ~= nil) then
+        log_warn('Valor state restore failed: ' .. restore_error);
+        return;
+    end
+    if (persisted == nil or state.pov_run == nil) then return; end
+    state.pov_run.pov = persisted.pov;
+    state.pov_active = persisted.active;
+    state.valor_visible[1] = persisted.active and persisted.visible;
 end
 
 local function lua_boolean(value)
@@ -2092,6 +2298,12 @@ local function is_training_complete(text)
         or lower:find('completed the training regime', 1, true) ~= nil;
 end
 
+state.is_training_repeat = function (text)
+    local lower = text:lower();
+    return lower:find('current training regime will begin anew', 1, true) ~= nil
+        or lower:find('training regime will begin anew', 1, true) ~= nil;
+end
+
 local function is_training_cancel(text)
     local lower = text:lower();
     return lower:find('training regime has been canceled', 1, true) ~= nil
@@ -2138,11 +2350,48 @@ local function singular_target_name(value)
     return name;
 end
 
+state.infer_pov_runtime_page = function (pov, total)
+    local zone = trim_string(pov.zone);
+    if (zone == '') then zone = state.current_zone_name() or ''; end
+    local defeated = singular_target_name(pov.last_defeated_name);
+    if (zone == '' or defeated == '' or total == nil) then return nil; end
+    for _, page in ipairs(state.pov_recovery_pages) do
+        if (page.zone:lower() == zone:lower()) then
+            for _, target in ipairs(page.targets) do
+                if (target.count == total and singular_target_name(target.name) == defeated) then
+                    local recovered = {
+                        key = page.key,
+                        name = page.name,
+                        number = page.number,
+                        zone = page.zone,
+                        notes = page.notes,
+                        targets = {},
+                    };
+                    for _, page_target in ipairs(page.targets) do
+                        table.insert(recovered.targets, {
+                            name = page_target.name,
+                            count = page_target.count,
+                            progress = 0,
+                        });
+                    end
+                    pov.runtime_page = recovered;
+                    pov.zone = recovered.zone;
+                    pov.total = page_total(recovered);
+                    log_info('Recovered active training details as ' .. recovered.name .. ' from recent chat evidence.');
+                    return recovered;
+                end
+            end
+        end
+    end
+    return nil;
+end
+
 local function update_designated_progress(run, current, total)
     local pov = run.pov;
     local page = current_pov_page(run);
     if (page == nil) then
-        return;
+        page = state.infer_pov_runtime_page(pov, total);
+        if (page == nil) then return; end
     end
 
     local defeated = singular_target_name(pov.last_defeated_name);
@@ -2213,7 +2462,8 @@ local function handle_pov_text(run, text)
 
     local pov = run.pov;
     capture_pov_transcript(pov, text);
-    local defeated_name = text:match('defeats the ([^%.]+)%.');
+    local defeated_name = text:match('defeats the ([^%.]+)%.')
+        or text:match('^The (.-) falls to the ground%.$');
     if (defeated_name ~= nil) then
         pov.last_defeated_name = trim_string(defeated_name);
         pov.last_defeated_time = os.clock();
@@ -2225,6 +2475,18 @@ local function handle_pov_text(run, text)
 
     if (is_training_accept(text)) then
         commit_pov_transcript(run);
+        return true;
+    end
+
+    if (state.is_training_repeat(text)) then
+        pov.progress = 0;
+        pov.completed = false;
+        pov.cycle = (pov.cycle or 1) + 1;
+        if (pov.runtime_page ~= nil) then
+            for _, target in ipairs(pov.runtime_page.targets or {}) do target.progress = 0; end
+            pov.total = page_total(pov.runtime_page);
+        end
+        run.step_index = 1;
         return true;
     end
 
@@ -2279,6 +2541,7 @@ local function process_observed_text(text, source, mode, alternate_mode)
         local current, total = extract_progress(cleaned);
         local designated_current, designated_total = extract_designated_progress(cleaned);
         local activation_evidence = is_training_accept(cleaned)
+            or state.is_training_repeat(cleaned)
             or (current ~= nil and total ~= nil)
             or (designated_current ~= nil and designated_total ~= nil);
         local ended = is_training_cancel(cleaned) or is_training_complete(cleaned);
@@ -4203,6 +4466,7 @@ ashita.events.register('load', 'load_cb', function ()
 end);
 
 ashita.events.register('unload', 'unload_cb', function ()
+    state.save_pov_state_if_needed(true);
     save_settings_if_needed(true);
     state.visible[1] = false;
     state.config_visible[1] = false;
@@ -4217,6 +4481,7 @@ ashita.events.register('text_in', 'text_in_cb', function (e)
 end);
 
 ashita.events.register('d3d_present', 'present_cb', function ()
+    state.restore_persisted_pov_state_if_needed();
     poll_chat_log();
     poll_ai_guides_file();
     poll_auction_sale_guide_file();
@@ -4228,5 +4493,6 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     render_valor_window();
     render_casket_window();
     render_config_window();
+    state.save_pov_state_if_needed(false);
     save_settings_if_needed(false);
 end);

@@ -44,6 +44,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - balanced navigation layout with configurable map size
 - Pages of Valor progress seeding from the current character chat log
 - live Pages of Valor updates from incoming chat text and appended log lines
+- character-scoped Pages of Valor state that survives game reloads and addon reinstalls
 
 ## Casket Helper
 
@@ -75,9 +76,10 @@ You defeated a training regime target. (Progress: 1/6)
 ```
 
 The addon captures the target list and training area printed before `New
-training regime registered!`. That one runtime regime is displayed directly;
-there is no saved page catalog or manual page selector. CatsEyeXI designated
-target progress updates each captured target row independently.
+training regime registered!`. That runtime regime is displayed directly, with
+one recovery signature for Crawlers' Nest Page 1 when the original transcript
+has already left the chat tail. There is no manual page selector. CatsEyeXI
+designated target progress updates each captured target row independently.
 The dedicated window stays compact: it shows only the zone and remaining kill
 counts. Its enabled state, zone display, progress totals, and visibility are
 controlled from the Valor tab in Guide Config.
@@ -113,6 +115,12 @@ positions and sizes, the Guides-window anchor corner, visibility, map size, Valo
 Casket settings, per-window background opacity, and active normal guides.
 Replacing or reinstalling the addon directory does not overwrite any of these
 persistent files.
+
+The active Pages of Valor target list, progress, and window state are stored in a
+character-specific `Ashita/config/addons/ashitaguide/valor_state_<character>.lua`
+file. It restores the guide before recent chat is replayed, so the target details
+remain available even after the original page-registration messages leave the log
+tail.
 
 ## AI / MCP Guide Contract
 
