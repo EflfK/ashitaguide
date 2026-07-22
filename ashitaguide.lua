@@ -78,9 +78,6 @@ local GUIDE_ANCHOR_CORNERS = {
 
 local GUIDE_WINDOW_MAX_WIDTH = 560;
 local GUIDE_TEXT_WRAP_POS_X = GUIDE_WINDOW_MAX_WIDTH - 12;
-local NAVIGATION_TARGET_LIVE_REFRESH_SECONDS = 0.25;
-local NAVIGATION_TARGET_MISS_RETRY_SECONDS = 5.0;
-local NAVIGATION_TARGET_FALLBACK_SCAN_DISTANCE = 100.0;
 
 local DEFAULT_SETTINGS = {
     visible = true,
@@ -199,6 +196,9 @@ local state = {
     observed_text_events = 0,
     observed_log_events = 0,
     navigation_targets = {},
+    navigation_target_live_refresh_seconds = 0.25,
+    navigation_target_miss_retry_seconds = 5.0,
+    navigation_target_fallback_scan_distance = 100.0,
     minimap = {
         settings = nil,
         settings_checked_at = 0,
@@ -3311,7 +3311,7 @@ local function current_navigation_player()
     return { x = x, y = y, yaw = yaw, zone = zone_name, zone_id = zone_id, entity = entity };
 end
 
-local function read_navigation_target_at_index(entity, index, lookup, checked_at)
+state.read_navigation_target_at_index = function(entity, index, lookup, checked_at)
     local name = clean_message(safe_read(function () return entity:GetName(index); end, ''));
     if (name == '' or name:lower() ~= lookup) then
         return nil;
@@ -3349,7 +3349,7 @@ local function find_navigation_target(player, npc, fallback_x, fallback_y)
         local fallback_delta_y = fallback_y - player.y;
         local fallback_distance = math.sqrt(
             (fallback_delta_x * fallback_delta_x) + (fallback_delta_y * fallback_delta_y));
-        if (fallback_distance > NAVIGATION_TARGET_FALLBACK_SCAN_DISTANCE) then
+        if (fallback_distance > state.navigation_target_fallback_scan_distance) then
             return nil;
         end
     end
@@ -3358,24 +3358,24 @@ local function find_navigation_target(player, npc, fallback_x, fallback_y)
     local cache_key = string.format('%s:%s', tostring(player.zone_id or 0), lookup);
     local cached = state.navigation_targets[cache_key];
     if (cached ~= nil and cached.index ~= nil) then
-        if (now - cached.checked_at < NAVIGATION_TARGET_LIVE_REFRESH_SECONDS) then
+        if (now - cached.checked_at < state.navigation_target_live_refresh_seconds) then
             return cached;
         end
 
-        local refreshed = read_navigation_target_at_index(entity, cached.index, lookup, now);
+        local refreshed = state.read_navigation_target_at_index(entity, cached.index, lookup, now);
         if (refreshed ~= nil) then
             state.navigation_targets[cache_key] = refreshed;
             return refreshed;
         end
         cached = nil;
-    elseif (cached ~= nil and now - cached.checked_at < NAVIGATION_TARGET_MISS_RETRY_SECONDS) then
+    elseif (cached ~= nil and now - cached.checked_at < state.navigation_target_miss_retry_seconds) then
         return cached;
     end
 
     local result = { checked_at = now };
     local count = tonumber(safe_read(function () return entity:GetEntityMapSize(); end, 0)) or 0;
     for index = 0, count - 1 do
-        local candidate = read_navigation_target_at_index(entity, index, lookup, now);
+        local candidate = state.read_navigation_target_at_index(entity, index, lookup, now);
         if (candidate ~= nil) then
             result = candidate;
             break;

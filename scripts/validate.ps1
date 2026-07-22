@@ -37,9 +37,9 @@ $required = @(
     "MAP_TABLE_SIGNATURE",
     "square-minimal",
     "navigation_context",
-    "NAVIGATION_TARGET_LIVE_REFRESH_SECONDS",
-    "NAVIGATION_TARGET_MISS_RETRY_SECONDS",
-    "NAVIGATION_TARGET_FALLBACK_SCAN_DISTANCE",
+    "navigation_target_live_refresh_seconds",
+    "navigation_target_miss_retry_seconds",
+    "navigation_target_fallback_scan_distance",
     "read_navigation_target_at_index",
     "navigation_world_radius",
     "config_dir_path",
@@ -214,21 +214,21 @@ if ($content -notmatch "local function navigation_world_radius\(distance\)\s+ret
     throw 'Navigation map must zoom smoothly with a five-yalm framing margin.'
 }
 
-if ($content -notmatch "NAVIGATION_TARGET_LIVE_REFRESH_SECONDS = 0\.25" -or
-    $content -notmatch "NAVIGATION_TARGET_MISS_RETRY_SECONDS = 5\.0" -or
-    $content -notmatch "NAVIGATION_TARGET_FALLBACK_SCAN_DISTANCE = 100\.0") {
+if ($content -notmatch "navigation_target_live_refresh_seconds = 0\.25" -or
+    $content -notmatch "navigation_target_miss_retry_seconds = 5\.0" -or
+    $content -notmatch "navigation_target_fallback_scan_distance = 100\.0") {
     throw 'Navigation target lookup throttles do not match the documented limits.'
 }
 
-if ($content -notmatch "(?s)fallback_distance > NAVIGATION_TARGET_FALLBACK_SCAN_DISTANCE.+return nil") {
+if ($content -notmatch "(?s)fallback_distance > state\.navigation_target_fallback_scan_distance.+return nil") {
     throw 'Fallback coordinates must distance-gate live NPC entity scans.'
 }
 
-if ($content -notmatch "(?s)cached\.index.+read_navigation_target_at_index\(entity, cached\.index, lookup, now\)") {
+if ($content -notmatch "(?s)cached\.index.+state\.read_navigation_target_at_index\(entity, cached\.index, lookup, now\)") {
     throw 'Resolved NPC navigation targets must refresh through their cached entity index.'
 }
 
-if ($content -notmatch "now - cached\.checked_at < NAVIGATION_TARGET_MISS_RETRY_SECONDS") {
+if ($content -notmatch "now - cached\.checked_at < state\.navigation_target_miss_retry_seconds") {
     throw 'Unresolved NPC navigation targets must use the miss retry throttle.'
 }
 
