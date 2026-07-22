@@ -295,13 +295,17 @@ When a step has `target_x` and `target_y`, its active guide tab shows a north-up
 navigation map. The player remains centered with a live heading marker and the
 destination is plotted from its world coordinates. If `npc` is also set and
 that entity is available in memory, its live position takes precedence over
-the configured coordinates. The map is drawn entirely by the Lua addon and
-does not depend on the Minimap plugin. Navigation is display-only and never
-moves or targets the character. The map section is hidden until the player is
-in the step's destination zone and a usable target position is available. Its
-view continuously adjusts its radius based on distance, smoothly zooming in as
-the player approaches while retaining five yalms of framing space. The active
-map radius is shown next to the map.
+the configured coordinates. With fallback coordinates, live NPC resolution is
+distance-gated until the player is within 100 yalms. Without fallback
+coordinates, an unresolved NPC name is checked against the local entity table
+once every five seconds. Once found, AshitaGuide caches and cheaply refreshes
+that entity index every 0.25 seconds while it remains available. The map is
+drawn entirely by the Lua addon and does not depend on the Minimap plugin.
+Navigation is display-only and never moves or targets the character. The map
+section is hidden until the player is in the step's destination zone and a
+usable target position is available. Its view continuously adjusts its radius
+based on distance, smoothly zooming in as the player approaches while retaining
+five yalms of framing space. The active map radius is shown next to the map.
 
 With `minimap_marker_enabled = true`, that same destination is also drawn as a
 gold dot over the loaded Ashita Minimap plugin. This overlay currently requires

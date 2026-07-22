@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.19.4';
+addon.version = '0.19.5';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -78,6 +78,9 @@ local GUIDE_ANCHOR_CORNERS = {
 
 local GUIDE_WINDOW_MAX_WIDTH = 560;
 local GUIDE_TEXT_WRAP_POS_X = GUIDE_WINDOW_MAX_WIDTH - 12;
+local NAVIGATION_TARGET_LIVE_REFRESH_SECONDS = 0.25;
+local NAVIGATION_TARGET_MISS_RETRY_SECONDS = 5.0;
+local NAVIGATION_TARGET_FALLBACK_SCAN_DISTANCE = 100.0;
 
 local DEFAULT_SETTINGS = {
     visible = true,
@@ -3308,40 +3311,77 @@ local function current_navigation_player()
     return { x = x, y = y, yaw = yaw, zone = zone_name, zone_id = zone_id, entity = entity };
 end
 
-local function find_navigation_target(entity, npc)
-    local lookup = lower_string(npc);
-    if (entity == nil or lookup == '') then
+local function read_navigation_target_at_index(entity, index, lookup, checked_at)
+    local name = clean_message(safe_read(function () return entity:GetName(index); end, ''));
+    if (name == '' or name:lower() ~= lookup) then
         return nil;
     end
 
+    local x = tonumber(safe_read(function () return entity:GetLocalPositionX(index); end, nil));
+    local y = tonumber(safe_read(function () return entity:GetLocalPositionY(index); end, nil));
+    local z = tonumber(safe_read(function () return entity:GetLocalPositionZ(index); end, nil));
+    if (x == nil or y == nil) then
+        return nil;
+    end
+
+    return {
+        checked_at = checked_at,
+        x = x,
+        y = y,
+        z = z,
+        index = index,
+        rendered = bit.band(
+            tonumber(safe_read(function () return entity:GetRenderFlags0(index); end, 0)) or 0,
+            0x200) == 0x200,
+        name = name,
+    };
+end
+
+local function find_navigation_target(player, npc, fallback_x, fallback_y)
+    local lookup = lower_string(npc);
+    if (player == nil or player.entity == nil or lookup == '') then
+        return nil;
+    end
+
+    local entity = player.entity;
+    if (fallback_x ~= nil and fallback_y ~= nil) then
+        local fallback_delta_x = fallback_x - player.x;
+        local fallback_delta_y = fallback_y - player.y;
+        local fallback_distance = math.sqrt(
+            (fallback_delta_x * fallback_delta_x) + (fallback_delta_y * fallback_delta_y));
+        if (fallback_distance > NAVIGATION_TARGET_FALLBACK_SCAN_DISTANCE) then
+            return nil;
+        end
+    end
+
     local now = os.clock();
-    local cached = state.navigation_targets[lookup];
-    if (cached ~= nil and now - cached.checked_at < 0.25) then
+    local cache_key = string.format('%s:%s', tostring(player.zone_id or 0), lookup);
+    local cached = state.navigation_targets[cache_key];
+    if (cached ~= nil and cached.index ~= nil) then
+        if (now - cached.checked_at < NAVIGATION_TARGET_LIVE_REFRESH_SECONDS) then
+            return cached;
+        end
+
+        local refreshed = read_navigation_target_at_index(entity, cached.index, lookup, now);
+        if (refreshed ~= nil) then
+            state.navigation_targets[cache_key] = refreshed;
+            return refreshed;
+        end
+        cached = nil;
+    elseif (cached ~= nil and now - cached.checked_at < NAVIGATION_TARGET_MISS_RETRY_SECONDS) then
         return cached;
     end
 
     local result = { checked_at = now };
     local count = tonumber(safe_read(function () return entity:GetEntityMapSize(); end, 0)) or 0;
     for index = 0, count - 1 do
-        local name = clean_message(safe_read(function () return entity:GetName(index); end, ''));
-        if (name ~= '' and name:lower() == lookup) then
-            local x = tonumber(safe_read(function () return entity:GetLocalPositionX(index); end, nil));
-            local y = tonumber(safe_read(function () return entity:GetLocalPositionY(index); end, nil));
-            local z = tonumber(safe_read(function () return entity:GetLocalPositionZ(index); end, nil));
-            if (x ~= nil and y ~= nil) then
-                result.x = x;
-                result.y = y;
-                result.z = z;
-                result.index = index;
-                result.rendered = bit.band(
-                    tonumber(safe_read(function () return entity:GetRenderFlags0(index); end, 0)) or 0,
-                    0x200) == 0x200;
-                result.name = name;
-                break;
-            end
+        local candidate = read_navigation_target_at_index(entity, index, lookup, now);
+        if (candidate ~= nil) then
+            result = candidate;
+            break;
         end
     end
-    state.navigation_targets[lookup] = result;
+    state.navigation_targets[cache_key] = result;
     return result;
 end
 
@@ -3427,7 +3467,7 @@ local function render_npc_world_marker()
         or (step.zone ~= '' and lower_string(player.zone) ~= lower_string(step.zone))) then
         return;
     end
-    local target = find_navigation_target(player.entity, step.npc);
+    local target = find_navigation_target(player, step.npc, step.target_x, step.target_y);
     if (target == nil or target.rendered ~= true or target.z == nil) then
         return;
     end
@@ -3489,7 +3529,7 @@ local function navigation_context(step)
         return nil;
     end
 
-    local live_target = find_navigation_target(player.entity, step.npc);
+    local live_target = find_navigation_target(player, step.npc, step.target_x, step.target_y);
     local target_x = live_target ~= nil and live_target.x or step.target_x;
     local target_y = live_target ~= nil and live_target.y or step.target_y;
     if (target_x == nil or target_y == nil) then

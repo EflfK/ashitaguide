@@ -37,6 +37,10 @@ $required = @(
     "MAP_TABLE_SIGNATURE",
     "square-minimal",
     "navigation_context",
+    "NAVIGATION_TARGET_LIVE_REFRESH_SECONDS",
+    "NAVIGATION_TARGET_MISS_RETRY_SECONDS",
+    "NAVIGATION_TARGET_FALLBACK_SCAN_DISTANCE",
+    "read_navigation_target_at_index",
     "navigation_world_radius",
     "config_dir_path",
     "bootstrap_persistent_config",
@@ -208,6 +212,24 @@ if ($content -notmatch "local sub_active = truthy\(safe_read\(function \(\) retu
 
 if ($content -notmatch "local function navigation_world_radius\(distance\)\s+return math\.max\(5, distance \+ 5\);\s+end") {
     throw 'Navigation map must zoom smoothly with a five-yalm framing margin.'
+}
+
+if ($content -notmatch "NAVIGATION_TARGET_LIVE_REFRESH_SECONDS = 0\.25" -or
+    $content -notmatch "NAVIGATION_TARGET_MISS_RETRY_SECONDS = 5\.0" -or
+    $content -notmatch "NAVIGATION_TARGET_FALLBACK_SCAN_DISTANCE = 100\.0") {
+    throw 'Navigation target lookup throttles do not match the documented limits.'
+}
+
+if ($content -notmatch "(?s)fallback_distance > NAVIGATION_TARGET_FALLBACK_SCAN_DISTANCE.+return nil") {
+    throw 'Fallback coordinates must distance-gate live NPC entity scans.'
+}
+
+if ($content -notmatch "(?s)cached\.index.+read_navigation_target_at_index\(entity, cached\.index, lookup, now\)") {
+    throw 'Resolved NPC navigation targets must refresh through their cached entity index.'
+}
+
+if ($content -notmatch "now - cached\.checked_at < NAVIGATION_TARGET_MISS_RETRY_SECONDS") {
+    throw 'Unresolved NPC navigation targets must use the miss retry throttle.'
 }
 
 if ($content -notmatch "(?s)local function render_guide_window\(\).+window_no_resize.+window_no_scrollbar.+window_always_auto_resize") {
