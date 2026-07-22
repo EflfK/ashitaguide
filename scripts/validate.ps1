@@ -173,6 +173,10 @@ if ($content -notmatch "(?s)local function previous_step\(run\).+state\.settings
     throw 'Backward guide navigation does not persist the selected step.'
 }
 
+if ($content -notmatch "(?s)local function handle_pov_text\(run, text\).+if \(state\.is_training_repeat\(text\)\) then.+pov\.progress = 0.+for _, target in ipairs\(pov\.runtime_page\.targets or \{\}\) do target\.progress = 0; end.+if \(is_training_accept\(text\)\) then") {
+    throw 'Pages of Valor repeat handling must reset progress before the restart message can be treated as acceptance.'
+}
+
 if ($content -notmatch "guide\.origin == 'ai'\) then\s+return delete_ai_guide\(key\)") {
     throw 'AI guide tabs are not wired to persistent deletion.'
 }

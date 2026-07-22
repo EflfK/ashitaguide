@@ -118,7 +118,8 @@ visible square until they enter the map view.
 An accepted training regime or `Progress x/y` line opens the Pages of Valor window
 automatically. Completion or cancellation closes it. You can close the window
 manually; its background tracker remains active and will reopen it when another
-progress line arrives.
+progress line arrives. When the game says the current training regime will begin
+anew, every target count resets to zero progress for the new cycle.
 
 ## Persistent Configuration
 

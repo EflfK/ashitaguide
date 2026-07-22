@@ -2818,11 +2818,6 @@ local function handle_pov_text(run, text)
         pov.zone = area;
     end
 
-    if (is_training_accept(text)) then
-        commit_pov_transcript(run);
-        return true;
-    end
-
     if (state.is_training_repeat(text)) then
         pov.progress = 0;
         pov.completed = false;
@@ -2832,6 +2827,11 @@ local function handle_pov_text(run, text)
             pov.total = page_total(pov.runtime_page);
         end
         run.step_index = 1;
+        return true;
+    end
+
+    if (is_training_accept(text)) then
+        commit_pov_transcript(run);
         return true;
     end
 
