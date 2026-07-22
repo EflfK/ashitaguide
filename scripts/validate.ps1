@@ -98,7 +98,6 @@ $required = @(
     "AshitaGuideConfig",
     "tab_open",
     "AddTriangleFilled",
-    "world_to_screen",
     "truthy",
     "advance_on_target",
     "update_level_step_auto_advance",
@@ -136,6 +135,10 @@ foreach ($needle in $blocked) {
     if ($content -like "*$needle*") {
         throw "Read-only boundary violation candidate: $needle"
     }
+}
+
+if ($content -match 'render_npc_world_marker|world_to_screen|ashitaguide_npc_world_marker') {
+    throw 'NPC destinations must not render through-walls world-space markers.'
 }
 
 if ($content -notmatch "for _, key in ipairs\(close_keys\) do\s+close_guide_tab\(key\)") {

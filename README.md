@@ -315,10 +315,11 @@ Minimap, send commands, or require a custom DLL.
 Use `/agguide mapdebug` to print a bounded coordinate snapshot when diagnosing
 marker alignment.
 
-Any step with `npc` displays a world-space arrow above that NPC while it is
-rendered. Set `advance_on_target = true` on find/select steps to advance once
-the player selects that NPC. Leave it false or omit it on talk/interact steps
-so keeping the NPC selected does not skip later instructions.
+Set `advance_on_target = true` on find/select steps to advance once the player
+selects that NPC. Leave it false or omit it on talk/interact steps so keeping
+the NPC selected does not skip later instructions. NPC destinations remain on
+the guide navigation map and Minimap overlay; AshitaGuide intentionally does
+not draw world-space markers over NPC models.
 
 Set `minimum_level` on a step to advance automatically when the active main job
 reaches that level. Add `required_job` to restrict completion to one job. Job

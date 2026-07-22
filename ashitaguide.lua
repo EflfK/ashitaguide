@@ -1,13 +1,12 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.19.5';
+addon.version = '0.19.6';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
 
 local chat  = require('chat');
 local imgui = require('imgui');
-local ffi   = require('ffi');
 local d3d8  = require('d3d8');
 local d3d8_device = d3d8.get_device();
 
@@ -467,67 +466,6 @@ local function safe_read(callback, default)
         return result;
     end
     return default;
-end
-
-local function matrix_multiply(left, right)
-    return ffi.new('D3DXMATRIX', {
-        left._11 * right._11 + left._12 * right._21 + left._13 * right._31 + left._14 * right._41,
-        left._11 * right._12 + left._12 * right._22 + left._13 * right._32 + left._14 * right._42,
-        left._11 * right._13 + left._12 * right._23 + left._13 * right._33 + left._14 * right._43,
-        left._11 * right._14 + left._12 * right._24 + left._13 * right._34 + left._14 * right._44,
-        left._21 * right._11 + left._22 * right._21 + left._23 * right._31 + left._24 * right._41,
-        left._21 * right._12 + left._22 * right._22 + left._23 * right._32 + left._24 * right._42,
-        left._21 * right._13 + left._22 * right._23 + left._23 * right._33 + left._24 * right._43,
-        left._21 * right._14 + left._22 * right._24 + left._23 * right._34 + left._24 * right._44,
-        left._31 * right._11 + left._32 * right._21 + left._33 * right._31 + left._34 * right._41,
-        left._31 * right._12 + left._32 * right._22 + left._33 * right._32 + left._34 * right._42,
-        left._31 * right._13 + left._32 * right._23 + left._33 * right._33 + left._34 * right._43,
-        left._31 * right._14 + left._32 * right._24 + left._33 * right._34 + left._34 * right._44,
-        left._41 * right._11 + left._42 * right._21 + left._43 * right._31 + left._44 * right._41,
-        left._41 * right._12 + left._42 * right._22 + left._43 * right._32 + left._44 * right._42,
-        left._41 * right._13 + left._42 * right._23 + left._43 * right._33 + left._44 * right._43,
-        left._41 * right._14 + left._42 * right._24 + left._43 * right._34 + left._44 * right._44,
-    });
-end
-
-local function transform_vector(vector, matrix)
-    return ffi.new('D3DXVECTOR4', {
-        matrix._11 * vector.x + matrix._21 * vector.y + matrix._31 * vector.z + matrix._41 * vector.w,
-        matrix._12 * vector.x + matrix._22 * vector.y + matrix._32 * vector.z + matrix._42 * vector.w,
-        matrix._13 * vector.x + matrix._23 * vector.y + matrix._33 * vector.z + matrix._43 * vector.w,
-        matrix._14 * vector.x + matrix._24 * vector.y + matrix._34 * vector.z + matrix._44 * vector.w,
-    });
-end
-
-local function world_to_screen(x, z, y)
-    if (d3d8_device == nil) then
-        return nil;
-    end
-    local _, view = d3d8_device:GetTransform(ffi.C.D3DTS_VIEW);
-    local _, projection = d3d8_device:GetTransform(ffi.C.D3DTS_PROJECTION);
-    local _, viewport = d3d8_device:GetViewport();
-    if (view == nil or projection == nil or viewport == nil) then
-        return nil;
-    end
-
-    local camera = transform_vector(
-        ffi.new('D3DXVECTOR4', { x, z, y, 1 }),
-        matrix_multiply(view, projection));
-    if (camera.w == 0) then
-        return nil;
-    end
-    local reciprocal = 1 / camera.w;
-    local ndc_x = camera.x * reciprocal;
-    local ndc_y = camera.y * reciprocal;
-    local ndc_z = camera.z * reciprocal;
-    local screen_x = math.floor((ndc_x + 1) * 0.5 * viewport.Width);
-    local screen_y = math.floor((1 - ndc_y) * 0.5 * viewport.Height);
-    if (ndc_z < 0 or ndc_z > 1
-        or screen_x < 0 or screen_x > viewport.Width
-        or screen_y < 0 or screen_y > viewport.Height) then
-        return nil;
-    end
-    return screen_x, screen_y;
 end
 
 state.current_character_name = function ()
@@ -3319,7 +3257,6 @@ state.read_navigation_target_at_index = function(entity, index, lookup, checked_
 
     local x = tonumber(safe_read(function () return entity:GetLocalPositionX(index); end, nil));
     local y = tonumber(safe_read(function () return entity:GetLocalPositionY(index); end, nil));
-    local z = tonumber(safe_read(function () return entity:GetLocalPositionZ(index); end, nil));
     if (x == nil or y == nil) then
         return nil;
     end
@@ -3328,11 +3265,7 @@ state.read_navigation_target_at_index = function(entity, index, lookup, checked_
         checked_at = checked_at,
         x = x,
         y = y,
-        z = z,
         index = index,
-        rendered = bit.band(
-            tonumber(safe_read(function () return entity:GetRenderFlags0(index); end, 0)) or 0,
-            0x200) == 0x200,
         name = name,
     };
 end
@@ -3453,67 +3386,6 @@ local function update_level_step_auto_advance()
     else
         run.level_match_step = nil;
     end
-end
-
-local function render_npc_world_marker()
-    local run = state.active[state.selected_active_key];
-    local step = run ~= nil and run.guide.steps[run.step_index] or nil;
-    if (step == nil or step.npc == '') then
-        return;
-    end
-
-    local player = current_navigation_player();
-    if (player == nil
-        or (step.zone ~= '' and lower_string(player.zone) ~= lower_string(step.zone))) then
-        return;
-    end
-    local target = find_navigation_target(player, step.npc, step.target_x, step.target_y);
-    if (target == nil or target.rendered ~= true or target.z == nil) then
-        return;
-    end
-
-    local screen_x, screen_y = world_to_screen(target.x, target.z - 2.5, target.y);
-    if (screen_x == nil or screen_y == nil) then
-        return;
-    end
-
-    local marker_width = 64;
-    local marker_height = 58;
-    local bob = math.sin(os.clock() * 4) * 3;
-    local tip_y = screen_y - 2 + bob;
-    local flags = bit.bor(
-        bit.lshift(1, 0),  -- NoTitleBar
-        bit.lshift(1, 1),  -- NoResize
-        bit.lshift(1, 2),  -- NoMove
-        bit.lshift(1, 3),  -- NoScrollbar
-        bit.lshift(1, 7),  -- NoBackground
-        bit.lshift(1, 8),  -- NoSavedSettings
-        bit.lshift(1, 9),  -- NoMouseInputs
-        bit.lshift(1, 12), -- NoFocusOnAppearing
-        bit.lshift(1, 13), -- NoBringToFrontOnFocus
-        bit.lshift(1, 18), -- NoNavInputs
-        bit.lshift(1, 19));-- NoNavFocus
-    imgui.SetNextWindowPos({ screen_x - (marker_width / 2), screen_y - marker_height }, 0);
-    imgui.SetNextWindowSize({ marker_width, marker_height }, 0);
-    if (type(imgui.SetNextWindowBgAlpha) == 'function') then
-        imgui.SetNextWindowBgAlpha(0.0);
-    end
-    if (imgui.Begin('##ashitaguide_npc_world_marker', true, flags)) then
-        local draw_list = imgui.GetWindowDrawList();
-        local shadow = imgui.GetColorU32({ 0.02, 0.02, 0.02, 0.78 });
-        local color = imgui.GetColorU32(COLORS.header);
-        draw_list:AddTriangleFilled(
-            { screen_x + 2, tip_y + 2 },
-            { screen_x - 9, tip_y - 15 },
-            { screen_x + 13, tip_y - 15 },
-            shadow);
-        draw_list:AddTriangleFilled(
-            { screen_x, tip_y },
-            { screen_x - 11, tip_y - 17 },
-            { screen_x + 11, tip_y - 17 },
-            color);
-    end
-    imgui.End();
 end
 
 local function navigation_context(step)
@@ -4570,7 +4442,6 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     poll_auction_sale_guide_file();
     update_npc_step_auto_advance();
     update_level_step_auto_advance();
-    render_npc_world_marker();
     render_minimap_destination_marker();
     render_guide_window();
     render_valor_window();
