@@ -375,7 +375,10 @@ Set `key_item` or `key_item_id` on a step to advance when the player already
 owns that key item, including immediately after entering the step. AshitaGuide
 also advances as soon as the matching `Obtained key item` message arrives.
 Prefer `key_item_id` when multiple key items share the same resource name; both
-fields may be supplied together to keep the guide readable.
+fields may be supplied together to keep the guide readable. Matching
+acquisitions are saved per character and step, so revisiting the step still
+skips it when a private server tracks temporary quest fragments outside
+Ashita's normal key-item ownership flags.
 
 Set `minimum_level` on a step to advance automatically when the active main job
 reaches that level. Add `required_job` to restrict completion to one job. Job

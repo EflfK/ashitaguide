@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.22.0';
+addon.version = '0.22.1';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -210,6 +210,7 @@ local DEFAULT_SETTINGS = {
     poll_chat_log = true,
     default_active_guides = {},
     guide_steps = {},
+    key_item_step_completions = {},
 };
 
 local JOB_NAMES = {
@@ -547,6 +548,19 @@ local function copy_step_map(values)
     for key, value in pairs(values) do
         if (type(key) == 'string' and trim_string(key) ~= '' and tonumber(value) ~= nil) then
             output[key] = bounded_number(value, 1, 1, 100000);
+        end
+    end
+    return output;
+end
+
+local function copy_boolean_map(values)
+    local output = {};
+    if (type(values) ~= 'table') then
+        return output;
+    end
+    for key, value in pairs(values) do
+        if (type(key) == 'string' and trim_string(key) ~= '' and truthy(value)) then
+            output[key] = true;
         end
     end
     return output;
@@ -1123,6 +1137,8 @@ local function normalize_settings(source)
         poll_chat_log = bounded_boolean(source.poll_chat_log, DEFAULT_SETTINGS.poll_chat_log),
         default_active_guides = copy_array(source.default_active_guides or DEFAULT_SETTINGS.default_active_guides),
         guide_steps = copy_step_map(source.guide_steps or DEFAULT_SETTINGS.guide_steps),
+        key_item_step_completions = copy_boolean_map(
+            source.key_item_step_completions or DEFAULT_SETTINGS.key_item_step_completions),
     };
 end
 
@@ -2554,6 +2570,21 @@ local function lua_number_map(values)
     return #pieces > 0 and ('{ ' .. table.concat(pieces, ', ') .. ' }') or '{}';
 end
 
+local function lua_boolean_map(values)
+    local keys = {};
+    for key, value in pairs(type(values) == 'table' and values or {}) do
+        if (type(key) == 'string' and value == true) then
+            table.insert(keys, key);
+        end
+    end
+    table.sort(keys);
+    local pieces = {};
+    for _, key in ipairs(keys) do
+        table.insert(pieces, string.format('[%q] = true', key));
+    end
+    return #pieces > 0 and ('{ ' .. table.concat(pieces, ', ') .. ' }') or '{}';
+end
+
 local function settings_text()
     local values = state.settings;
     local lines = {
@@ -2599,6 +2630,9 @@ local function settings_text()
         string.format('    poll_chat_log = %s,', lua_boolean(values.poll_chat_log)),
         string.format('    default_active_guides = %s,', lua_string_list(state.active_order)),
         string.format('    guide_steps = %s,', lua_number_map(values.guide_steps)),
+        string.format(
+            '    key_item_step_completions = %s,',
+            lua_boolean_map(values.key_item_step_completions)),
         '};',
         '',
     };
@@ -3028,6 +3062,36 @@ local function step_key_item_name(step)
         or '';
 end
 
+local function key_item_completion_token(run, step_index, step)
+    local character = lower_string(state.current_character_name() or '');
+    if (character == '' or run == nil or step == nil) then
+        return nil;
+    end
+
+    local identity = resolve_step_key_item_id(step);
+    if (identity == nil) then
+        identity = normalized_match_text(step.key_item);
+    end
+    if (identity == nil or identity == '') then
+        return nil;
+    end
+    return string.format('%s|%s|%d|%s', character, run.key, step_index, tostring(identity));
+end
+
+local function persist_key_item_step_completion(run, step_index, step)
+    local token = key_item_completion_token(run, step_index, step);
+    if (token == nil) then
+        return false;
+    end
+    state.settings.key_item_step_completions[token] = true;
+    return true;
+end
+
+local function key_item_step_is_persisted(run, step_index, step)
+    local token = key_item_completion_token(run, step_index, step);
+    return token ~= nil and state.settings.key_item_step_completions[token] == true;
+end
+
 local function process_observed_text(text, source, mode, alternate_mode)
     local cleaned = clean_message(text);
     if (cleaned == '') then
@@ -3055,6 +3119,7 @@ local function process_observed_text(text, source, mode, alternate_mode)
             if (key_item_name ~= ''
                 and normalized_text:find(obtained_prefix, 1, true) ~= nil
                 and normalized_text:find(key_item_name, 1, true) ~= nil) then
+                persist_key_item_step_completion(run, run.step_index, step);
                 next_step(run);
                 handled = true;
             end
@@ -4011,7 +4076,11 @@ local function update_key_item_step_auto_advance()
     local has_key_item = player ~= nil
         and truthy(safe_read(function () return player:HasKeyItem(key_item_id); end, false));
     local token = string.format('%s:%d', run.key, run.step_index);
-    if (has_key_item and run.step_index < #run.guide.steps) then
+    local persisted = key_item_step_is_persisted(run, run.step_index, step);
+    if (has_key_item) then
+        persist_key_item_step_completion(run, run.step_index, step);
+    end
+    if ((persisted or has_key_item) and run.step_index < #run.guide.steps) then
         if (run.key_item_match_step ~= token) then
             run.key_item_match_step = token;
             next_step(run);
