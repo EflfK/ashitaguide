@@ -123,7 +123,9 @@ current step destination on the loaded Ashita Minimap plugin when its active
 theme is `square-minimal`. AshitaGuide reads the base theme configuration from
 `config/minimap/` and the active position, scale, zoom, and rotation directly
 from the loaded plugin; distant destinations are held at the edge of the
-visible square until they enter the map view.
+visible square until they enter the map view. The marker uses Minimap's live
+frame and mask dimensions so it remains attached to the same map location while
+the player moves or changes zoom.
 
 An accepted training regime or `Progress x/y` line opens the Pages of Valor window
 automatically. Completion or cancellation closes it. You can close the window
@@ -330,8 +332,10 @@ When a step has `target_x` and `target_y`, its active guide tab shows a north-up
 navigation map. The player remains centered with a live heading marker and the
 destination is plotted from its world coordinates. If `npc` is also set and
 that entity is available in memory, its live position takes precedence over
-the configured coordinates. With fallback coordinates, live NPC resolution is
-distance-gated until the player is within 100 yalms. Without fallback
+the configured coordinates. When multiple entities share a name such as `???`,
+the entity nearest the configured coordinates is used. With fallback
+coordinates, live NPC resolution is distance-gated until the player is within
+100 yalms. Without fallback
 coordinates, an unresolved NPC name is checked against the local entity table
 once every five seconds. Once found, AshitaGuide caches and cheaply refreshes
 that entity index every 0.25 seconds while it remains available. The map is

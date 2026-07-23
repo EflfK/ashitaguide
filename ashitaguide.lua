@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.20.4';
+addon.version = '0.20.5';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -1850,8 +1850,17 @@ local function apply_live_minimap_settings(settings)
     local rotate_frame = tonumber(safe_read(function ()
         return ashita.memory.read_uint8(runtime + 0x4D);
     end, nil));
-    local map_extent = tonumber(safe_read(function ()
+    local frame_width = tonumber(safe_read(function ()
+        return ashita.memory.read_float(runtime + 0xA4);
+    end, nil));
+    local frame_height = tonumber(safe_read(function ()
+        return ashita.memory.read_float(runtime + 0xA8);
+    end, nil));
+    local mask_width = tonumber(safe_read(function ()
         return ashita.memory.read_float(runtime + 0xB0);
+    end, nil));
+    local mask_height = tonumber(safe_read(function ()
+        return ashita.memory.read_float(runtime + 0xB4);
     end, nil));
 
     if (x ~= nil and math.abs(x) < 100000) then settings.x = x; end
@@ -1861,9 +1870,10 @@ local function apply_live_minimap_settings(settings)
     if (zoom ~= nil and zoom >= 0.1 and zoom <= 2.0) then settings.zoom = zoom; end
     if (rotate_map == 0 or rotate_map == 1) then settings.rotate_map = rotate_map == 1; end
     if (rotate_frame == 0 or rotate_frame == 1) then settings.rotate_frame = rotate_frame == 1; end
-    if (map_extent ~= nil and math.abs(map_extent) > 0.01 and math.abs(map_extent) < 10000) then
-        settings.native_map_extent = map_extent;
-    end
+    if (frame_width ~= nil and frame_width > 0.01 and frame_width < 10000) then settings.frame_width = frame_width; end
+    if (frame_height ~= nil and frame_height > 0.01 and frame_height < 10000) then settings.frame_height = frame_height; end
+    if (mask_width ~= nil and mask_width > 0.01 and mask_width < 10000) then settings.mask_width = mask_width; end
+    if (mask_height ~= nil and mask_height > 0.01 and mask_height < 10000) then settings.mask_height = mask_height; end
     settings.runtime_address = runtime;
     return settings;
 end
@@ -3828,7 +3838,12 @@ local function find_navigation_target(player, npc, fallback_x, fallback_y)
     end
 
     local now = os.clock();
-    local cache_key = string.format('%s:%s', tostring(player.zone_id or 0), lookup);
+    local cache_key = string.format(
+        '%s:%s:%s:%s',
+        tostring(player.zone_id or 0),
+        lookup,
+        fallback_x ~= nil and string.format('%.3f', fallback_x) or '',
+        fallback_y ~= nil and string.format('%.3f', fallback_y) or '');
     local cached = state.navigation_targets[cache_key];
     if (cached ~= nil and cached.index ~= nil) then
         if (now - cached.checked_at < state.navigation_target_live_refresh_seconds) then
@@ -3846,12 +3861,23 @@ local function find_navigation_target(player, npc, fallback_x, fallback_y)
     end
 
     local result = { checked_at = now };
+    local best_distance_squared = nil;
     local count = tonumber(safe_read(function () return entity:GetEntityMapSize(); end, 0)) or 0;
     for index = 0, count - 1 do
         local candidate = state.read_navigation_target_at_index(entity, index, lookup, now);
         if (candidate ~= nil) then
-            result = candidate;
-            break;
+            if (fallback_x == nil or fallback_y == nil) then
+                result = candidate;
+                break;
+            end
+            local candidate_delta_x = candidate.x - fallback_x;
+            local candidate_delta_y = candidate.y - fallback_y;
+            local candidate_distance_squared =
+                (candidate_delta_x * candidate_delta_x) + (candidate_delta_y * candidate_delta_y);
+            if (best_distance_squared == nil or candidate_distance_squared < best_distance_squared) then
+                best_distance_squared = candidate_distance_squared;
+                result = candidate;
+            end
         end
     end
     state.navigation_targets[cache_key] = result;
@@ -4005,18 +4031,13 @@ local function render_minimap_destination_marker()
 
     local center_x = (minimap.x + (minimap.frame_width / 2)) * minimap.scale_x;
     local center_y = (minimap.y + (minimap.frame_height / 2)) * minimap.scale_y;
-    -- FFXI zone maps are 512px textures. Minimap fits that texture into the
-    -- theme mask, then applies zoom and the configured display scale.
-    local native_scale = minimap.native_map_extent ~= nil
-        and (zone_scale / 5) * minimap.zoom * (512 / minimap.native_map_extent)
-            * MINIMAP_COORDINATE_SCALE
-        or nil;
-    local pixels_per_yalm_x = native_scale ~= nil
-        and native_scale * minimap.scale_x
-        or (zone_scale / 5) * minimap.zoom * minimap.scale_x;
-    local pixels_per_yalm_y = native_scale ~= nil
-        and native_scale * minimap.scale_y
-        or (zone_scale / 5) * minimap.zoom * minimap.scale_y;
+    -- FFXI zone maps are 512px textures. Minimap fits the full texture into
+    -- the active theme mask, then applies zoom and configured display scale.
+    -- The mask-to-texture ratio must therefore be mask/512, not 512/mask.
+    local pixels_per_yalm_x = (zone_scale / 5) * minimap.zoom
+        * (minimap.mask_width / 512) * MINIMAP_COORDINATE_SCALE * minimap.scale_x;
+    local pixels_per_yalm_y = (zone_scale / 5) * minimap.zoom
+        * (minimap.mask_height / 512) * MINIMAP_COORDINATE_SCALE * minimap.scale_y;
     local marker_x = center_x + (delta_x * pixels_per_yalm_x);
     local marker_y = center_y + (delta_y * pixels_per_yalm_y);
 
@@ -4040,7 +4061,8 @@ local function render_minimap_destination_marker()
         zoom = minimap.zoom,
         scale_x = minimap.scale_x,
         scale_y = minimap.scale_y,
-        map_extent = minimap.native_map_extent,
+        mask_width = minimap.mask_width,
+        mask_height = minimap.mask_height,
         zone_scale = zone_scale,
         rotate_map = minimap.rotate_map,
         rotate_frame = minimap.rotate_frame,
@@ -4974,14 +4996,15 @@ local function print_minimap_debug()
         debug.delta_x,
         debug.delta_y));
     log_info(string.format(
-        'MapDebug live: runtime=%s center=(%.2f,%.2f) zoom=%.3f scale=(%.3f,%.3f) extent=%s zoneScale=%.1f rotateMap=%s rotateFrame=%s.',
+        'MapDebug live: runtime=%s center=(%.2f,%.2f) zoom=%.3f scale=(%.3f,%.3f) mask=(%.1f,%.1f) zoneScale=%.1f rotateMap=%s rotateFrame=%s.',
         tostring(debug.runtime_address or 'none'),
         debug.center_x,
         debug.center_y,
         debug.zoom,
         debug.scale_x,
         debug.scale_y,
-        debug.map_extent ~= nil and string.format('%.3f', debug.map_extent) or 'none',
+        debug.mask_width,
+        debug.mask_height,
         debug.zone_scale,
         tostring(debug.rotate_map),
         tostring(debug.rotate_frame)));

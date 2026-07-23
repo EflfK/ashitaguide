@@ -265,8 +265,18 @@ if ($content -notmatch "(?s)cached\.index.+state\.read_navigation_target_at_inde
     throw 'Resolved NPC navigation targets must refresh through their cached entity index.'
 }
 
+if ($content -notmatch "(?s)candidate_distance_squared.+best_distance_squared.+result = candidate") {
+    throw 'Duplicate NPC names must resolve to the entity nearest configured fallback coordinates.'
+}
+
 if ($content -notmatch "now - cached\.checked_at < state\.navigation_target_miss_retry_seconds") {
     throw 'Unresolved NPC navigation targets must use the miss retry throttle.'
+}
+
+if ($content -notmatch "\(minimap\.mask_width / 512\)" -or
+    $content -notmatch "\(minimap\.mask_height / 512\)" -or
+    $content -match "512 / minimap\.") {
+    throw 'Minimap navigation scaling must fit the 512px map texture into the live theme mask.'
 }
 
 if ($content -notmatch "(?s)local function render_guide_window\(\).+window_no_resize.+window_no_scrollbar.+window_always_auto_resize") {
