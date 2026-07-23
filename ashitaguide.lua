@@ -3924,7 +3924,7 @@ state.read_navigation_target_at_index = function(entity, index, lookup, checked_
     };
 end
 
-local function navigation_target_matches_fallback(candidate, fallback_x, fallback_y)
+state.navigation_target_matches_fallback = function(candidate, fallback_x, fallback_y)
     if (candidate == nil or fallback_x == nil or fallback_y == nil) then
         return candidate ~= nil;
     end
@@ -3965,7 +3965,7 @@ local function find_navigation_target(player, npc, fallback_x, fallback_y)
         end
 
         local refreshed = state.read_navigation_target_at_index(entity, cached.index, lookup, now);
-        if (navigation_target_matches_fallback(refreshed, fallback_x, fallback_y)) then
+        if (state.navigation_target_matches_fallback(refreshed, fallback_x, fallback_y)) then
             state.navigation_targets[cache_key] = refreshed;
             return refreshed;
         end
@@ -3984,7 +3984,7 @@ local function find_navigation_target(player, npc, fallback_x, fallback_y)
                 result = candidate;
                 break;
             end
-            if (navigation_target_matches_fallback(candidate, fallback_x, fallback_y)) then
+            if (state.navigation_target_matches_fallback(candidate, fallback_x, fallback_y)) then
                 local candidate_delta_x = candidate.x - fallback_x;
                 local candidate_delta_y = candidate.y - fallback_y;
                 local candidate_distance_squared =

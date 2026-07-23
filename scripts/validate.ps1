@@ -272,7 +272,7 @@ if ($content -notmatch "(?s)fallback_distance > state\.navigation_target_fallbac
     throw 'Fallback coordinates must distance-gate live NPC entity scans.'
 }
 
-if ($content -notmatch "(?s)navigation_target_matches_fallback.+maximum \* maximum.+navigation_target_matches_fallback\(refreshed, fallback_x, fallback_y\).+navigation_target_matches_fallback\(candidate, fallback_x, fallback_y\)") {
+if ($content -notmatch "(?s)state\.navigation_target_matches_fallback.+maximum \* maximum.+state\.navigation_target_matches_fallback\(refreshed, fallback_x, fallback_y\).+state\.navigation_target_matches_fallback\(candidate, fallback_x, fallback_y\)") {
     throw 'Live NPC candidates and cached targets must stay near configured fallback coordinates.'
 }
 
