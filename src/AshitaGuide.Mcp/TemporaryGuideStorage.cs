@@ -93,6 +93,8 @@ public static partial class TemporaryGuideStorage
                         TargetX = -59.961,
                         TargetY = -75.649,
                         MapId = 15,
+                        KeyItem = "Exoray mold crumb",
+                        KeyItemId = 2137,
                         AdvanceOnText = "You have undertaken All for One",
                     },
                 },
@@ -129,6 +131,8 @@ public static partial class TemporaryGuideStorage
                 || !contents.Contains("key = \"ai_level_goal\"", StringComparison.Ordinal)
                 || !contents.Contains("name = \"Fire Crystal\"", StringComparison.Ordinal)
                 || !contents.Contains("map_id = 15", StringComparison.Ordinal)
+                || !contents.Contains("key_item = \"Exoray mold crumb\"", StringComparison.Ordinal)
+                || !contents.Contains("key_item_id = 2137", StringComparison.Ordinal)
                 || !contents.Contains("advance_on_text = \"You have undertaken All for One\"", StringComparison.Ordinal)
                 || contents.Contains("name = \"Current Goal\"", StringComparison.Ordinal))
             {
@@ -218,6 +222,10 @@ public static partial class TemporaryGuideStorage
         {
             throw new ArgumentException($"guide.steps[{index}].mapId must be between 0 and 255.");
         }
+        if (input.KeyItemId is < 0 or > 65535)
+        {
+            throw new ArgumentException($"guide.steps[{index}].keyItemId must be between 0 and 65535.");
+        }
         if (input.MinimumLevel is < 1 or > 99)
         {
             throw new ArgumentException($"guide.steps[{index}].minimumLevel must be between 1 and 99.");
@@ -239,6 +247,8 @@ public static partial class TemporaryGuideStorage
             input.TargetX,
             input.TargetY,
             input.MapId,
+            CleanOptionalText(input.KeyItem, 128, $"guide.steps[{index}].keyItem"),
+            input.KeyItemId,
             input.MinimumLevel,
             requiredJob,
             input.AdvanceOnTarget,
@@ -329,6 +339,8 @@ public static partial class TemporaryGuideStorage
             value.GetDouble("target_x"),
             value.GetDouble("target_y"),
             value.GetInt("map_id"),
+            value.GetString("key_item") ?? string.Empty,
+            value.GetInt("key_item_id"),
             value.GetInt("minimum_level"),
             value.GetString("required_job") ?? string.Empty,
             value.GetBool("advance_on_target") ?? false,
@@ -403,6 +415,14 @@ public static partial class TemporaryGuideStorage
                 if (step.MapId is not null)
                 {
                     output.AppendLine($"                    map_id = {step.MapId.Value.ToString(CultureInfo.InvariantCulture)},");
+                }
+                if (step.KeyItem.Length > 0)
+                {
+                    output.AppendLine($"                    key_item = {LuaQuote(step.KeyItem)},");
+                }
+                if (step.KeyItemId is not null)
+                {
+                    output.AppendLine($"                    key_item_id = {step.KeyItemId.Value.ToString(CultureInfo.InvariantCulture)},");
                 }
                 if (step.MinimumLevel is not null)
                 {
@@ -530,6 +550,8 @@ public static partial class TemporaryGuideStorage
         double? TargetX,
         double? TargetY,
         int? MapId,
+        string KeyItem,
+        int? KeyItemId,
         int? MinimumLevel,
         string RequiredJob,
         bool AdvanceOnTarget,

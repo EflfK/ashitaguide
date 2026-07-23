@@ -371,6 +371,12 @@ punctuation, and repeated whitespace, so typographic quotation marks do not
 make a reliable confirmation fail. This is event-driven and does not add a
 chat-log polling loop; historical messages are intentionally not replayed.
 
+Set `key_item` or `key_item_id` on a step to advance when the player already
+owns that key item, including immediately after entering the step. AshitaGuide
+also advances as soon as the matching `Obtained key item` message arrives.
+Prefer `key_item_id` when multiple key items share the same resource name; both
+fields may be supplied together to keep the guide readable.
+
 Set `minimum_level` on a step to advance automatically when the active main job
 reaches that level. Add `required_job` to restrict completion to one job. Job
 abbreviations and full names are accepted, so `BST` and `Beastmaster` are

@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.21.0';
+addon.version = '0.22.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -752,6 +752,13 @@ local function normalize_step(source, index)
             map_id = nil;
         end
     end
+    local key_item_id = tonumber(source.key_item_id or source.keyItemId);
+    if (key_item_id ~= nil) then
+        key_item_id = math.floor(key_item_id);
+        if (key_item_id < 0 or key_item_id > 65535) then
+            key_item_id = nil;
+        end
+    end
 
     return {
         title = title,
@@ -764,6 +771,8 @@ local function normalize_step(source, index)
         target_x = tonumber(source.target_x or source.x),
         target_y = tonumber(source.target_y or source.y),
         map_id = map_id,
+        key_item = trim_string(source.key_item or source.keyItem),
+        key_item_id = key_item_id,
         minimum_level = minimum_level,
         required_job = normalize_required_job(source.required_job or source.job),
         advance_on_target = bounded_boolean(
@@ -2253,6 +2262,12 @@ local function guide_storage_text(guides)
             if (step.map_id ~= nil) then
                 table.insert(lines, string.format('                    map_id = %d,', step.map_id));
             end
+            if (step.key_item ~= '') then
+                table.insert(lines, string.format('                    key_item = %s,', lua_quoted(step.key_item)));
+            end
+            if (step.key_item_id ~= nil) then
+                table.insert(lines, string.format('                    key_item_id = %d,', step.key_item_id));
+            end
             if (step.minimum_level ~= nil) then
                 table.insert(lines, string.format('                    minimum_level = %d,', step.minimum_level));
             end
@@ -2969,6 +2984,50 @@ local function handle_pov_text(run, text)
     return false;
 end
 
+local function normalized_match_text(value)
+    return trim_string(clean_message(value):lower():gsub('[^%w]+', ' '));
+end
+
+local function resolve_step_key_item_id(step)
+    if (step == nil) then
+        return nil;
+    end
+    if (step.key_item_id ~= nil) then
+        return step.key_item_id;
+    end
+    if (step._resolved_key_item_id ~= nil) then
+        return step._resolved_key_item_id;
+    end
+    if (step.key_item == '') then
+        return nil;
+    end
+
+    local resources = safe_read(function () return AshitaCore:GetResourceManager(); end, nil);
+    local id = resources ~= nil
+        and tonumber(safe_read(function () return resources:GetString('keyitems.names', step.key_item, 2); end, nil))
+        or nil;
+    if (id ~= nil and id >= 0 and id <= 65535) then
+        step._resolved_key_item_id = math.floor(id);
+        return step._resolved_key_item_id;
+    end
+    return nil;
+end
+
+local function step_key_item_name(step)
+    if (step == nil) then
+        return '';
+    end
+    if (step.key_item ~= '') then
+        return step.key_item;
+    end
+
+    local id = resolve_step_key_item_id(step);
+    local resources = id ~= nil and safe_read(function () return AshitaCore:GetResourceManager(); end, nil) or nil;
+    return resources ~= nil
+        and trim_string(safe_read(function () return resources:GetString('keyitems.names', id); end, ''))
+        or '';
+end
+
 local function process_observed_text(text, source, mode, alternate_mode)
     local cleaned = clean_message(text);
     if (cleaned == '') then
@@ -2980,10 +3039,22 @@ local function process_observed_text(text, source, mode, alternate_mode)
         local run = state.active[state.selected_active_key];
         local step = run ~= nil and run.guide.steps[run.step_index] or nil;
         local trigger = step ~= nil and trim_string(step.advance_on_text) or '';
+        local normalized_text = normalized_match_text(cleaned);
+        local advanced = false;
         if (trigger ~= '' and run.step_index < #run.guide.steps) then
-            local normalized_text = trim_string(cleaned:lower():gsub('[^%w]+', ' '));
-            local normalized_trigger = trim_string(trigger:lower():gsub('[^%w]+', ' '));
+            local normalized_trigger = normalized_match_text(trigger);
             if (normalized_trigger ~= '' and normalized_text:find(normalized_trigger, 1, true) ~= nil) then
+                next_step(run);
+                handled = true;
+                advanced = true;
+            end
+        end
+        if (not advanced and step ~= nil and run.step_index < #run.guide.steps) then
+            local key_item_name = normalized_match_text(step_key_item_name(step));
+            local obtained_prefix = 'obtained key item';
+            if (key_item_name ~= ''
+                and normalized_text:find(obtained_prefix, 1, true) ~= nil
+                and normalized_text:find(key_item_name, 1, true) ~= nil) then
                 next_step(run);
                 handled = true;
             end
@@ -3919,6 +3990,34 @@ local function update_level_step_auto_advance()
         end
     else
         run.level_match_step = nil;
+    end
+end
+
+local function update_key_item_step_auto_advance()
+    local run = state.active[state.selected_active_key];
+    if (run == nil) then
+        return;
+    end
+
+    local step = run.guide.steps[run.step_index];
+    local key_item_id = resolve_step_key_item_id(step);
+    if (key_item_id == nil) then
+        run.key_item_match_step = nil;
+        return;
+    end
+
+    local memory = safe_read(function () return AshitaCore:GetMemoryManager(); end, nil);
+    local player = memory ~= nil and safe_read(function () return memory:GetPlayer(); end, nil) or nil;
+    local has_key_item = player ~= nil
+        and truthy(safe_read(function () return player:HasKeyItem(key_item_id); end, false));
+    local token = string.format('%s:%d', run.key, run.step_index);
+    if (has_key_item and run.step_index < #run.guide.steps) then
+        if (run.key_item_match_step ~= token) then
+            run.key_item_match_step = token;
+            next_step(run);
+        end
+    else
+        run.key_item_match_step = nil;
     end
 end
 
@@ -5148,6 +5247,7 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     poll_auction_sale_guide_file();
     update_npc_step_auto_advance();
     update_level_step_auto_advance();
+    update_key_item_step_auto_advance();
     decision.update();
     decision.pin_legacy_chat_closed();
     render_minimap_destination_marker();

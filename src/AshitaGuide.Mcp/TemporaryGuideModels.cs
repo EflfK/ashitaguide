@@ -52,6 +52,12 @@ public sealed class TemporaryGuideStepInput
     [Description("Optional live Minimap map/floor id from 0 through 255. The Minimap marker is hidden while another map is displayed.")]
     public int? MapId { get; init; }
 
+    [Description("Optional key-item resource name that completes this step when already owned or newly obtained. Use keyItemId when names are duplicated.")]
+    public string? KeyItem { get; init; }
+
+    [Description("Optional key-item resource id from 0 through 65535 that completes this step when already owned or newly obtained.")]
+    public int? KeyItemId { get; init; }
+
     [Description("Optional main-job level, from 1 through 99, that completes this step.")]
     public int? MinimumLevel { get; init; }
 
