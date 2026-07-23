@@ -34,7 +34,8 @@ $required = @(
     "guide_map_size",
     "minimap_marker_enabled",
     "render_minimap_destination_marker",
-    "MAP_TABLE_SIGNATURE",
+    "MINIMAP_RUNTIME_SIGNATURE",
+    "map_scale_raw",
     "square-minimal",
     "navigation_context",
     "navigation_target_live_refresh_seconds",
@@ -273,10 +274,9 @@ if ($content -notmatch "now - cached\.checked_at < state\.navigation_target_miss
     throw 'Unresolved NPC navigation targets must use the miss retry throttle.'
 }
 
-if ($content -notmatch "\(minimap\.mask_width / 512\)" -or
-    $content -notmatch "\(minimap\.mask_height / 512\)" -or
-    $content -match "512 / minimap\.") {
-    throw 'Minimap navigation scaling must fit the 512px map texture into the live theme mask.'
+if ($content -notmatch "minimap\.mask_width \* minimap\.zoom\s+/ \(minimap\.map_scale_raw \* 20\)" -or
+    $content -notmatch "minimap\.mask_height \* minimap\.zoom\s+/ \(minimap\.map_scale_raw \* 20\)") {
+    throw 'Minimap navigation scaling must match the plugin live map transform.'
 }
 
 if ($content -notmatch "(?s)local function render_guide_window\(\).+window_no_resize.+window_no_scrollbar.+window_always_auto_resize") {

@@ -301,8 +301,6 @@ local state = {
         settings = nil,
         settings_checked_at = 0,
         runtime_pointer_address = 0,
-        map_table_address = 0,
-        zone_scales = {},
         reported_scale_zone = nil,
         reported_marker_step = nil,
     },
@@ -1862,6 +1860,12 @@ local function apply_live_minimap_settings(settings)
     local mask_height = tonumber(safe_read(function ()
         return ashita.memory.read_float(runtime + 0xB4);
     end, nil));
+    local map_info = tonumber(safe_read(function ()
+        return ashita.memory.read_uint32(runtime + 0x14);
+    end, 0)) or 0;
+    local map_scale_raw = map_info ~= 0 and tonumber(safe_read(function ()
+        return ashita.memory.read_uint8(map_info + 0x05);
+    end, nil)) or nil;
 
     if (x ~= nil and math.abs(x) < 100000) then settings.x = x; end
     if (y ~= nil and math.abs(y) < 100000) then settings.y = y; end
@@ -1874,6 +1878,7 @@ local function apply_live_minimap_settings(settings)
     if (frame_height ~= nil and frame_height > 0.01 and frame_height < 10000) then settings.frame_height = frame_height; end
     if (mask_width ~= nil and mask_width > 0.01 and mask_width < 10000) then settings.mask_width = mask_width; end
     if (mask_height ~= nil and mask_height > 0.01 and mask_height < 10000) then settings.mask_height = mask_height; end
+    if (map_scale_raw ~= nil and map_scale_raw > 0) then settings.map_scale_raw = map_scale_raw; end
     settings.runtime_address = runtime;
     return settings;
 end
@@ -1915,58 +1920,6 @@ local function load_minimap_settings()
         mask_height = tonumber(theme_values['mask.h']) or 210,
     };
     return apply_live_minimap_settings(state.minimap.settings);
-end
-
-local MAP_TABLE_SIGNATURE = '8A0D????????5333C05684C95774??8A5424188B7424148B7C2410B9';
-local MAP_TABLE_ENTRY_SIZE = 0x0E;
-local MINIMAP_COORDINATE_SCALE = 1.06;
-
-local function initialize_map_table()
-    if (state.minimap.map_table_address ~= 0) then
-        return;
-    end
-    local signature = tonumber(safe_read(function ()
-        return ashita.memory.find('FFXiMain.dll', 0, MAP_TABLE_SIGNATURE, 0, 0);
-    end, 0)) or 0;
-    if (signature ~= 0) then
-        state.minimap.map_table_address = tonumber(safe_read(function ()
-            return ashita.memory.read_uint32(signature + 0x1C);
-        end, 0)) or 0;
-    end
-end
-
-local function map_scale_for_zone(zone_id)
-    zone_id = tonumber(zone_id);
-    if (zone_id == nil or zone_id <= 0) then
-        return nil;
-    end
-    if (state.minimap.zone_scales[zone_id] ~= nil) then
-        return state.minimap.zone_scales[zone_id];
-    end
-
-    initialize_map_table();
-    local address = state.minimap.map_table_address;
-    if (address == 0) then
-        return nil;
-    end
-    for index = 0, 999 do
-        local entry = address + (index * MAP_TABLE_ENTRY_SIZE);
-        local entry_zone = tonumber(safe_read(function ()
-            return ashita.memory.read_uint16(entry);
-        end, 0)) or 0;
-        if (entry_zone == zone_id) then
-            local raw = tonumber(safe_read(function ()
-                return ashita.memory.read_uint8(entry + 0x05);
-            end, 0)) or 0;
-            local signed = raw >= 0x80 and raw - 0x100 or raw;
-            local scale = math.abs(signed);
-            if (scale > 0) then
-                state.minimap.zone_scales[zone_id] = scale;
-                return scale;
-            end
-        end
-    end
-    return nil;
 end
 
 local function write_text_file(path, contents)
@@ -4008,16 +3961,15 @@ local function render_minimap_destination_marker()
     end
 
     local minimap = load_minimap_settings();
-    local zone_scale = map_scale_for_zone(navigation.player.zone_id);
-    if (minimap == nil or zone_scale == nil) then
+    if (minimap == nil or minimap.map_scale_raw == nil) then
         return;
     end
     if (state.minimap.reported_scale_zone ~= navigation.player.zone_id) then
         state.minimap.reported_scale_zone = navigation.player.zone_id;
         log_info(string.format(
-            'Minimap marker: zone=%d mapScale=%.1f zoom=%.2f scale=%.2fx%.2f.',
+            'Minimap marker: zone=%d mapScaleByte=%d zoom=%.2f scale=%.2fx%.2f.',
             navigation.player.zone_id,
-            zone_scale,
+            minimap.map_scale_raw,
             minimap.zoom,
             minimap.scale_x,
             minimap.scale_y));
@@ -4031,13 +3983,12 @@ local function render_minimap_destination_marker()
 
     local center_x = (minimap.x + (minimap.frame_width / 2)) * minimap.scale_x;
     local center_y = (minimap.y + (minimap.frame_height / 2)) * minimap.scale_y;
-    -- FFXI zone maps are 512px textures. Minimap fits the full texture into
-    -- the active theme mask, then applies zoom and configured display scale.
-    -- The mask-to-texture ratio must therefore be mask/512, not 512/mask.
-    local pixels_per_yalm_x = (zone_scale / 5) * minimap.zoom
-        * (minimap.mask_width / 512) * MINIMAP_COORDINATE_SCALE * minimap.scale_x;
-    local pixels_per_yalm_y = (zone_scale / 5) * minimap.zoom
-        * (minimap.mask_height / 512) * MINIMAP_COORDINATE_SCALE * minimap.scale_y;
+    -- Match Minimap's live world-to-map transform exactly. Its renderer divides
+    -- the active mask size by mapScaleByte * 20, then applies zoom and display scale.
+    local pixels_per_yalm_x = minimap.mask_width * minimap.zoom
+        / (minimap.map_scale_raw * 20) * minimap.scale_x;
+    local pixels_per_yalm_y = minimap.mask_height * minimap.zoom
+        / (minimap.map_scale_raw * 20) * minimap.scale_y;
     local marker_x = center_x + (delta_x * pixels_per_yalm_x);
     local marker_y = center_y + (delta_y * pixels_per_yalm_y);
 
@@ -4063,7 +4014,7 @@ local function render_minimap_destination_marker()
         scale_y = minimap.scale_y,
         mask_width = minimap.mask_width,
         mask_height = minimap.mask_height,
-        zone_scale = zone_scale,
+        map_scale_raw = minimap.map_scale_raw,
         rotate_map = minimap.rotate_map,
         rotate_frame = minimap.rotate_frame,
         runtime_address = minimap.runtime_address,
@@ -4996,7 +4947,7 @@ local function print_minimap_debug()
         debug.delta_x,
         debug.delta_y));
     log_info(string.format(
-        'MapDebug live: runtime=%s center=(%.2f,%.2f) zoom=%.3f scale=(%.3f,%.3f) mask=(%.1f,%.1f) zoneScale=%.1f rotateMap=%s rotateFrame=%s.',
+        'MapDebug live: runtime=%s center=(%.2f,%.2f) zoom=%.3f scale=(%.3f,%.3f) mask=(%.1f,%.1f) mapScaleByte=%d rotateMap=%s rotateFrame=%s.',
         tostring(debug.runtime_address or 'none'),
         debug.center_x,
         debug.center_y,
@@ -5005,7 +4956,7 @@ local function print_minimap_debug()
         debug.scale_y,
         debug.mask_width,
         debug.mask_height,
-        debug.zone_scale,
+        debug.map_scale_raw,
         tostring(debug.rotate_map),
         tostring(debug.rotate_frame)));
     log_info(string.format(
