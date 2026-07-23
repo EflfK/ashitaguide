@@ -125,7 +125,8 @@ theme is `square-minimal`. AshitaGuide reads the base theme configuration from
 from the loaded plugin; distant destinations are held at the edge of the
 visible square until they enter the map view. The marker uses Minimap's live
 frame and mask dimensions so it remains attached to the same map location while
-the player moves or changes zoom.
+the player moves or changes zoom. While a destination is outside the visible
+map range, its border marker moves as the player's bearing to it changes.
 
 An accepted training regime or `Progress x/y` line opens the Pages of Valor window
 automatically. Completion or cancellation closes it. You can close the window

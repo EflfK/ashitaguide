@@ -274,8 +274,8 @@ if ($content -notmatch "now - cached\.checked_at < state\.navigation_target_miss
     throw 'Unresolved NPC navigation targets must use the miss retry throttle.'
 }
 
-if ($content -notmatch "minimap\.mask_width \* minimap\.zoom\s+/ \(minimap\.map_scale_raw \* 20\)" -or
-    $content -notmatch "minimap\.mask_height \* minimap\.zoom\s+/ \(minimap\.map_scale_raw \* 20\)") {
+if ($content -notmatch "minimap\.mask_width \* minimap\.zoom\s+/ 100 \* minimap\.scale_x" -or
+    $content -notmatch "minimap\.mask_height \* minimap\.zoom\s+/ 100 \* minimap\.scale_y") {
     throw 'Minimap navigation scaling must match the plugin live map transform.'
 }
 

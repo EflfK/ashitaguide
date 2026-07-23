@@ -3983,12 +3983,12 @@ local function render_minimap_destination_marker()
 
     local center_x = (minimap.x + (minimap.frame_width / 2)) * minimap.scale_x;
     local center_y = (minimap.y + (minimap.frame_height / 2)) * minimap.scale_y;
-    -- Match Minimap's live world-to-map transform exactly. Its renderer divides
-    -- the active mask size by mapScaleByte * 20, then applies zoom and display scale.
+    -- Match Minimap's live world-to-map transform exactly. Its coordinate
+    -- normalization and map-scale division cancel, leaving mask * zoom / 100.
     local pixels_per_yalm_x = minimap.mask_width * minimap.zoom
-        / (minimap.map_scale_raw * 20) * minimap.scale_x;
+        / 100 * minimap.scale_x;
     local pixels_per_yalm_y = minimap.mask_height * minimap.zoom
-        / (minimap.map_scale_raw * 20) * minimap.scale_y;
+        / 100 * minimap.scale_y;
     local marker_x = center_x + (delta_x * pixels_per_yalm_x);
     local marker_y = center_y + (delta_y * pixels_per_yalm_y);
 
