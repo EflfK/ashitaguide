@@ -36,6 +36,8 @@ $required = @(
     "render_minimap_destination_marker",
     "MINIMAP_RUNTIME_SIGNATURE",
     "map_scale_raw",
+    "current_map_id",
+    "map_id",
     "square-minimal",
     "navigation_context",
     "navigation_target_live_refresh_seconds",
@@ -277,6 +279,10 @@ if ($content -notmatch "now - cached\.checked_at < state\.navigation_target_miss
 if ($content -notmatch "minimap\.mask_width \* minimap\.zoom\s+/ 100 \* minimap\.scale_x" -or
     $content -notmatch "minimap\.mask_height \* minimap\.zoom\s+/ 100 \* minimap\.scale_y") {
     throw 'Minimap navigation scaling must match the plugin live map transform.'
+}
+
+if ($content -notmatch "(?s)step\.map_id ~= nil.+minimap\.current_map_id ~= step\.map_id.+Minimap marker hidden") {
+    throw 'Minimap markers must be hidden when a step targets another map or floor.'
 }
 
 if ($content -notmatch "(?s)local function render_guide_window\(\).+window_no_resize.+window_no_scrollbar.+window_always_auto_resize") {

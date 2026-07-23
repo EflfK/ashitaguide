@@ -49,6 +49,9 @@ public sealed class TemporaryGuideStepInput
     [Description("Optional destination Y coordinate. Supply targetX as well.")]
     public double? TargetY { get; init; }
 
+    [Description("Optional live Minimap map/floor id from 0 through 255. The Minimap marker is hidden while another map is displayed.")]
+    public int? MapId { get; init; }
+
     [Description("Optional main-job level, from 1 through 99, that completes this step.")]
     public int? MinimumLevel { get; init; }
 

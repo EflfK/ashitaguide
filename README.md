@@ -193,6 +193,7 @@ return {
                     npc = 'Mendi',
                     target_x = -59.961,
                     target_y = -75.649,
+                    map_id = 15,
                     advance_on_target = false,
                 },
             },
@@ -320,6 +321,7 @@ return {
                     npc = 'Mendi',
                     target_x = -59.961,
                     target_y = -75.649,
+                    map_id = 15,
                     advance_on_target = true,
                 },
                 { text = 'Pick the answer.', answer = 'This is the statement.' },
@@ -350,7 +352,9 @@ five yalms of framing space. The active map radius is shown next to the map.
 With `minimap_marker_enabled = true`, that same destination is also drawn as a
 gold dot over the loaded Ashita Minimap plugin. This overlay currently requires
 the `square-minimal` theme so its clipping boundary matches the displayed map.
-It reads the zone's map scale from the local FFXI map table and does not modify
+Set optional `map_id` to the destination's verified live Minimap map/floor id;
+the dot is suppressed whenever Minimap is displaying another map in the same
+zone. AshitaGuide reads Minimap's live map id and transform but does not modify
 Minimap, send commands, or require a custom DLL.
 Use `/agguide mapdebug` to print a bounded coordinate snapshot when diagnosing
 marker alignment.

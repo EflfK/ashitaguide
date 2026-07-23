@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.20.5';
+addon.version = '0.21.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -745,6 +745,13 @@ local function normalize_step(source, index)
     if (minimum_level ~= nil) then
         minimum_level = bounded_number(minimum_level, 1, 1, 99);
     end
+    local map_id = tonumber(source.map_id or source.mapId);
+    if (map_id ~= nil) then
+        map_id = math.floor(map_id);
+        if (map_id < 0 or map_id > 255) then
+            map_id = nil;
+        end
+    end
 
     return {
         title = title,
@@ -756,6 +763,7 @@ local function normalize_step(source, index)
         note = trim_string(source.note or source.notes),
         target_x = tonumber(source.target_x or source.x),
         target_y = tonumber(source.target_y or source.y),
+        map_id = map_id,
         minimum_level = minimum_level,
         required_job = normalize_required_job(source.required_job or source.job),
         advance_on_target = bounded_boolean(
@@ -1866,6 +1874,9 @@ local function apply_live_minimap_settings(settings)
     local map_scale_raw = map_info ~= 0 and tonumber(safe_read(function ()
         return ashita.memory.read_uint8(map_info + 0x05);
     end, nil)) or nil;
+    local current_map_id = map_info ~= 0 and tonumber(safe_read(function ()
+        return ashita.memory.read_uint8(map_info + 0x02);
+    end, nil)) or nil;
 
     if (x ~= nil and math.abs(x) < 100000) then settings.x = x; end
     if (y ~= nil and math.abs(y) < 100000) then settings.y = y; end
@@ -1878,7 +1889,8 @@ local function apply_live_minimap_settings(settings)
     if (frame_height ~= nil and frame_height > 0.01 and frame_height < 10000) then settings.frame_height = frame_height; end
     if (mask_width ~= nil and mask_width > 0.01 and mask_width < 10000) then settings.mask_width = mask_width; end
     if (mask_height ~= nil and mask_height > 0.01 and mask_height < 10000) then settings.mask_height = mask_height; end
-    if (map_scale_raw ~= nil and map_scale_raw > 0) then settings.map_scale_raw = map_scale_raw; end
+    settings.map_scale_raw = map_scale_raw ~= nil and map_scale_raw > 0 and map_scale_raw or nil;
+    settings.current_map_id = current_map_id;
     settings.runtime_address = runtime;
     return settings;
 end
@@ -2237,6 +2249,9 @@ local function guide_storage_text(guides)
             end
             if (step.target_y ~= nil) then
                 table.insert(lines, string.format('                    target_y = %.6f,', step.target_y));
+            end
+            if (step.map_id ~= nil) then
+                table.insert(lines, string.format('                    map_id = %d,', step.map_id));
             end
             if (step.minimum_level ~= nil) then
                 table.insert(lines, string.format('                    minimum_level = %d,', step.minimum_level));
@@ -3964,6 +3979,23 @@ local function render_minimap_destination_marker()
     if (minimap == nil or minimap.map_scale_raw == nil) then
         return;
     end
+    if (step.map_id ~= nil and minimap.current_map_id ~= step.map_id) then
+        local mismatch_token = string.format(
+            '%s:%d:%d:%s',
+            run.key,
+            run.step_index,
+            step.map_id,
+            tostring(minimap.current_map_id));
+        if (state.minimap.reported_map_mismatch_step ~= mismatch_token) then
+            state.minimap.reported_map_mismatch_step = mismatch_token;
+            log_info(string.format(
+                'Minimap marker hidden: stepMap=%d currentMap=%s.',
+                step.map_id,
+                tostring(minimap.current_map_id)));
+        end
+        return;
+    end
+    state.minimap.reported_map_mismatch_step = nil;
     if (state.minimap.reported_scale_zone ~= navigation.player.zone_id) then
         state.minimap.reported_scale_zone = navigation.player.zone_id;
         log_info(string.format(
@@ -4015,6 +4047,7 @@ local function render_minimap_destination_marker()
         mask_width = minimap.mask_width,
         mask_height = minimap.mask_height,
         map_scale_raw = minimap.map_scale_raw,
+        current_map_id = minimap.current_map_id,
         rotate_map = minimap.rotate_map,
         rotate_frame = minimap.rotate_frame,
         runtime_address = minimap.runtime_address,
@@ -4947,7 +4980,7 @@ local function print_minimap_debug()
         debug.delta_x,
         debug.delta_y));
     log_info(string.format(
-        'MapDebug live: runtime=%s center=(%.2f,%.2f) zoom=%.3f scale=(%.3f,%.3f) mask=(%.1f,%.1f) mapScaleByte=%d rotateMap=%s rotateFrame=%s.',
+        'MapDebug live: runtime=%s center=(%.2f,%.2f) zoom=%.3f scale=(%.3f,%.3f) mask=(%.1f,%.1f) mapId=%s mapScaleByte=%d rotateMap=%s rotateFrame=%s.',
         tostring(debug.runtime_address or 'none'),
         debug.center_x,
         debug.center_y,
@@ -4956,6 +4989,7 @@ local function print_minimap_debug()
         debug.scale_y,
         debug.mask_width,
         debug.mask_height,
+        tostring(debug.current_map_id),
         debug.map_scale_raw,
         tostring(debug.rotate_map),
         tostring(debug.rotate_frame)));

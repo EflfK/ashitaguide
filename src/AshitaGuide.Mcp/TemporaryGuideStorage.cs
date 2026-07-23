@@ -92,6 +92,7 @@ public static partial class TemporaryGuideStorage
                         Npc = "Mendi",
                         TargetX = -59.961,
                         TargetY = -75.649,
+                        MapId = 15,
                         AdvanceOnText = "You have undertaken All for One",
                     },
                 },
@@ -127,6 +128,7 @@ public static partial class TemporaryGuideStorage
                 || !contents.Contains("name = \"Updated Goal\"", StringComparison.Ordinal)
                 || !contents.Contains("key = \"ai_level_goal\"", StringComparison.Ordinal)
                 || !contents.Contains("name = \"Fire Crystal\"", StringComparison.Ordinal)
+                || !contents.Contains("map_id = 15", StringComparison.Ordinal)
                 || !contents.Contains("advance_on_text = \"You have undertaken All for One\"", StringComparison.Ordinal)
                 || contents.Contains("name = \"Current Goal\"", StringComparison.Ordinal))
             {
@@ -212,6 +214,10 @@ public static partial class TemporaryGuideStorage
         {
             throw new ArgumentException($"guide.steps[{index}].targetY must be a finite coordinate between -100000 and 100000.");
         }
+        if (input.MapId is < 0 or > 255)
+        {
+            throw new ArgumentException($"guide.steps[{index}].mapId must be between 0 and 255.");
+        }
         if (input.MinimumLevel is < 1 or > 99)
         {
             throw new ArgumentException($"guide.steps[{index}].minimumLevel must be between 1 and 99.");
@@ -232,6 +238,7 @@ public static partial class TemporaryGuideStorage
             CleanOptionalText(input.Note, 512, $"guide.steps[{index}].note"),
             input.TargetX,
             input.TargetY,
+            input.MapId,
             input.MinimumLevel,
             requiredJob,
             input.AdvanceOnTarget,
@@ -321,6 +328,7 @@ public static partial class TemporaryGuideStorage
             value.GetString("note") ?? string.Empty,
             value.GetDouble("target_x"),
             value.GetDouble("target_y"),
+            value.GetInt("map_id"),
             value.GetInt("minimum_level"),
             value.GetString("required_job") ?? string.Empty,
             value.GetBool("advance_on_target") ?? false,
@@ -391,6 +399,10 @@ public static partial class TemporaryGuideStorage
                 {
                     output.AppendLine($"                    target_x = {step.TargetX.Value.ToString("R", CultureInfo.InvariantCulture)},");
                     output.AppendLine($"                    target_y = {step.TargetY!.Value.ToString("R", CultureInfo.InvariantCulture)},");
+                }
+                if (step.MapId is not null)
+                {
+                    output.AppendLine($"                    map_id = {step.MapId.Value.ToString(CultureInfo.InvariantCulture)},");
                 }
                 if (step.MinimumLevel is not null)
                 {
@@ -517,6 +529,7 @@ public static partial class TemporaryGuideStorage
         string Note,
         double? TargetX,
         double? TargetY,
+        int? MapId,
         int? MinimumLevel,
         string RequiredJob,
         bool AdvanceOnTarget,
