@@ -43,6 +43,8 @@ $required = @(
     "navigation_target_live_refresh_seconds",
     "navigation_target_miss_retry_seconds",
     "navigation_target_fallback_scan_distance",
+    "navigation_target_fallback_match_distance",
+    "navigation_target_matches_fallback",
     "read_navigation_target_at_index",
     "navigation_world_radius",
     "config_dir_path",
@@ -261,12 +263,17 @@ if ($content -notmatch "local function navigation_world_radius\(distance\)\s+ret
 
 if ($content -notmatch "navigation_target_live_refresh_seconds = 0\.25" -or
     $content -notmatch "navigation_target_miss_retry_seconds = 5\.0" -or
-    $content -notmatch "navigation_target_fallback_scan_distance = 100\.0") {
+    $content -notmatch "navigation_target_fallback_scan_distance = 100\.0" -or
+    $content -notmatch "navigation_target_fallback_match_distance = 25\.0") {
     throw 'Navigation target lookup throttles do not match the documented limits.'
 }
 
 if ($content -notmatch "(?s)fallback_distance > state\.navigation_target_fallback_scan_distance.+return nil") {
     throw 'Fallback coordinates must distance-gate live NPC entity scans.'
+}
+
+if ($content -notmatch "(?s)navigation_target_matches_fallback.+maximum \* maximum.+navigation_target_matches_fallback\(refreshed, fallback_x, fallback_y\).+navigation_target_matches_fallback\(candidate, fallback_x, fallback_y\)") {
+    throw 'Live NPC candidates and cached targets must stay near configured fallback coordinates.'
 }
 
 if ($content -notmatch "(?s)cached\.index.+state\.read_navigation_target_at_index\(entity, cached\.index, lookup, now\)") {

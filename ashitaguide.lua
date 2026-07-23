@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.22.2';
+addon.version = '0.22.3';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -298,6 +298,7 @@ local state = {
     navigation_target_live_refresh_seconds = 0.25,
     navigation_target_miss_retry_seconds = 5.0,
     navigation_target_fallback_scan_distance = 100.0,
+    navigation_target_fallback_match_distance = 25.0,
     minimap = {
         settings = nil,
         settings_checked_at = 0,
@@ -3923,6 +3924,16 @@ state.read_navigation_target_at_index = function(entity, index, lookup, checked_
     };
 end
 
+local function navigation_target_matches_fallback(candidate, fallback_x, fallback_y)
+    if (candidate == nil or fallback_x == nil or fallback_y == nil) then
+        return candidate ~= nil;
+    end
+    local delta_x = candidate.x - fallback_x;
+    local delta_y = candidate.y - fallback_y;
+    local maximum = state.navigation_target_fallback_match_distance;
+    return ((delta_x * delta_x) + (delta_y * delta_y)) <= (maximum * maximum);
+end
+
 local function find_navigation_target(player, npc, fallback_x, fallback_y)
     local lookup = lower_string(npc);
     if (player == nil or player.entity == nil or lookup == '') then
@@ -3954,7 +3965,7 @@ local function find_navigation_target(player, npc, fallback_x, fallback_y)
         end
 
         local refreshed = state.read_navigation_target_at_index(entity, cached.index, lookup, now);
-        if (refreshed ~= nil) then
+        if (navigation_target_matches_fallback(refreshed, fallback_x, fallback_y)) then
             state.navigation_targets[cache_key] = refreshed;
             return refreshed;
         end
@@ -3973,13 +3984,15 @@ local function find_navigation_target(player, npc, fallback_x, fallback_y)
                 result = candidate;
                 break;
             end
-            local candidate_delta_x = candidate.x - fallback_x;
-            local candidate_delta_y = candidate.y - fallback_y;
-            local candidate_distance_squared =
-                (candidate_delta_x * candidate_delta_x) + (candidate_delta_y * candidate_delta_y);
-            if (best_distance_squared == nil or candidate_distance_squared < best_distance_squared) then
-                best_distance_squared = candidate_distance_squared;
-                result = candidate;
+            if (navigation_target_matches_fallback(candidate, fallback_x, fallback_y)) then
+                local candidate_delta_x = candidate.x - fallback_x;
+                local candidate_delta_y = candidate.y - fallback_y;
+                local candidate_distance_squared =
+                    (candidate_delta_x * candidate_delta_x) + (candidate_delta_y * candidate_delta_y);
+                if (best_distance_squared == nil or candidate_distance_squared < best_distance_squared) then
+                    best_distance_squared = candidate_distance_squared;
+                    result = candidate;
+                end
             end
         end
     end

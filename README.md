@@ -338,11 +338,13 @@ that entity is available in memory, its live position takes precedence over
 the configured coordinates. When multiple entities share a name such as `???`,
 the entity nearest the configured coordinates is used. With fallback
 coordinates, live NPC resolution is distance-gated until the player is within
-100 yalms. Without fallback
-coordinates, an unresolved NPC name is checked against the local entity table
-once every five seconds. Once found, AshitaGuide caches and cheaply refreshes
-that entity index every 0.25 seconds while it remains available. The map is
-drawn entirely by the Lua addon and does not depend on the Minimap plugin.
+100 yalms. A same-named entity must also be within 25 yalms of those configured
+coordinates before it can replace the fallback marker, preventing a distant
+duplicate `???` from taking over. Without fallback coordinates, an unresolved
+NPC name is checked against the local entity table once every five seconds.
+Once found, AshitaGuide caches and cheaply refreshes that entity index every
+0.25 seconds while it remains available. The map is drawn entirely by the Lua
+addon and does not depend on the Minimap plugin.
 Navigation is display-only and never moves or targets the character. The map
 section is hidden until the player is in the step's destination zone and a
 usable target position is available. Its view continuously adjusts its radius
