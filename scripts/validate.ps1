@@ -108,6 +108,8 @@ $required = @(
     "key_item_step_completions",
     "persist_key_item_step_completion",
     "key_item_step_is_persisted",
+    "update_key_item_step_completion",
+    "DONE - click > to continue",
     "update_level_step_auto_advance",
     "minimum_level",
     "required_job",

@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.22.1';
+addon.version = '0.22.2';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -3120,7 +3120,6 @@ local function process_observed_text(text, source, mode, alternate_mode)
                 and normalized_text:find(obtained_prefix, 1, true) ~= nil
                 and normalized_text:find(key_item_name, 1, true) ~= nil) then
                 persist_key_item_step_completion(run, run.step_index, step);
-                next_step(run);
                 handled = true;
             end
         end
@@ -4058,7 +4057,7 @@ local function update_level_step_auto_advance()
     end
 end
 
-local function update_key_item_step_auto_advance()
+local function update_key_item_step_completion()
     local run = state.active[state.selected_active_key];
     if (run == nil) then
         return;
@@ -4067,7 +4066,6 @@ local function update_key_item_step_auto_advance()
     local step = run.guide.steps[run.step_index];
     local key_item_id = resolve_step_key_item_id(step);
     if (key_item_id == nil) then
-        run.key_item_match_step = nil;
         return;
     end
 
@@ -4075,18 +4073,8 @@ local function update_key_item_step_auto_advance()
     local player = memory ~= nil and safe_read(function () return memory:GetPlayer(); end, nil) or nil;
     local has_key_item = player ~= nil
         and truthy(safe_read(function () return player:HasKeyItem(key_item_id); end, false));
-    local token = string.format('%s:%d', run.key, run.step_index);
-    local persisted = key_item_step_is_persisted(run, run.step_index, step);
     if (has_key_item) then
         persist_key_item_step_completion(run, run.step_index, step);
-    end
-    if ((persisted or has_key_item) and run.step_index < #run.guide.steps) then
-        if (run.key_item_match_step ~= token) then
-            run.key_item_match_step = token;
-            next_step(run);
-        end
-    else
-        run.key_item_match_step = nil;
     end
 end
 
@@ -4428,6 +4416,9 @@ local function render_step_list(run)
     for index, step in ipairs(run.guide.steps) do
         local prefix = index == run.step_index and '> ' or '  ';
         local label = step.title ~= '' and step.title or step.text;
+        if (key_item_step_is_persisted(run, index, step)) then
+            label = '[Done] ' .. label;
+        end
         if (index == run.step_index) then
             text_colored_wrapped(COLORS.accent, string.format('%s%d. %s', prefix, index, label));
         else
@@ -4437,6 +4428,8 @@ local function render_step_list(run)
 end
 
 local function render_guide_navigation_row(run)
+    local step = run.guide.steps[run.step_index] or run.guide.steps[1];
+    local done = key_item_step_is_persisted(run, run.step_index, step);
     if (imgui.Button('<##ashitaguide_back_' .. run.key, { 36, 0 })) then
         previous_step(run);
     end
@@ -4444,14 +4437,16 @@ local function render_guide_navigation_row(run)
 
     local child_open, child_visible = begin_child(
         '##ashitaguide_guide_summary_' .. run.key,
-        { -52, 46 },
+        { -52, done and 64 or 46 },
         false);
     if (child_visible) then
-        local step = run.guide.steps[run.step_index] or run.guide.steps[1];
         local progress = string.format('STEP %d OF %d', run.step_index, #run.guide.steps);
         centered_text_colored(COLORS.accent, progress);
         if (step.title ~= '') then
             centered_text_colored(COLORS.header, step.title);
+        end
+        if (done) then
+            centered_text_colored(COLORS.accent, 'DONE - click > to continue');
         end
     end
     if (child_open) then
@@ -4535,6 +4530,9 @@ local function render_active_guide(run)
     if (guide.type == 'auction_sale_list') then
         render_auction_sale_items(step);
         return;
+    end
+    if (key_item_step_is_persisted(run, run.step_index, step)) then
+        text_colored_wrapped(COLORS.accent, 'DONE - click > to continue.');
     end
     text_wrapped(step.text);
     local navigation = navigation_context(step);
@@ -5316,7 +5314,7 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     poll_auction_sale_guide_file();
     update_npc_step_auto_advance();
     update_level_step_auto_advance();
-    update_key_item_step_auto_advance();
+    update_key_item_step_completion();
     decision.update();
     decision.pin_legacy_chat_closed();
     render_minimap_destination_marker();

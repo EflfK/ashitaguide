@@ -371,9 +371,11 @@ punctuation, and repeated whitespace, so typographic quotation marks do not
 make a reliable confirmation fail. This is event-driven and does not add a
 chat-log polling loop; historical messages are intentionally not replayed.
 
-Set `key_item` or `key_item_id` on a step to advance when the player already
-owns that key item, including immediately after entering the step. AshitaGuide
-also advances as soon as the matching `Obtained key item` message arrives.
+Set `key_item` or `key_item_id` on a step to mark it done when the player
+already owns that key item, including immediately after entering the step.
+AshitaGuide also marks it done as soon as the matching `Obtained key item`
+message arrives. The completed step remains selected until the player clicks
+the normal `>` control.
 Prefer `key_item_id` when multiple key items share the same resource name; both
 fields may be supplied together to keep the guide readable. Matching
 acquisitions are saved per character and step, so revisiting the step still
