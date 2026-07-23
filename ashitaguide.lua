@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.20.2';
+addon.version = '0.20.3';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -1117,6 +1117,8 @@ local function new_casket_state()
         updated_at = 0,
         last_event = nil,
         last_result = nil,
+        last_clue_signature = nil,
+        last_clue_observed_at = 0,
     };
 end
 
@@ -1256,8 +1258,48 @@ local function casket_parse_range_event(lower, original)
     return { kind = 'range', low = low, high = high, message = original };
 end
 
+local function casket_normalize_message(message)
+    local text = clean_message(message);
+    local lower = text:lower();
+    local starts = {
+        'you have a hunch',
+        'it appears that you can enter',
+        'you succeeded in opening the lock',
+        'succeeded in opening the lock',
+        'you failed to open the lock',
+        'failed to open the lock',
+        'you open the treasure casket',
+        'the treasure casket opens',
+        'the treasure casket disappears',
+        'the lock breaks',
+        'the chest is locked',
+        'chest is locked',
+        'the casket is locked',
+        'casket is locked',
+    };
+    local first = nil;
+    for _, phrase in ipairs(starts) do
+        local position = lower:find(phrase, 1, true);
+        if (position ~= nil and (first == nil or position < first)) then
+            first = position;
+        end
+    end
+    if (first ~= nil) then
+        return trim_string(text:sub(first));
+    end
+
+    -- Chat-log copies carry timestamps and can contain a printable byte left
+    -- behind by Ashita formatting. Remove all leading timestamp wrappers.
+    local previous = nil;
+    while (text ~= previous) do
+        previous = text;
+        text = trim_string(text:gsub('^.-%[%d%d:%d%d:%d%d%]%s*', '', 1));
+    end
+    return text;
+end
+
 local function casket_parse_message(message)
-    local original = clean_message(message);
+    local original = casket_normalize_message(message);
     if (original == '') then
         return nil;
     end
@@ -1433,10 +1475,19 @@ local function process_casket_text(text, source, mode, alternate_mode)
         reset_casket_state(now);
     end
 
+    local observed_at = os.time();
+    local clue_signature = event.kind .. ':' .. event.message:lower();
+    if (state.casket.last_clue_signature == clue_signature
+        and observed_at - (tonumber(state.casket.last_clue_observed_at) or 0) <= 2) then
+        return true;
+    end
+
     casket_apply_event(state.casket, event);
     state.casket.active = true;
     state.casket.updated_at = now;
     state.casket.last_event = event;
+    state.casket.last_clue_signature = clue_signature;
+    state.casket.last_clue_observed_at = observed_at;
     table.insert(state.casket.clues, event);
     state.casket_visible[1] = true;
     return true;

@@ -75,6 +75,7 @@ $required = @(
     "render_casket_config",
     "render_casket_window",
     "casket_parse_message",
+    "casket_normalize_message",
     "casket_is_player_chat",
     "PLAYER_CHAT_MODES",
     "one%s+of%s+the%s+two%s+digits",
@@ -297,6 +298,14 @@ if ($content -notmatch "(?s)PLAYER_CHAT_MODES\[normalized_mode\].+PLAYER_CHAT_MO
 
 if ($content -notmatch "(?s)local prefix = clean_message\(text\):sub\(1, 128\).+prefix:find\('<\[\^<>\]\+>%s'\)") {
     throw 'Casket player-chat filtering must reject speaker-tagged chat-log lines.'
+}
+
+if ($content -notmatch "(?s)local function casket_normalize_message\(message\).+you have a hunch.+%\[%d%d:%d%d:%d%d%\].+local function casket_parse_message\(message\).+casket_normalize_message\(message\)") {
+    throw 'Casket messages must remove chat-log prefixes before parsing and display.'
+}
+
+if ($content -notmatch "(?s)last_clue_signature == clue_signature.+last_clue_observed_at.+<= 2.+last_clue_signature = clue_signature") {
+    throw 'Casket hints must collapse duplicate live-event and chat-log observations.'
 }
 
 $configStart = $content.IndexOf('local function render_casket_config()')

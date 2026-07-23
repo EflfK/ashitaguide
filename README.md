@@ -80,7 +80,9 @@ packets, click menus, or automate casket interaction. Historical chat-log
 seeding is ignored for caskets so stale casket hints do not reopen the window
 on login. Player chat is ignored, including speaker-tagged lines read through
 the chat-log fallback, so players quoting hint phrases cannot alter the candidate
-list. Reset is available directly in the Casket Helper window. The Casket tab in
+list. Live-event and chat-log copies of the same hint are collapsed, and chat-log
+timestamps and formatting prefixes are removed before hints are displayed.
+Reset is available directly in the Casket Helper window. The Casket tab in
 Guide Config controls whether the helper is enabled, its background opacity, and
 how long an inactive casket session is kept before new hints start a fresh
 session.
