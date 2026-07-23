@@ -35,6 +35,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - built-in brown treasure casket code helper
 - dedicated Casket Helper window that appears from live casket chat hints
 - movable, display-only native decision-menu companion with guide answer highlighting
+- optional legacy chat-frame hiding while the Decision Window is enabled
 - separate Guides, Decision Window, AI Guides, Auction Sales, Valor, and Casket tabs in Guide Config
 - independent 0-100% background opacity for the Guides, Decision, Valor, and Casket windows
 - permanent AshitaChat-style titleless frames, dark borders, and transparent child regions
@@ -59,11 +60,18 @@ recommended row. Matching ignores case and punctuation and accepts instructions
 such as `Select Other settings.`
 
 The window is display-only. It does not select a choice, send input, inject a
-packet, or advance the guide. The original game menu remains visible and all
-interaction continues through the normal game controls. The Decision Window
-configuration tab controls whether the companion is enabled, its background
-opacity, and which corner remains stationary as differently sized menus expand.
-The window auto-sizes without resize handles or scrollbars.
+packet, or advance the guide. Interaction continues through the normal game
+controls.
+
+For the current trial, **Hide native chat frame** is enabled by default in the
+Decision Window configuration tab. It restores AshitaChat's original local
+UI-only behavior from commit `1195c68`: the two legacy chat windows are pinned
+closed each frame, except while the normal chat input is open. This also hides
+native NPC and destination menus, so keep the Decision Window enabled while
+testing and turn the option off if a menu is not represented correctly. The
+same tab also controls the companion background opacity and which corner remains
+stationary as differently sized menus expand. The window auto-sizes without
+resize handles or scrollbars.
 
 ## Casket Helper
 
@@ -133,10 +141,11 @@ Ashita/config/addons/ashitaguide/ashitaguide_config.lua
 
 Edit that persistent copy when adding or changing guides. The addon writes UI
 preferences to `Ashita/config/addons/ashitaguide/settings.lua`, including window
-positions and sizes, the Guides and Decision anchor corners, visibility, map size, Valor settings,
-Casket settings, per-window background opacity, active normal guides, and each guide's
-last selected step. A normal guide resumes that step even after its tab is closed and
-reopened or the game is restarted.
+positions and sizes, the Guides and Decision anchor corners, native chat-frame
+hiding, visibility, map size, Valor settings, Casket settings, per-window
+background opacity, active normal guides, and each guide's last selected step.
+A normal guide resumes that step even after its tab is closed and reopened or
+the game is restarted.
 Replacing or reinstalling the addon directory does not overwrite any of these
 persistent files.
 

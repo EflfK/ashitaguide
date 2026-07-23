@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.20.3';
+addon.version = '0.20.4';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -178,6 +178,7 @@ local DEFAULT_SETTINGS = {
     minimap_marker_enabled = true,
     guide_opacity = 92,
     decision_enabled = true,
+    decision_hide_native_chat = true,
     decision_anchor_corner = 'top_left',
     decision_window_x = 80,
     decision_window_y = 180,
@@ -271,6 +272,7 @@ local state = {
     minimap_marker_enabled = T{ true },
     guide_opacity = T{ 92 },
     decision_enabled = T{ true },
+    decision_hide_native_chat = T{ true },
     decision_opacity = T{ 96 },
     valor_opacity = T{ 92 },
     casket_opacity = T{ 92 },
@@ -354,6 +356,9 @@ local state = {
     decision_menu_open = T{ true },
     decision_window_width = nil,
     decision_window_height = nil,
+    native_chat_pointer_error = nil,
+    native_chat_win_ptr1 = nil,
+    native_chat_win_ptr2 = nil,
     guide_window_width = nil,
     guide_window_height = nil,
 };
@@ -945,6 +950,68 @@ function decision.update()
     end
 end
 
+function decision.find_legacy_chat_windows()
+    state.native_chat_pointer_error = nil;
+    state.native_chat_win_ptr1 = nil;
+    state.native_chat_win_ptr2 = nil;
+
+    local pattern = ashita.memory.find(
+        'FFXiMain.dll',
+        0,
+        'A1????????C64059018B0D????????C6415901C20800',
+        0,
+        0);
+    if (pattern == nil or pattern == 0) then
+        state.native_chat_pointer_error = 'legacy chat window pattern not found';
+        return false;
+    end
+
+    state.native_chat_win_ptr1 = ashita.memory.read_uint32(pattern + 0x01);
+    state.native_chat_win_ptr2 = ashita.memory.read_uint32(pattern + 0x0B);
+
+    if ((state.native_chat_win_ptr1 == nil or state.native_chat_win_ptr1 == 0)
+        and (state.native_chat_win_ptr2 == nil or state.native_chat_win_ptr2 == 0)) then
+        state.native_chat_pointer_error = 'legacy chat window pointers were empty';
+        return false;
+    end
+
+    return true;
+end
+
+function decision.pin_legacy_chat_window(pointer_address)
+    if (pointer_address == nil or pointer_address == 0) then
+        return false;
+    end
+
+    local window = ashita.memory.read_uint32(pointer_address);
+    if (window == nil or window == 0) then
+        return false;
+    end
+
+    ashita.memory.unprotect(window + 0x34, 4);
+    ashita.memory.write_uint32(window + 0x34, 0x00);
+    return true;
+end
+
+function decision.pin_legacy_chat_closed()
+    if (state.decision_enabled[1] ~= true or state.decision_hide_native_chat[1] ~= true) then
+        return;
+    end
+
+    if (AshitaCore:GetChatManager():IsInputOpen() ~= 0x00) then
+        return;
+    end
+
+    if (state.native_chat_win_ptr1 == nil
+        and state.native_chat_win_ptr2 == nil
+        and not decision.find_legacy_chat_windows()) then
+        return;
+    end
+
+    decision.pin_legacy_chat_window(state.native_chat_win_ptr1);
+    decision.pin_legacy_chat_window(state.native_chat_win_ptr2);
+end
+
 local function normalize_guide(source, index, origin)
     source = type(source) == 'table' and source or {};
     local name = trim_string(source.name or source.label);
@@ -991,6 +1058,9 @@ local function normalize_settings(source)
             DEFAULT_SETTINGS.minimap_marker_enabled),
         guide_opacity = bounded_number(source.guide_opacity, legacy_opacity, 0, 100),
         decision_enabled = bounded_boolean(source.decision_enabled, DEFAULT_SETTINGS.decision_enabled),
+        decision_hide_native_chat = bounded_boolean(
+            source.decision_hide_native_chat,
+            DEFAULT_SETTINGS.decision_hide_native_chat),
         decision_anchor_corner = decision.normalize_anchor(source.decision_anchor_corner),
         decision_window_x = bounded_number(
             source.decision_window_x,
@@ -2292,6 +2362,7 @@ local function load_config()
     state.minimap_marker_enabled[1] = state.settings.minimap_marker_enabled;
     state.guide_opacity[1] = state.settings.guide_opacity;
     state.decision_enabled[1] = state.settings.decision_enabled;
+    state.decision_hide_native_chat[1] = state.settings.decision_hide_native_chat;
     state.decision_opacity[1] = state.settings.decision_opacity;
     state.valor_opacity[1] = state.settings.valor_opacity;
     state.casket_opacity[1] = state.settings.casket_opacity;
@@ -2503,6 +2574,7 @@ local function settings_text()
         string.format('    minimap_marker_enabled = %s,', lua_boolean(state.minimap_marker_enabled[1])),
         string.format('    guide_opacity = %d,', bounded_number(state.guide_opacity[1], DEFAULT_SETTINGS.guide_opacity, 0, 100)),
         string.format('    decision_enabled = %s,', lua_boolean(state.decision_enabled[1])),
+        string.format('    decision_hide_native_chat = %s,', lua_boolean(state.decision_hide_native_chat[1])),
         string.format('    decision_anchor_corner = %q,', decision.normalize_anchor(values.decision_anchor_corner)),
         string.format('    decision_window_x = %d,', bounded_number(values.decision_window_x, DEFAULT_SETTINGS.decision_window_x, 0, 10000)),
         string.format('    decision_window_y = %d,', bounded_number(values.decision_window_y, DEFAULT_SETTINGS.decision_window_y, 0, 10000)),
@@ -3319,6 +3391,9 @@ end
 function decision.render_config()
     imgui.TextColored(COLORS.header, 'Decision Window');
     imgui.Checkbox('Enabled##ashitaguide_decision_enabled', state.decision_enabled);
+    imgui.Checkbox(
+        'Hide native chat frame##ashitaguide_decision_hide_native_chat',
+        state.decision_hide_native_chat);
     imgui.PushItemWidth(220);
     imgui.SliderInt(
         'Background opacity##ashitaguide_decision_opacity',
@@ -3329,6 +3404,7 @@ function decision.render_config()
     imgui.PopItemWidth();
     decision.render_anchor_selector();
     imgui.TextColored(COLORS.muted, 'The selected corner stays fixed while menu content expands.');
+    imgui.TextColored(COLORS.muted, 'Native chat reopens while the normal chat input is active.');
     imgui.TextColored(COLORS.muted, 'Open an NPC decision menu to drag the window into position.');
 end
 
@@ -5033,6 +5109,9 @@ end
 ashita.events.register('load', 'load_cb', function ()
     load_config();
     seed_chat_log();
+    if (state.decision_hide_native_chat[1] == true and not decision.find_legacy_chat_windows()) then
+        log_warn('Native chat hiding is unavailable: ' .. state.native_chat_pointer_error .. '.');
+    end
     log_info('Loaded. Use /agguide show and /agguide list.');
     if (state.config_error ~= nil) then
         log_warn('Config warning: ' .. state.config_error);
@@ -5062,6 +5141,7 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     update_npc_step_auto_advance();
     update_level_step_auto_advance();
     decision.update();
+    decision.pin_legacy_chat_closed();
     render_minimap_destination_marker();
     render_guide_window();
     decision.render();

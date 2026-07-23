@@ -121,7 +121,12 @@ $required = @(
     "decision_anchor_corner",
     "decision_window_x",
     "decision_window_y",
-    "decision_opacity"
+    "decision_opacity",
+    "decision_hide_native_chat",
+    "function decision.find_legacy_chat_windows",
+    "function decision.pin_legacy_chat_window",
+    "function decision.pin_legacy_chat_closed",
+    "A1????????C64059018B0D????????C6415901C20800"
 )
 
 foreach ($needle in $required) {
@@ -135,7 +140,6 @@ $blocked = @(
     'InjectPacket',
     'SendPacket',
     'SetTarget',
-    'ashita.memory.write',
     '/target',
     '/targetnpc',
     '/attack',
@@ -152,6 +156,15 @@ foreach ($needle in $blocked) {
     if ($content -like "*$needle*") {
         throw "Read-only boundary violation candidate: $needle"
     }
+}
+
+$memoryWrites = [regex]::Matches($content, 'ashita\.memory\.write_[A-Za-z0-9_]+')
+if ($memoryWrites.Count -ne 1 -or $memoryWrites[0].Value -ne 'ashita.memory.write_uint32') {
+    throw 'Only the single legacy chat-window visibility write is allowed.'
+}
+
+if ($content -notmatch 'ashita\.memory\.write_uint32\(window \+ 0x34, 0x00\)') {
+    throw 'Legacy chat hiding must only close the known local chat-window field.'
 }
 
 if ($content -match 'render_npc_world_marker|world_to_screen|ashitaguide_npc_world_marker') {

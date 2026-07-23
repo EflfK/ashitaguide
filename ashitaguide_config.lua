@@ -14,6 +14,7 @@ return {
         minimap_marker_enabled = true,
         guide_opacity = 92,
         decision_enabled = true,
+        decision_hide_native_chat = true,
         decision_anchor_corner = 'top_left',
         decision_window_x = 80,
         decision_window_y = 180,
