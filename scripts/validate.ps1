@@ -259,6 +259,10 @@ if ($content -notmatch "(?s)local function render_guide_window\(\).+window_no_re
     throw 'Guides window must auto-size without resize handles or scrollbars.'
 }
 
+if ($content -notmatch "(?s)local function set_next_guide_window_position\(width, height\).+SetNextWindowPos\(\{ window_x, window_y \}, IMGUI\.cond_first_use\)") {
+    throw 'Guides window must remain draggable after applying its initial configured position.'
+}
+
 if ($content -notmatch "PushTextWrapPos\(math\.max\(cursor_x \+ 1, GUIDE_TEXT_WRAP_POS_X\)\)") {
     throw 'Guide text must use a stable maximum wrap width during auto-resize.'
 }
