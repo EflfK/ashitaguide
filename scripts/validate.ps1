@@ -118,7 +118,7 @@ $required = @(
     "required_job",
     "GetMainJobLevel",
     "target_x",
-    "normalize_destinations",
+    "state.normalize_destinations",
     "step.destinations",
     "Progress",
     "ReadProcessMemory",

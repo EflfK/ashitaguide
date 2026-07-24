@@ -744,7 +744,7 @@ local function normalize_sale_items(source)
     return output;
 end
 
-local function normalize_destinations(source)
+state.normalize_destinations = function (source)
     local output = {};
     if (type(source) ~= 'table') then
         return output;
@@ -816,7 +816,7 @@ local function normalize_step(source, index)
         target_x = tonumber(source.target_x or source.x),
         target_y = tonumber(source.target_y or source.y),
         map_id = map_id,
-        destinations = normalize_destinations(source.destinations or source.markers),
+        destinations = state.normalize_destinations(source.destinations or source.markers),
         key_item = trim_string(source.key_item or source.keyItem),
         key_item_id = key_item_id,
         minimum_level = minimum_level,
