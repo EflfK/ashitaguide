@@ -744,6 +744,36 @@ local function normalize_sale_items(source)
     return output;
 end
 
+local function normalize_destinations(source)
+    local output = {};
+    if (type(source) ~= 'table') then
+        return output;
+    end
+    for _, destination in ipairs(source) do
+        if (type(destination) == 'table') then
+            local target_x = tonumber(destination.target_x or destination.x);
+            local target_y = tonumber(destination.target_y or destination.y);
+            local map_id = tonumber(destination.map_id or destination.mapId);
+            if (map_id ~= nil) then
+                map_id = math.floor(map_id);
+                if (map_id < 0 or map_id > 255) then
+                    map_id = nil;
+                end
+            end
+            if (target_x ~= nil and target_y ~= nil) then
+                table.insert(output, {
+                    label = trim_string(destination.label or destination.name),
+                    npc = trim_string(destination.npc),
+                    target_x = target_x,
+                    target_y = target_y,
+                    map_id = map_id,
+                });
+            end
+        end
+    end
+    return output;
+end
+
 local function normalize_step(source, index)
     if (type(source) == 'string') then
         source = { text = source };
@@ -786,6 +816,7 @@ local function normalize_step(source, index)
         target_x = tonumber(source.target_x or source.x),
         target_y = tonumber(source.target_y or source.y),
         map_id = map_id,
+        destinations = normalize_destinations(source.destinations or source.markers),
         key_item = trim_string(source.key_item or source.keyItem),
         key_item_id = key_item_id,
         minimum_level = minimum_level,
@@ -2278,6 +2309,21 @@ local function guide_storage_text(guides)
             end
             if (step.map_id ~= nil) then
                 table.insert(lines, string.format('                    map_id = %d,', step.map_id));
+            end
+            if (type(step.destinations) == 'table' and #step.destinations > 0) then
+                table.insert(lines, '                    destinations = {');
+                for _, destination in ipairs(step.destinations) do
+                    table.insert(lines, '                        {');
+                    table.insert(lines, string.format('                            label = %s,', lua_quoted(destination.label)));
+                    table.insert(lines, string.format('                            npc = %s,', lua_quoted(destination.npc)));
+                    table.insert(lines, string.format('                            target_x = %.6f,', destination.target_x));
+                    table.insert(lines, string.format('                            target_y = %.6f,', destination.target_y));
+                    if (destination.map_id ~= nil) then
+                        table.insert(lines, string.format('                            map_id = %d,', destination.map_id));
+                    end
+                    table.insert(lines, '                        },');
+                end
+                table.insert(lines, '                    },');
             end
             if (step.key_item ~= '') then
                 table.insert(lines, string.format('                    key_item = %s,', lua_quoted(step.key_item)));
@@ -4329,6 +4375,61 @@ local function render_minimap_destination_marker()
         draw_list:AddCircleFilled({ marker_x, marker_y }, 6.0, outline_color, 20);
         draw_list:AddCircleFilled({ marker_x, marker_y }, 4.0, fill_color, 20);
         draw_list:AddCircle({ marker_x, marker_y }, clamped and 9.0 or 8.0, fill_color, 20, 2.0);
+
+        for _, destination in ipairs(step.destinations or {}) do
+            if (destination.map_id == nil or minimap.current_map_id == destination.map_id) then
+                local destination_delta_x = destination.target_x - navigation.player.x;
+                local destination_delta_y = -(destination.target_y - navigation.player.y);
+                if (minimap.rotate_map) then
+                    destination_delta_x, destination_delta_y = rotate_minimap_delta(
+                        destination_delta_x,
+                        destination_delta_y,
+                        navigation.player.yaw);
+                end
+
+                local destination_marker_x = center_x + (destination_delta_x * pixels_per_yalm_x);
+                local destination_marker_y = center_y + (destination_delta_y * pixels_per_yalm_y);
+                local destination_clamped = false;
+                if (destination_marker_x < center_x - half_width) then
+                    destination_marker_x = center_x - half_width;
+                    destination_clamped = true;
+                elseif (destination_marker_x > center_x + half_width) then
+                    destination_marker_x = center_x + half_width;
+                    destination_clamped = true;
+                end
+                if (destination_marker_y < center_y - half_height) then
+                    destination_marker_y = center_y - half_height;
+                    destination_clamped = true;
+                elseif (destination_marker_y > center_y + half_height) then
+                    destination_marker_y = center_y + half_height;
+                    destination_clamped = true;
+                end
+
+                local world_delta_x = destination.target_x - navigation.player.x;
+                local world_delta_y = destination.target_y - navigation.player.y;
+                local destination_distance = math.sqrt(
+                    (world_delta_x * world_delta_x) + (world_delta_y * world_delta_y));
+                local destination_fill = destination_distance <= 2.5
+                    and imgui.GetColorU32(COLORS.accent)
+                    or imgui.GetColorU32({ COLORS.header[1], COLORS.header[2], COLORS.header[3], pulse });
+                draw_list:AddCircleFilled(
+                    { destination_marker_x, destination_marker_y },
+                    6.0,
+                    outline_color,
+                    20);
+                draw_list:AddCircleFilled(
+                    { destination_marker_x, destination_marker_y },
+                    4.0,
+                    destination_fill,
+                    20);
+                draw_list:AddCircle(
+                    { destination_marker_x, destination_marker_y },
+                    destination_clamped and 9.0 or 8.0,
+                    destination_fill,
+                    20,
+                    2.0);
+            end
+        end
     end
     imgui.End();
 end

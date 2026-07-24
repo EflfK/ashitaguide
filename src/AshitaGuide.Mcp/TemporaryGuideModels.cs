@@ -52,6 +52,9 @@ public sealed class TemporaryGuideStepInput
     [Description("Optional live Minimap map/floor id from 0 through 255. The Minimap marker is hidden while another map is displayed.")]
     public int? MapId { get; init; }
 
+    [Description("Optional additional destinations rendered together on the guide map and Minimap. Use this for one-step guides that need several simultaneous markers.")]
+    public IReadOnlyList<TemporaryGuideDestinationInput>? Destinations { get; init; }
+
     [Description("Optional key-item resource name that persistently marks this step done when already owned or newly obtained. Use keyItemId when names are duplicated.")]
     public string? KeyItem { get; init; }
 
@@ -69,4 +72,22 @@ public sealed class TemporaryGuideStepInput
 
     [Description("Optional exact phrase that advances this step when it appears in a new incoming chat event. Matching ignores case, punctuation, and repeated whitespace; no chat-log polling is added.")]
     public string? AdvanceOnText { get; init; }
+}
+
+public sealed class TemporaryGuideDestinationInput
+{
+    [Description("Optional short marker label.")]
+    public string? Label { get; init; }
+
+    [Description("Optional exact NPC name used for live-position resolution. Omit it when marking fixed spawn possibilities.")]
+    public string? Npc { get; init; }
+
+    [Description("Destination X coordinate.")]
+    public required double TargetX { get; init; }
+
+    [Description("Destination Y coordinate.")]
+    public required double TargetY { get; init; }
+
+    [Description("Optional live Minimap map/floor id from 0 through 255. The marker is hidden while another map is displayed.")]
+    public int? MapId { get; init; }
 }

@@ -194,6 +194,14 @@ return {
                     target_x = -59.961,
                     target_y = -75.649,
                     map_id = 15,
+                    destinations = {
+                        {
+                            label = 'Alternate spawn',
+                            target_x = -40.250,
+                            target_y = -60.500,
+                            map_id = 15,
+                        },
+                    },
                     advance_on_target = false,
                 },
             },
@@ -350,6 +358,14 @@ section is hidden until the player is in the step's destination zone and a
 usable target position is available. Its view continuously adjusts its radius
 based on distance, smoothly zooming in as the player approaches while retaining
 five yalms of framing space. The active map radius is shown next to the map.
+
+Set `destinations` to a list of additional fixed markers when one step needs
+several destinations visible simultaneously. Each entry accepts `label`,
+`target_x`, `target_y`, and optional `npc` and `map_id`. The step's primary
+`target_x`/`target_y` remains the destination shown in the guide panel, while
+the primary destination and every additional destination are rendered together
+on the Minimap. Omit `npc` for fixed spawn possibilities so multiple markers do
+not collapse onto the one currently visible entity.
 
 With `minimap_marker_enabled = true`, that same destination is also drawn as a
 gold dot over the loaded Ashita Minimap plugin. This overlay currently requires

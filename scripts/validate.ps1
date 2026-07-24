@@ -118,6 +118,8 @@ $required = @(
     "required_job",
     "GetMainJobLevel",
     "target_x",
+    "normalize_destinations",
+    "step.destinations",
     "Progress",
     "ReadProcessMemory",
     "guarded_read_bytes",
@@ -313,6 +315,10 @@ if ($content -notmatch "minimap\.mask_width \* minimap\.zoom\s+/ 100 \* minimap\
 
 if ($content -notmatch "(?s)step\.map_id ~= nil.+minimap\.current_map_id ~= step\.map_id.+Minimap marker hidden") {
     throw 'Minimap markers must be hidden when a step targets another map or floor.'
+}
+
+if ($content -notmatch "(?s)for _, destination in ipairs\(step\.destinations or \{\}\) do.+destination_marker_x.+destination_marker_y.+AddCircleFilled") {
+    throw 'Additional step destinations must render together on the Minimap.'
 }
 
 if ($content -notmatch "(?s)local function render_guide_window\(\).+window_no_resize.+window_no_scrollbar.+window_always_auto_resize") {

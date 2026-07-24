@@ -93,12 +93,23 @@ public static partial class TemporaryGuideStorage
                         TargetX = -59.961,
                         TargetY = -75.649,
                         MapId = 15,
+                        Destinations = new[]
+                        {
+                            new TemporaryGuideDestinationInput
+                            {
+                                Label = "Alternate",
+                                TargetX = -40.25,
+                                TargetY = -60.5,
+                                MapId = 15,
+                            },
+                        },
                         KeyItem = "Exoray mold crumb",
                         KeyItemId = 2137,
                         AdvanceOnText = "You have undertaken All for One",
                     },
                 },
             });
+            var firstContents = File.ReadAllText(Path.Combine(testDirectory, PublicationFileName));
             var second = Publish(new TemporaryGuideInput
             {
                 Key = "ai_level_goal",
@@ -130,10 +141,12 @@ public static partial class TemporaryGuideStorage
                 || !contents.Contains("name = \"Updated Goal\"", StringComparison.Ordinal)
                 || !contents.Contains("key = \"ai_level_goal\"", StringComparison.Ordinal)
                 || !contents.Contains("name = \"Fire Crystal\"", StringComparison.Ordinal)
-                || !contents.Contains("map_id = 15", StringComparison.Ordinal)
-                || !contents.Contains("key_item = \"Exoray mold crumb\"", StringComparison.Ordinal)
-                || !contents.Contains("key_item_id = 2137", StringComparison.Ordinal)
-                || !contents.Contains("advance_on_text = \"You have undertaken All for One\"", StringComparison.Ordinal)
+                || !firstContents.Contains("map_id = 15", StringComparison.Ordinal)
+                || !firstContents.Contains("label = \"Alternate\"", StringComparison.Ordinal)
+                || !firstContents.Contains("target_x = -40.25", StringComparison.Ordinal)
+                || !firstContents.Contains("key_item = \"Exoray mold crumb\"", StringComparison.Ordinal)
+                || !firstContents.Contains("key_item_id = 2137", StringComparison.Ordinal)
+                || !firstContents.Contains("advance_on_text = \"You have undertaken All for One\"", StringComparison.Ordinal)
                 || contents.Contains("name = \"Current Goal\"", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Temporary guide upsert self-test failed.");
@@ -222,6 +235,7 @@ public static partial class TemporaryGuideStorage
         {
             throw new ArgumentException($"guide.steps[{index}].mapId must be between 0 and 255.");
         }
+        var destinations = NormalizeDestinations(input.Destinations, index);
         if (input.KeyItemId is < 0 or > 65535)
         {
             throw new ArgumentException($"guide.steps[{index}].keyItemId must be between 0 and 65535.");
@@ -247,6 +261,7 @@ public static partial class TemporaryGuideStorage
             input.TargetX,
             input.TargetY,
             input.MapId,
+            destinations,
             CleanOptionalText(input.KeyItem, 128, $"guide.steps[{index}].keyItem"),
             input.KeyItemId,
             input.MinimumLevel,
@@ -339,6 +354,9 @@ public static partial class TemporaryGuideStorage
             value.GetDouble("target_x"),
             value.GetDouble("target_y"),
             value.GetInt("map_id"),
+            value.GetTable("destinations")?.ArrayValues
+                .Select(item => ParseStoredDestination(item.RequireTable()))
+                .ToArray() ?? Array.Empty<StoredDestination>(),
             value.GetString("key_item") ?? string.Empty,
             value.GetInt("key_item_id"),
             value.GetInt("minimum_level"),
@@ -347,6 +365,13 @@ public static partial class TemporaryGuideStorage
             value.GetString("advance_on_text") ?? string.Empty,
             saleItems);
     }
+
+    private static StoredDestination ParseStoredDestination(LuaTableValue value) => new(
+        value.GetString("label") ?? string.Empty,
+        value.GetString("npc") ?? string.Empty,
+        value.GetDouble("target_x") ?? throw new FormatException("Destination target_x must be a number."),
+        value.GetDouble("target_y") ?? throw new FormatException("Destination target_y must be a number."),
+        value.GetInt("map_id"));
 
     private static StoredSaleItem ParseStoredSaleItem(LuaTableValue value) => new(
         value.RequireString("name"),
@@ -416,6 +441,24 @@ public static partial class TemporaryGuideStorage
                 {
                     output.AppendLine($"                    map_id = {step.MapId.Value.ToString(CultureInfo.InvariantCulture)},");
                 }
+                if (step.Destinations.Count > 0)
+                {
+                    output.AppendLine("                    destinations = {");
+                    foreach (var destination in step.Destinations)
+                    {
+                        output.AppendLine("                        {");
+                        output.AppendLine($"                            label = {LuaQuote(destination.Label)},");
+                        output.AppendLine($"                            npc = {LuaQuote(destination.Npc)},");
+                        output.AppendLine($"                            target_x = {destination.TargetX.ToString("R", CultureInfo.InvariantCulture)},");
+                        output.AppendLine($"                            target_y = {destination.TargetY.ToString("R", CultureInfo.InvariantCulture)},");
+                        if (destination.MapId is not null)
+                        {
+                            output.AppendLine($"                            map_id = {destination.MapId.Value.ToString(CultureInfo.InvariantCulture)},");
+                        }
+                        output.AppendLine("                        },");
+                    }
+                    output.AppendLine("                    },");
+                }
                 if (step.KeyItem.Length > 0)
                 {
                     output.AppendLine($"                    key_item = {LuaQuote(step.KeyItem)},");
@@ -466,6 +509,51 @@ public static partial class TemporaryGuideStorage
         output.AppendLine("    },");
         output.AppendLine("};");
         return output.ToString();
+    }
+
+    private static IReadOnlyList<StoredDestination> NormalizeDestinations(
+        IReadOnlyList<TemporaryGuideDestinationInput>? destinations,
+        int stepIndex)
+    {
+        if (destinations is null)
+        {
+            return Array.Empty<StoredDestination>();
+        }
+        if (destinations.Count > 40)
+        {
+            throw new ArgumentException($"guide.steps[{stepIndex}].destinations can contain at most 40 entries.");
+        }
+
+        return destinations.Select((destination, destinationIndex) =>
+        {
+            if (destination is null)
+            {
+                throw new ArgumentException(
+                    $"guide.steps[{stepIndex}].destinations[{destinationIndex}] is required.");
+            }
+            if (!double.IsFinite(destination.TargetX) || Math.Abs(destination.TargetX) > 100_000)
+            {
+                throw new ArgumentException(
+                    $"guide.steps[{stepIndex}].destinations[{destinationIndex}].targetX must be a finite coordinate between -100000 and 100000.");
+            }
+            if (!double.IsFinite(destination.TargetY) || Math.Abs(destination.TargetY) > 100_000)
+            {
+                throw new ArgumentException(
+                    $"guide.steps[{stepIndex}].destinations[{destinationIndex}].targetY must be a finite coordinate between -100000 and 100000.");
+            }
+            if (destination.MapId is < 0 or > 255)
+            {
+                throw new ArgumentException(
+                    $"guide.steps[{stepIndex}].destinations[{destinationIndex}].mapId must be between 0 and 255.");
+            }
+
+            return new StoredDestination(
+                CleanOptionalText(destination.Label, 64, $"guide.steps[{stepIndex}].destinations[{destinationIndex}].label"),
+                CleanOptionalText(destination.Npc, 96, $"guide.steps[{stepIndex}].destinations[{destinationIndex}].npc"),
+                destination.TargetX,
+                destination.TargetY,
+                destination.MapId);
+        }).ToArray();
     }
 
     private static string ResolvePublicationPath()
@@ -550,6 +638,7 @@ public static partial class TemporaryGuideStorage
         double? TargetX,
         double? TargetY,
         int? MapId,
+        IReadOnlyList<StoredDestination> Destinations,
         string KeyItem,
         int? KeyItemId,
         int? MinimumLevel,
@@ -557,6 +646,13 @@ public static partial class TemporaryGuideStorage
         bool AdvanceOnTarget,
         string AdvanceOnText,
         IReadOnlyList<StoredSaleItem> SaleItems);
+
+    private sealed record StoredDestination(
+        string Label,
+        string Npc,
+        double TargetX,
+        double TargetY,
+        int? MapId);
 
     private sealed record StoredSaleItem(
         string Name,
