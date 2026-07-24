@@ -209,10 +209,14 @@ if (-not $content.Contains("name:match('[sxz]es$')") -or
     throw 'Pages of Valor target matching must preserve singular names that merely end in e before plural s.'
 }
 
-if (-not $content.Contains('local function target_matches_defeated(target_name, defeated_name)') -or
+if (-not $content.Contains('state.target_matches_defeated = function (target_name, defeated_name)') -or
     -not $content.Contains("normalized_target:match('^members? of the (.-) family$')") -or
     -not $content.Contains('word:sub(1, #family) == family')) {
     throw 'Pages of Valor target matching must recognize family objectives from defeated member names.'
+}
+
+if ($content -match 'local function target_matches_defeated') {
+    throw 'Pages of Valor target matching must not consume another top-level Lua local.'
 }
 
 if ($content -notmatch "guide\.origin == 'ai'\) then\s+return delete_ai_guide\(key\)") {

@@ -2848,7 +2848,7 @@ local function singular_target_name(value)
     return name;
 end
 
-local function target_matches_defeated(target_name, defeated_name)
+state.target_matches_defeated = function (target_name, defeated_name)
     local target = singular_target_name(target_name);
     local defeated = singular_target_name(defeated_name);
     if (target == '' or defeated == '') then
@@ -2882,7 +2882,7 @@ state.infer_pov_runtime_page = function (pov, total)
     for _, page in ipairs(state.pov_recovery_pages) do
         if (page.zone:lower() == zone:lower()) then
             for _, target in ipairs(page.targets) do
-                if (target.count == total and target_matches_defeated(target.name, pov.last_defeated_name)) then
+                if (target.count == total and state.target_matches_defeated(target.name, pov.last_defeated_name)) then
                     local recovered = {
                         key = page.key,
                         name = page.name,
@@ -2920,7 +2920,7 @@ local function update_designated_progress(run, current, total)
 
     local matched = nil;
     for _, target in ipairs(page.targets or {}) do
-        if (target.count == total and target_matches_defeated(target.name, pov.last_defeated_name)) then
+        if (target.count == total and state.target_matches_defeated(target.name, pov.last_defeated_name)) then
             matched = target;
             break;
         end
