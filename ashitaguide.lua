@@ -2837,7 +2837,9 @@ local function singular_target_name(value)
     if (name:sub(-3) == 'ies') then
         return name:sub(1, -4) .. 'y';
     end
-    if (name:sub(-2) == 'es') then
+    if (name:match('[sxz]es$') ~= nil
+        or name:match('ches$') ~= nil
+        or name:match('shes$') ~= nil) then
         return name:sub(1, -3);
     end
     if (name:sub(-1) == 's') then
@@ -2846,15 +2848,41 @@ local function singular_target_name(value)
     return name;
 end
 
+local function target_matches_defeated(target_name, defeated_name)
+    local target = singular_target_name(target_name);
+    local defeated = singular_target_name(defeated_name);
+    if (target == '' or defeated == '') then
+        return false;
+    end
+    if (target == defeated) then
+        return true;
+    end
+
+    local normalized_target = trim_string(target_name):lower()
+        :gsub('^the%s+', '')
+        :gsub('[^%a%d%s]', '')
+        :gsub('%s+', ' ');
+    local family = normalized_target:match('^members? of the (.-) family$');
+    if (family == nil or #family < 4) then
+        return false;
+    end
+    family = singular_target_name(family);
+    for word in defeated:gmatch('%S+') do
+        if (word:sub(1, #family) == family or family:sub(1, #word) == word) then
+            return true;
+        end
+    end
+    return false;
+end
+
 state.infer_pov_runtime_page = function (pov, total)
     local zone = trim_string(pov.zone);
     if (zone == '') then zone = state.current_zone_name() or ''; end
-    local defeated = singular_target_name(pov.last_defeated_name);
-    if (zone == '' or defeated == '' or total == nil) then return nil; end
+    if (zone == '' or trim_string(pov.last_defeated_name) == '' or total == nil) then return nil; end
     for _, page in ipairs(state.pov_recovery_pages) do
         if (page.zone:lower() == zone:lower()) then
             for _, target in ipairs(page.targets) do
-                if (target.count == total and singular_target_name(target.name) == defeated) then
+                if (target.count == total and target_matches_defeated(target.name, pov.last_defeated_name)) then
                     local recovered = {
                         key = page.key,
                         name = page.name,
@@ -2890,10 +2918,9 @@ local function update_designated_progress(run, current, total)
         if (page == nil) then return; end
     end
 
-    local defeated = singular_target_name(pov.last_defeated_name);
     local matched = nil;
     for _, target in ipairs(page.targets or {}) do
-        if (target.count == total and defeated ~= '' and singular_target_name(target.name) == defeated) then
+        if (target.count == total and target_matches_defeated(target.name, pov.last_defeated_name)) then
             matched = target;
             break;
         end

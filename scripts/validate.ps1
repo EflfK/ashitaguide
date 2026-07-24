@@ -60,6 +60,7 @@ $required = @(
     "current training regime will begin anew",
     "falls to the ground",
     "infer_pov_runtime_page",
+    "target_matches_defeated",
     "crawlers_nest_page_1",
     "capture_window_geometry",
     "guide_anchor_corner",
@@ -199,6 +200,19 @@ if ($content -notmatch "(?s)local function previous_step\(run\).+state\.settings
 
 if ($content -notmatch "(?s)local function handle_pov_text\(run, text\).+if \(state\.is_training_repeat\(text\)\) then.+pov\.progress = 0.+for _, target in ipairs\(pov\.runtime_page\.targets or \{\}\) do target\.progress = 0; end.+if \(is_training_accept\(text\)\) then") {
     throw 'Pages of Valor repeat handling must reset progress before the restart message can be treated as acceptance.'
+}
+
+if (-not $content.Contains("name:match('[sxz]es$')") -or
+    -not $content.Contains("name:match('ches$')") -or
+    -not $content.Contains("name:match('shes$')") -or
+    -not $content.Contains("name:sub(-1) == 's'")) {
+    throw 'Pages of Valor target matching must preserve singular names that merely end in e before plural s.'
+}
+
+if (-not $content.Contains('local function target_matches_defeated(target_name, defeated_name)') -or
+    -not $content.Contains("normalized_target:match('^members? of the (.-) family$')") -or
+    -not $content.Contains('word:sub(1, #family) == family')) {
+    throw 'Pages of Valor target matching must recognize family objectives from defeated member names.'
 }
 
 if ($content -notmatch "guide\.origin == 'ai'\) then\s+return delete_ai_guide\(key\)") {
