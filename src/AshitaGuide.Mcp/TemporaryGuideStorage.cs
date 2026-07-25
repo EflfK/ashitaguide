@@ -93,6 +93,8 @@ public static partial class TemporaryGuideStorage
                         TargetX = -59.961,
                         TargetY = -75.649,
                         MapId = 15,
+                        Approximate = true,
+                        MarkerLabel = "H8",
                         Destinations = new[]
                         {
                             new TemporaryGuideDestinationInput
@@ -142,6 +144,8 @@ public static partial class TemporaryGuideStorage
                 || !contents.Contains("key = \"ai_level_goal\"", StringComparison.Ordinal)
                 || !contents.Contains("name = \"Fire Crystal\"", StringComparison.Ordinal)
                 || !firstContents.Contains("map_id = 15", StringComparison.Ordinal)
+                || !firstContents.Contains("approximate = true", StringComparison.Ordinal)
+                || !firstContents.Contains("marker_label = \"H8\"", StringComparison.Ordinal)
                 || !firstContents.Contains("label = \"Alternate\"", StringComparison.Ordinal)
                 || !firstContents.Contains("target_x = -40.25", StringComparison.Ordinal)
                 || !firstContents.Contains("key_item = \"Exoray mold crumb\"", StringComparison.Ordinal)
@@ -261,6 +265,8 @@ public static partial class TemporaryGuideStorage
             input.TargetX,
             input.TargetY,
             input.MapId,
+            input.Approximate,
+            CleanOptionalText(input.MarkerLabel, 24, $"guide.steps[{index}].markerLabel"),
             destinations,
             CleanOptionalText(input.KeyItem, 128, $"guide.steps[{index}].keyItem"),
             input.KeyItemId,
@@ -354,6 +360,8 @@ public static partial class TemporaryGuideStorage
             value.GetDouble("target_x"),
             value.GetDouble("target_y"),
             value.GetInt("map_id"),
+            value.GetBool("approximate") ?? false,
+            value.GetString("marker_label") ?? string.Empty,
             value.GetTable("destinations")?.ArrayValues
                 .Select(item => ParseStoredDestination(item.RequireTable()))
                 .ToArray() ?? Array.Empty<StoredDestination>(),
@@ -440,6 +448,14 @@ public static partial class TemporaryGuideStorage
                 if (step.MapId is not null)
                 {
                     output.AppendLine($"                    map_id = {step.MapId.Value.ToString(CultureInfo.InvariantCulture)},");
+                }
+                if (step.Approximate)
+                {
+                    output.AppendLine("                    approximate = true,");
+                }
+                if (step.MarkerLabel.Length > 0)
+                {
+                    output.AppendLine($"                    marker_label = {LuaQuote(step.MarkerLabel)},");
                 }
                 if (step.Destinations.Count > 0)
                 {
@@ -638,6 +654,8 @@ public static partial class TemporaryGuideStorage
         double? TargetX,
         double? TargetY,
         int? MapId,
+        bool Approximate,
+        string MarkerLabel,
         IReadOnlyList<StoredDestination> Destinations,
         string KeyItem,
         int? KeyItemId,

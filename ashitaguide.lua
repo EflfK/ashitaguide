@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.22.3';
+addon.version = '0.23.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -816,6 +816,8 @@ local function normalize_step(source, index)
         target_x = tonumber(source.target_x or source.x),
         target_y = tonumber(source.target_y or source.y),
         map_id = map_id,
+        approximate = bounded_boolean(source.approximate or source.is_approximate, false),
+        marker_label = trim_string(source.marker_label or source.markerLabel),
         destinations = state.normalize_destinations(source.destinations or source.markers),
         key_item = trim_string(source.key_item or source.keyItem),
         key_item_id = key_item_id,
@@ -2309,6 +2311,12 @@ local function guide_storage_text(guides)
             end
             if (step.map_id ~= nil) then
                 table.insert(lines, string.format('                    map_id = %d,', step.map_id));
+            end
+            if (step.approximate == true) then
+                table.insert(lines, '                    approximate = true,');
+            end
+            if (step.marker_label ~= '') then
+                table.insert(lines, string.format('                    marker_label = %s,', lua_quoted(step.marker_label)));
             end
             if (type(step.destinations) == 'table' and #step.destinations > 0) then
                 table.insert(lines, '                    destinations = {');
@@ -3918,6 +3926,24 @@ local function render_step_fields(step)
     end
 end
 
+state.location_grid_label = function (location)
+    local column, row = trim_string(location):match('([A-Pa-p])%s*%-?%s*(%d%d?)');
+    if (column == nil or row == nil) then
+        return '';
+    end
+    return string.upper(column) .. row;
+end
+
+state.step_marker_label = function (step)
+    if (step == nil) then
+        return '';
+    end
+    if (step.marker_label ~= '') then
+        return step.marker_label;
+    end
+    return state.location_grid_label(step.location);
+end
+
 local function render_destination_strip(step, navigation)
     local parts = {};
     if (step.zone ~= '') then
@@ -3936,6 +3962,12 @@ local function render_destination_strip(step, navigation)
     end
     if (#parts > 0) then
         text_colored_wrapped(COLORS.muted, table.concat(parts, '  |  '));
+    end
+    local marker_label = state.step_marker_label(step);
+    if (marker_label ~= '' and (step.approximate == true or navigation == nil)) then
+        text_colored_wrapped(
+            COLORS.header,
+            string.format('Approximate area: %s', marker_label));
     end
 end
 
@@ -4385,9 +4417,28 @@ local function render_minimap_destination_marker()
             and imgui.GetColorU32(COLORS.accent)
             or imgui.GetColorU32({ COLORS.header[1], COLORS.header[2], COLORS.header[3], pulse });
         local outline_color = imgui.GetColorU32({ 0.02, 0.02, 0.02, 0.96 });
-        draw_list:AddCircleFilled({ marker_x, marker_y }, 6.0, outline_color, 20);
-        draw_list:AddCircleFilled({ marker_x, marker_y }, 4.0, fill_color, 20);
-        draw_list:AddCircle({ marker_x, marker_y }, clamped and 9.0 or 8.0, fill_color, 20, 2.0);
+        if (step.approximate == true) then
+            local radius = clamped and 9.0 or 8.0;
+            draw_list:AddLine({ marker_x, marker_y - radius }, { marker_x + radius, marker_y }, outline_color, 5.0);
+            draw_list:AddLine({ marker_x + radius, marker_y }, { marker_x, marker_y + radius }, outline_color, 5.0);
+            draw_list:AddLine({ marker_x, marker_y + radius }, { marker_x - radius, marker_y }, outline_color, 5.0);
+            draw_list:AddLine({ marker_x - radius, marker_y }, { marker_x, marker_y - radius }, outline_color, 5.0);
+            draw_list:AddLine({ marker_x, marker_y - radius }, { marker_x + radius, marker_y }, fill_color, 2.0);
+            draw_list:AddLine({ marker_x + radius, marker_y }, { marker_x, marker_y + radius }, fill_color, 2.0);
+            draw_list:AddLine({ marker_x, marker_y + radius }, { marker_x - radius, marker_y }, fill_color, 2.0);
+            draw_list:AddLine({ marker_x - radius, marker_y }, { marker_x, marker_y - radius }, fill_color, 2.0);
+        else
+            draw_list:AddCircleFilled({ marker_x, marker_y }, 6.0, outline_color, 20);
+            draw_list:AddCircleFilled({ marker_x, marker_y }, 4.0, fill_color, 20);
+            draw_list:AddCircle({ marker_x, marker_y }, clamped and 9.0 or 8.0, fill_color, 20, 2.0);
+        end
+        local marker_label = state.step_marker_label(step);
+        if (marker_label ~= '') then
+            local label_x = marker_x + 11;
+            local label_y = marker_y - 9;
+            draw_list:AddText({ label_x + 1, label_y + 1 }, outline_color, marker_label);
+            draw_list:AddText({ label_x, label_y }, fill_color, marker_label);
+        end
 
         for _, destination in ipairs(step.destinations or {}) do
             if (destination.map_id == nil or minimap.current_map_id == destination.map_id) then
@@ -4505,8 +4556,19 @@ local function render_navigation_map(step, navigation)
     draw_list:AddText({ center_x - 3, cursor_y + size - 18 }, text_color, 'S');
     draw_list:AddText({ cursor_x + 4, center_y - 8 }, text_color, 'W');
 
-    draw_list:AddCircleFilled({ target_screen_x, target_screen_y }, 6.0, target_color, 20);
-    draw_list:AddCircle({ target_screen_x, target_screen_y }, 10.0, target_color, 20, 2.0);
+    if (step.approximate == true) then
+        draw_list:AddLine({ target_screen_x, target_screen_y - 9 }, { target_screen_x + 9, target_screen_y }, target_color, 2.0);
+        draw_list:AddLine({ target_screen_x + 9, target_screen_y }, { target_screen_x, target_screen_y + 9 }, target_color, 2.0);
+        draw_list:AddLine({ target_screen_x, target_screen_y + 9 }, { target_screen_x - 9, target_screen_y }, target_color, 2.0);
+        draw_list:AddLine({ target_screen_x - 9, target_screen_y }, { target_screen_x, target_screen_y - 9 }, target_color, 2.0);
+    else
+        draw_list:AddCircleFilled({ target_screen_x, target_screen_y }, 6.0, target_color, 20);
+        draw_list:AddCircle({ target_screen_x, target_screen_y }, 10.0, target_color, 20, 2.0);
+    end
+    local marker_label = state.step_marker_label(step);
+    if (marker_label ~= '') then
+        draw_list:AddText({ target_screen_x + 11, target_screen_y - 9 }, target_color, marker_label);
+    end
 
     local heading_x = math.cos(player.yaw);
     local heading_y = math.sin(player.yaw);
@@ -4523,8 +4585,11 @@ local function render_navigation_map(step, navigation)
     imgui.Dummy({ size, size });
     imgui.SameLine(0, 8);
     imgui.BeginGroup();
-    imgui.TextColored(COLORS.muted, 'Target');
+    imgui.TextColored(COLORS.muted, step.approximate == true and 'Approximate target' or 'Target');
     imgui.Text(step.npc ~= '' and step.npc or 'Destination');
+    if (marker_label ~= '') then
+        imgui.TextColored(COLORS.header, marker_label);
+    end
     imgui.Text(distance <= 2.5 and 'Arrived' or string.format('%.1f yalms', distance));
     imgui.TextColored(COLORS.muted, string.format('Map radius: %.1f yalms', world_radius));
     if (step.npc ~= '') then

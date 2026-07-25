@@ -52,6 +52,12 @@ public sealed class TemporaryGuideStepInput
     [Description("Optional live Minimap map/floor id from 0 through 255. The Minimap marker is hidden while another map is displayed.")]
     public int? MapId { get; init; }
 
+    [Description("True when targetX and targetY are the best available estimate rather than an exact destination. AshitaGuide renders a distinct gold labeled marker.")]
+    public bool Approximate { get; init; }
+
+    [Description("Optional short gold marker label such as J7. Recommended for approximate destinations.")]
+    public string? MarkerLabel { get; init; }
+
     [Description("Optional additional destinations rendered together on the guide map and Minimap. Use this for one-step guides that need several simultaneous markers.")]
     public IReadOnlyList<TemporaryGuideDestinationInput>? Destinations { get; init; }
 

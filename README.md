@@ -223,6 +223,14 @@ step counts, and file update time. Neither tool accepts raw Lua or a destination
 path. If `ai_guides.lua` contains executable or malformed Lua instead of the
 documented data-only table, the MCP publisher refuses to change it.
 
+When exact destination coordinates are unavailable, a step may supply the best
+available `targetX` and `targetY` estimate with `approximate: true` and a short
+`markerLabel` such as `J7`. AshitaGuide renders that destination as a gold
+diamond with gold text on both its navigation map and the live Minimap overlay.
+Grid-only legacy steps without coordinates show a gold approximate-area cue in
+the guide panel, but cannot place a spatial marker until estimated coordinates
+are supplied.
+
 Temporary AI guides survive addon reloads and reinstalls because the file is
 outside the addon directory. Clicking the `x` on an AI guide tab removes that
 guide from `ai_guides.lua` and closes it. Closing a normal guide tab only stops
