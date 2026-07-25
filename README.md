@@ -364,8 +364,11 @@ several destinations visible simultaneously. Each entry accepts `label`,
 `target_x`, `target_y`, and optional `npc` and `map_id`. The step's primary
 `target_x`/`target_y` remains the destination shown in the guide panel, while
 the primary destination and every additional destination are rendered together
-on the Minimap. Omit `npc` for fixed spawn possibilities so multiple markers do
-not collapse onto the one currently visible entity.
+on the Minimap. A step may omit its primary coordinates when `destinations`
+contains every possible target; AshitaGuide then uses the first entry as the
+navigation anchor and still renders the complete list. Omit `npc` for fixed
+spawn possibilities so multiple markers do not collapse onto the one currently
+visible entity.
 
 With `minimap_marker_enabled = true`, that same destination is also drawn as a
 gold dot over the loaded Ashita Minimap plugin. This overlay currently requires

@@ -4165,8 +4165,16 @@ local function update_key_item_step_completion()
 end
 
 local function navigation_context(step)
-    if (step == nil or (step.target_x == nil and step.target_y == nil and step.npc == '')) then
+    if (step == nil) then
         return nil;
+    end
+
+    local primary_destination = nil;
+    if (step.target_x == nil and step.target_y == nil and step.npc == '') then
+        primary_destination = type(step.destinations) == 'table' and step.destinations[1] or nil;
+        if (primary_destination == nil) then
+            return nil;
+        end
     end
 
     local player = current_navigation_player();
@@ -4177,9 +4185,12 @@ local function navigation_context(step)
         return nil;
     end
 
-    local live_target = find_navigation_target(player, step.npc, step.target_x, step.target_y);
-    local target_x = live_target ~= nil and live_target.x or step.target_x;
-    local target_y = live_target ~= nil and live_target.y or step.target_y;
+    local target_npc = primary_destination ~= nil and primary_destination.npc or step.npc;
+    local fallback_x = primary_destination ~= nil and primary_destination.target_x or step.target_x;
+    local fallback_y = primary_destination ~= nil and primary_destination.target_y or step.target_y;
+    local live_target = find_navigation_target(player, target_npc, fallback_x, fallback_y);
+    local target_x = live_target ~= nil and live_target.x or fallback_x;
+    local target_y = live_target ~= nil and live_target.y or fallback_y;
     if (target_x == nil or target_y == nil) then
         return nil;
     end
@@ -4195,6 +4206,8 @@ local function navigation_context(step)
         delta_y = delta_y,
         distance = math.sqrt((delta_x * delta_x) + (delta_y * delta_y)),
         selected = live_target ~= nil and live_target.index == current_target_index(),
+        primary_destination = primary_destination,
+        target_map_id = primary_destination ~= nil and primary_destination.map_id or step.map_id,
     };
 end
 
@@ -4221,18 +4234,18 @@ local function render_minimap_destination_marker()
     if (minimap == nil or minimap.map_scale_raw == nil) then
         return;
     end
-    if (step.map_id ~= nil and minimap.current_map_id ~= step.map_id) then
+    if (navigation.target_map_id ~= nil and minimap.current_map_id ~= navigation.target_map_id) then
         local mismatch_token = string.format(
             '%s:%d:%d:%s',
             run.key,
             run.step_index,
-            step.map_id,
+            navigation.target_map_id,
             tostring(minimap.current_map_id));
         if (state.minimap.reported_map_mismatch_step ~= mismatch_token) then
             state.minimap.reported_map_mismatch_step = mismatch_token;
             log_info(string.format(
                 'Minimap marker hidden: stepMap=%d currentMap=%s.',
-                step.map_id,
+                navigation.target_map_id,
                 tostring(minimap.current_map_id)));
         end
         return;

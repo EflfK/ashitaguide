@@ -313,12 +313,16 @@ if ($content -notmatch "minimap\.mask_width \* minimap\.zoom\s+/ 100 \* minimap\
     throw 'Minimap navigation scaling must match the plugin live map transform.'
 }
 
-if ($content -notmatch "(?s)step\.map_id ~= nil.+minimap\.current_map_id ~= step\.map_id.+Minimap marker hidden") {
+if ($content -notmatch "(?s)navigation\.target_map_id ~= nil.+minimap\.current_map_id ~= navigation\.target_map_id.+Minimap marker hidden") {
     throw 'Minimap markers must be hidden when a step targets another map or floor.'
 }
 
 if ($content -notmatch "(?s)for _, destination in ipairs\(step\.destinations or \{\}\) do.+destination_marker_x.+destination_marker_y.+AddCircleFilled") {
     throw 'Additional step destinations must render together on the Minimap.'
+}
+
+if ($content -notmatch "(?s)local function navigation_context\(step\).+primary_destination.+step\.destinations\[1\].+target_map_id") {
+    throw 'Destination-only steps must use their first destination as the navigation anchor.'
 }
 
 if ($content -notmatch "(?s)local function render_guide_window\(\).+window_no_resize.+window_no_scrollbar.+window_always_auto_resize") {
