@@ -58,6 +58,12 @@ public sealed class TemporaryGuideStepInput
     [Description("Optional short gold marker label such as J7. Recommended for approximate destinations.")]
     public string? MarkerLabel { get; init; }
 
+    [Description("Optional key of a separately published guide containing first-visit travel directions. AshitaGuide shows a clickable button without advancing this parent step.")]
+    public string? TravelGuideKey { get; init; }
+
+    [Description("Optional short button label for travelGuideKey, such as Walk to San d'Oria.")]
+    public string? TravelGuideLabel { get; init; }
+
     [Description("Optional additional destinations rendered together on the guide map and Minimap. Use this for one-step guides that need several simultaneous markers.")]
     public IReadOnlyList<TemporaryGuideDestinationInput>? Destinations { get; init; }
 

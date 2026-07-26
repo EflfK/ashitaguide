@@ -95,6 +95,8 @@ public static partial class TemporaryGuideStorage
                         MapId = 15,
                         Approximate = true,
                         MarkerLabel = "H8",
+                        TravelGuideKey = "travel_to_lower_jeuno",
+                        TravelGuideLabel = "Walk to Lower Jeuno",
                         Destinations = new[]
                         {
                             new TemporaryGuideDestinationInput
@@ -146,6 +148,8 @@ public static partial class TemporaryGuideStorage
                 || !firstContents.Contains("map_id = 15", StringComparison.Ordinal)
                 || !firstContents.Contains("approximate = true", StringComparison.Ordinal)
                 || !firstContents.Contains("marker_label = \"H8\"", StringComparison.Ordinal)
+                || !firstContents.Contains("travel_guide_key = \"travel_to_lower_jeuno\"", StringComparison.Ordinal)
+                || !firstContents.Contains("travel_guide_label = \"Walk to Lower Jeuno\"", StringComparison.Ordinal)
                 || !firstContents.Contains("label = \"Alternate\"", StringComparison.Ordinal)
                 || !firstContents.Contains("target_x = -40.25", StringComparison.Ordinal)
                 || !firstContents.Contains("key_item = \"Exoray mold crumb\"", StringComparison.Ordinal)
@@ -253,6 +257,15 @@ public static partial class TemporaryGuideStorage
         {
             throw new ArgumentException($"guide.steps[{index}].requiredJob must contain only letters and spaces.");
         }
+        var travelGuideKey = CleanOptionalText(
+            input.TravelGuideKey,
+            64,
+            $"guide.steps[{index}].travelGuideKey");
+        if (travelGuideKey.Length > 0 && !GuideKeyPattern().IsMatch(travelGuideKey))
+        {
+            throw new ArgumentException(
+                $"guide.steps[{index}].travelGuideKey must use lowercase letters, numbers, underscores, or hyphens.");
+        }
 
         return new StoredStep(
             CleanOptionalText(input.Title, 128, $"guide.steps[{index}].title"),
@@ -267,6 +280,8 @@ public static partial class TemporaryGuideStorage
             input.MapId,
             input.Approximate,
             CleanOptionalText(input.MarkerLabel, 24, $"guide.steps[{index}].markerLabel"),
+            travelGuideKey,
+            CleanOptionalText(input.TravelGuideLabel, 96, $"guide.steps[{index}].travelGuideLabel"),
             destinations,
             CleanOptionalText(input.KeyItem, 128, $"guide.steps[{index}].keyItem"),
             input.KeyItemId,
@@ -362,6 +377,8 @@ public static partial class TemporaryGuideStorage
             value.GetInt("map_id"),
             value.GetBool("approximate") ?? false,
             value.GetString("marker_label") ?? string.Empty,
+            value.GetString("travel_guide_key") ?? string.Empty,
+            value.GetString("travel_guide_label") ?? string.Empty,
             value.GetTable("destinations")?.ArrayValues
                 .Select(item => ParseStoredDestination(item.RequireTable()))
                 .ToArray() ?? Array.Empty<StoredDestination>(),
@@ -456,6 +473,11 @@ public static partial class TemporaryGuideStorage
                 if (step.MarkerLabel.Length > 0)
                 {
                     output.AppendLine($"                    marker_label = {LuaQuote(step.MarkerLabel)},");
+                }
+                if (step.TravelGuideKey.Length > 0)
+                {
+                    output.AppendLine($"                    travel_guide_key = {LuaQuote(step.TravelGuideKey)},");
+                    output.AppendLine($"                    travel_guide_label = {LuaQuote(step.TravelGuideLabel)},");
                 }
                 if (step.Destinations.Count > 0)
                 {
@@ -656,6 +678,8 @@ public static partial class TemporaryGuideStorage
         int? MapId,
         bool Approximate,
         string MarkerLabel,
+        string TravelGuideKey,
+        string TravelGuideLabel,
         IReadOnlyList<StoredDestination> Destinations,
         string KeyItem,
         int? KeyItemId,

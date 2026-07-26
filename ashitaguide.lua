@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.23.0';
+addon.version = '0.24.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -818,6 +818,8 @@ local function normalize_step(source, index)
         map_id = map_id,
         approximate = bounded_boolean(source.approximate or source.is_approximate, false),
         marker_label = trim_string(source.marker_label or source.markerLabel),
+        travel_guide_key = trim_string(source.travel_guide_key or source.travelGuideKey),
+        travel_guide_label = trim_string(source.travel_guide_label or source.travelGuideLabel),
         destinations = state.normalize_destinations(source.destinations or source.markers),
         key_item = trim_string(source.key_item or source.keyItem),
         key_item_id = key_item_id,
@@ -2317,6 +2319,14 @@ local function guide_storage_text(guides)
             end
             if (step.marker_label ~= '') then
                 table.insert(lines, string.format('                    marker_label = %s,', lua_quoted(step.marker_label)));
+            end
+            if (step.travel_guide_key ~= '') then
+                table.insert(lines, string.format(
+                    '                    travel_guide_key = %s,',
+                    lua_quoted(step.travel_guide_key)));
+                table.insert(lines, string.format(
+                    '                    travel_guide_label = %s,',
+                    lua_quoted(step.travel_guide_label)));
             end
             if (type(step.destinations) == 'table' and #step.destinations > 0) then
                 table.insert(lines, '                    destinations = {');
@@ -4727,6 +4737,40 @@ local function render_auction_sale_items(step)
     end
 end
 
+state.render_travel_guide_link = function (step, run)
+    if (step.travel_guide_key == '') then
+        return;
+    end
+
+    imgui.Separator();
+    local linked_guide = state.guide_by_key[step.travel_guide_key];
+    local label = step.travel_guide_label;
+    if (label == '') then
+        label = linked_guide ~= nil and linked_guide.name or step.travel_guide_key;
+    end
+
+    if (linked_guide == nil) then
+        text_colored_wrapped(
+            COLORS.warning,
+            string.format('Travel directions unavailable: %s', label));
+        return;
+    end
+
+    imgui.PushStyleColor(IMGUI.col_button, { 0.48, 0.38, 0.13, 0.96 });
+    imgui.PushStyleColor(IMGUI.col_button_hovered, { 0.66, 0.53, 0.18, 1.00 });
+    imgui.PushStyleColor(IMGUI.col_button_active, { 0.76, 0.63, 0.24, 1.00 });
+    imgui.PushStyleColor(IMGUI.col_text, COLORS.header);
+    if (imgui.Button(
+        'Travel directions: ' .. label .. '##ashitaguide_travel_' .. run.key,
+        { -1, 0 })) then
+        start_guide(linked_guide);
+    end
+    imgui.PopStyleColor(4);
+    text_colored_wrapped(
+        COLORS.muted,
+        'Optional first-visit route. Use > above if you already know the way.');
+end
+
 local function render_active_guide(run)
     if (run == nil) then
         imgui.TextColored(COLORS.muted, 'No active guide selected.');
@@ -4757,6 +4801,7 @@ local function render_active_guide(run)
     local navigation = navigation_context(step);
     render_destination_strip(step, navigation);
     render_step_fields(step);
+    state.render_travel_guide_link(step, run);
     render_navigation_map(step, navigation);
 
     if (#guide.steps > 1 and state.guide_show_step_list[1] == true) then

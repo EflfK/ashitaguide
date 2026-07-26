@@ -231,6 +231,13 @@ Grid-only legacy steps without coordinates show a gold approximate-area cue in
 the guide panel, but cannot place a spatial marker until estimated coordinates
 are supplied.
 
+A long-distance parent step may link to a separately published guide with
+`travelGuideKey` and an optional `travelGuideLabel`. AshitaGuide displays a gold
+travel-directions button on that step. Clicking it opens and focuses the linked
+guide without advancing or closing the parent, so experienced players can use
+the normal next-step button while first-time visitors can follow the complete
+walking route and return to the parent tab afterward.
+
 Temporary AI guides survive addon reloads and reinstalls because the file is
 outside the addon directory. Clicking the `x` on an AI guide tab removes that
 guide from `ai_guides.lua` and closes it. Closing a normal guide tab only stops
