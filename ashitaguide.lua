@@ -167,7 +167,6 @@ local GUIDE_ANCHOR_CORNERS = {
 
 local GUIDE_WINDOW_MAX_WIDTH = 560;
 local GUIDE_TEXT_WRAP_POS_X = GUIDE_WINDOW_MAX_WIDTH - 12;
-local GUIDE_TAB_ROW_WIDTH = GUIDE_WINDOW_MAX_WIDTH - 12;
 
 local DEFAULT_SETTINGS = {
     visible = true,
@@ -4984,7 +4983,7 @@ local function render_active_tabs()
                 or 100;
             local tab_width = math.max(88, math.min(170, (label_width or 100) + 18));
             local tab_group_width = tab_width + 22;
-            if (tab_row_width > 0 and tab_row_width + 3 + tab_group_width <= GUIDE_TAB_ROW_WIDTH) then
+            if (tab_row_width > 0 and tab_row_width + 3 + tab_group_width <= GUIDE_TEXT_WRAP_POS_X) then
                 imgui.SameLine(0, 3);
                 tab_row_width = tab_row_width + 3 + tab_group_width;
             else

@@ -187,7 +187,7 @@ if ($content -match 'render_npc_world_marker|world_to_screen|ashitaguide_npc_wor
 if ($content -notmatch "for _, key in ipairs\(close_keys\) do\s+close_guide_tab\(key\)") {
     throw 'Guide tab close controls do not use the lifecycle-aware close handler.'
 }
-if ($content -notmatch "tab_row_width \+ 3 \+ tab_group_width <= GUIDE_TAB_ROW_WIDTH") {
+if ($content -notmatch "tab_row_width \+ 3 \+ tab_group_width <= GUIDE_TEXT_WRAP_POS_X") {
     throw 'Guide tabs must wrap within the existing guide window width.'
 }
 
