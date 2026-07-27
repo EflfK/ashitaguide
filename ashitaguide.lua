@@ -167,6 +167,7 @@ local GUIDE_ANCHOR_CORNERS = {
 
 local GUIDE_WINDOW_MAX_WIDTH = 560;
 local GUIDE_TEXT_WRAP_POS_X = GUIDE_WINDOW_MAX_WIDTH - 12;
+local GUIDE_TAB_ROW_WIDTH = GUIDE_WINDOW_MAX_WIDTH - 12;
 
 local DEFAULT_SETTINGS = {
     visible = true,
@@ -4969,12 +4970,10 @@ local function render_active_tabs()
     end
 
     local close_keys = {};
-    for index, key in ipairs(state.active_order) do
+    local tab_row_width = 0;
+    for _, key in ipairs(state.active_order) do
         local run = state.active[key];
         if (run ~= nil) then
-            if (index > 1) then
-                imgui.SameLine(0, 3);
-            end
             local selected = state.selected_active_key == key;
             imgui.PushStyleColor(IMGUI.col_button, selected and COLORS.tab_active or COLORS.tab);
             imgui.PushStyleColor(IMGUI.col_button_hovered, COLORS.tab_hover);
@@ -4984,6 +4983,13 @@ local function render_active_tabs()
                 and tonumber(imgui.CalcTextSize(run.guide.name))
                 or 100;
             local tab_width = math.max(88, math.min(170, (label_width or 100) + 18));
+            local tab_group_width = tab_width + 22;
+            if (tab_row_width > 0 and tab_row_width + 3 + tab_group_width <= GUIDE_TAB_ROW_WIDTH) then
+                imgui.SameLine(0, 3);
+                tab_row_width = tab_row_width + 3 + tab_group_width;
+            else
+                tab_row_width = tab_group_width;
+            end
             if (imgui.Button(run.guide.name .. '##ashitaguide_tab_button_' .. key, { tab_width, 22 })) then
                 state.selected_active_key = key;
             end

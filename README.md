@@ -22,6 +22,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - guide name/key/category search
 - multiple active guides at once
 - tabs for switching between active guides
+- automatic tab-row wrapping when active guides exceed the window width
 - browser-style close controls on active guide tabs
 - manual `<` and `>` step controls
 - single-step guides omit step numbering, the step list, and advancement controls
