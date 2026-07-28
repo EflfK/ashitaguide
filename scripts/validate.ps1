@@ -324,6 +324,10 @@ if ($content -notmatch "(?s)for _, destination in ipairs\(step\.destinations or 
     throw 'Additional step destinations must render together on the Minimap.'
 }
 
+if ($content -notmatch "(?s)local function render_navigation_map\(step, navigation\).+furthest_destination_distance.+navigation_destination_screen_x.+navigation_destination_screen_y.+Markers: %d") {
+    throw 'Additional step destinations must render together on the guide Navigation map.'
+}
+
 if ($content -notmatch "(?s)local function navigation_context\(step\).+primary_destination.+step\.destinations\[1\].+target_map_id") {
     throw 'Destination-only steps must use their first destination as the navigation anchor.'
 }

@@ -4526,7 +4526,22 @@ local function render_navigation_map(step, navigation)
     local distance = navigation.distance;
     local size = bounded_number(state.guide_map_size[1], 160, 120, 260);
     local padding = 14;
-    local world_radius = navigation_world_radius(distance);
+    local furthest_destination_distance = distance;
+    for _, destination in ipairs(step.destinations or {}) do
+        if (destination ~= navigation.primary_destination
+            and destination.target_x ~= nil
+            and destination.target_y ~= nil) then
+            local destination_delta_x = destination.target_x - player.x;
+            local destination_delta_y = destination.target_y - player.y;
+            local destination_distance = math.sqrt(
+                (destination_delta_x * destination_delta_x)
+                + (destination_delta_y * destination_delta_y));
+            furthest_destination_distance = math.max(
+                furthest_destination_distance,
+                destination_distance);
+        end
+    end
+    local world_radius = navigation_world_radius(furthest_destination_distance);
     local map_scale = ((size / 2) - padding) / world_radius;
     local cursor_x, cursor_y = imgui.GetCursorScreenPos();
     local center_x = cursor_x + (size / 2);
@@ -4566,6 +4581,43 @@ local function render_navigation_map(step, navigation)
     draw_list:AddText({ center_x - 3, cursor_y + size - 18 }, text_color, 'S');
     draw_list:AddText({ cursor_x + 4, center_y - 8 }, text_color, 'W');
 
+    local additional_destination_count = 0;
+    for destination_index, destination in ipairs(step.destinations or {}) do
+        if (destination ~= navigation.primary_destination
+            and destination.target_x ~= nil
+            and destination.target_y ~= nil) then
+            additional_destination_count = additional_destination_count + 1;
+            local navigation_destination_delta_x = destination.target_x - player.x;
+            local navigation_destination_delta_y = destination.target_y - player.y;
+            local navigation_destination_screen_x = center_x
+                + (navigation_destination_delta_x * map_scale);
+            local navigation_destination_screen_y = center_y
+                - (navigation_destination_delta_y * map_scale);
+            local navigation_destination_distance = math.sqrt(
+                (navigation_destination_delta_x * navigation_destination_delta_x)
+                + (navigation_destination_delta_y * navigation_destination_delta_y));
+            local navigation_destination_color = imgui.GetColorU32(
+                navigation_destination_distance <= 2.5 and COLORS.accent or COLORS.header);
+            draw_list:AddCircleFilled(
+                { navigation_destination_screen_x, navigation_destination_screen_y },
+                4.0,
+                navigation_destination_color,
+                20);
+            draw_list:AddCircle(
+                { navigation_destination_screen_x, navigation_destination_screen_y },
+                7.0,
+                navigation_destination_color,
+                20,
+                1.5);
+            draw_list:AddText(
+                { navigation_destination_screen_x + 8, navigation_destination_screen_y - 8 },
+                navigation_destination_color,
+                tostring(navigation.primary_destination ~= nil
+                    and destination_index
+                    or destination_index + 1));
+        end
+    end
+
     if (step.approximate == true) then
         draw_list:AddLine({ target_screen_x, target_screen_y - 9 }, { target_screen_x + 9, target_screen_y }, target_color, 2.0);
         draw_list:AddLine({ target_screen_x + 9, target_screen_y }, { target_screen_x, target_screen_y + 9 }, target_color, 2.0);
@@ -4578,6 +4630,8 @@ local function render_navigation_map(step, navigation)
     local marker_label = state.step_marker_label(step);
     if (marker_label ~= '') then
         draw_list:AddText({ target_screen_x + 11, target_screen_y - 9 }, target_color, marker_label);
+    elseif (additional_destination_count > 0) then
+        draw_list:AddText({ target_screen_x + 11, target_screen_y - 9 }, target_color, '1');
     end
 
     local heading_x = math.cos(player.yaw);
@@ -4601,6 +4655,11 @@ local function render_navigation_map(step, navigation)
         imgui.TextColored(COLORS.header, marker_label);
     end
     imgui.Text(distance <= 2.5 and 'Arrived' or string.format('%.1f yalms', distance));
+    if (additional_destination_count > 0) then
+        imgui.TextColored(
+            COLORS.muted,
+            string.format('Markers: %d', additional_destination_count + 1));
+    end
     imgui.TextColored(COLORS.muted, string.format('Map radius: %.1f yalms', world_radius));
     if (step.npc ~= '') then
         imgui.TextColored(
