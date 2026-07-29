@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.25.0';
+addon.version = '0.25.1';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -756,6 +756,8 @@ state.normalize_destinations = function (source)
         if (type(destination) == 'table') then
             local target_x = tonumber(destination.target_x or destination.x);
             local target_y = tonumber(destination.target_y or destination.y);
+            local target_z = tonumber(
+                destination.target_z or destination.targetZ or destination.z);
             local map_id = tonumber(destination.map_id or destination.mapId);
             if (map_id ~= nil) then
                 map_id = math.floor(map_id);
@@ -769,6 +771,7 @@ state.normalize_destinations = function (source)
                     npc = trim_string(destination.npc),
                     target_x = target_x,
                     target_y = target_y,
+                    target_z = target_z,
                     map_id = map_id,
                 });
             end
@@ -818,6 +821,7 @@ local function normalize_step(source, index)
         note = trim_string(source.note or source.notes),
         target_x = tonumber(source.target_x or source.x),
         target_y = tonumber(source.target_y or source.y),
+        target_z = tonumber(source.target_z or source.targetZ or source.z),
         map_id = map_id,
         approximate = bounded_boolean(source.approximate or source.is_approximate, false),
         marker_label = trim_string(source.marker_label or source.markerLabel),
@@ -2319,6 +2323,9 @@ local function guide_storage_text(guides)
             if (step.target_y ~= nil) then
                 table.insert(lines, string.format('                    target_y = %.6f,', step.target_y));
             end
+            if (step.target_z ~= nil) then
+                table.insert(lines, string.format('                    target_z = %.6f,', step.target_z));
+            end
             if (step.map_id ~= nil) then
                 table.insert(lines, string.format('                    map_id = %d,', step.map_id));
             end
@@ -2344,6 +2351,11 @@ local function guide_storage_text(guides)
                     table.insert(lines, string.format('                            npc = %s,', lua_quoted(destination.npc)));
                     table.insert(lines, string.format('                            target_x = %.6f,', destination.target_x));
                     table.insert(lines, string.format('                            target_y = %.6f,', destination.target_y));
+                    if (destination.target_z ~= nil) then
+                        table.insert(lines, string.format(
+                            '                            target_z = %.6f,',
+                            destination.target_z));
+                    end
                     if (destination.map_id ~= nil) then
                         table.insert(lines, string.format('                            map_id = %d,', destination.map_id));
                     end
@@ -4006,11 +4018,13 @@ local function current_navigation_player()
     local position = player ~= nil and safe_read(function () return player.Movement.LocalPosition; end, nil) or nil;
     local x = position ~= nil and tonumber(safe_read(function () return position.X; end, nil)) or nil;
     local y = position ~= nil and tonumber(safe_read(function () return position.Y; end, nil)) or nil;
+    local z = position ~= nil and tonumber(safe_read(function () return position.Z; end, nil)) or nil;
     local yaw = position ~= nil and tonumber(safe_read(function () return position.Yaw; end, nil)) or nil;
 
     if (index > 0) then
         x = x or tonumber(safe_read(function () return entity:GetLocalPositionX(index); end, nil));
         y = y or tonumber(safe_read(function () return entity:GetLocalPositionY(index); end, nil));
+        z = z or tonumber(safe_read(function () return entity:GetLocalPositionZ(index); end, nil));
         yaw = yaw or tonumber(safe_read(function () return entity:GetLocalPositionYaw(index); end, nil));
         yaw = yaw or tonumber(safe_read(function () return entity:GetHeading(index); end, nil));
     end
@@ -4023,7 +4037,15 @@ local function current_navigation_player()
     local zone_name = resources ~= nil
         and clean_message(safe_read(function () return resources:GetString('zones.names', zone_id); end, ''))
         or '';
-    return { x = x, y = y, yaw = yaw, zone = zone_name, zone_id = zone_id, entity = entity };
+    return {
+        x = x,
+        y = y,
+        z = z,
+        yaw = yaw,
+        zone = zone_name,
+        zone_id = zone_id,
+        entity = entity,
+    };
 end
 
 state.read_navigation_target_at_index = function(entity, index, lookup, checked_at)
@@ -4034,6 +4056,7 @@ state.read_navigation_target_at_index = function(entity, index, lookup, checked_
 
     local x = tonumber(safe_read(function () return entity:GetLocalPositionX(index); end, nil));
     local y = tonumber(safe_read(function () return entity:GetLocalPositionY(index); end, nil));
+    local z = tonumber(safe_read(function () return entity:GetLocalPositionZ(index); end, nil));
     if (x == nil or y == nil) then
         return nil;
     end
@@ -4042,6 +4065,7 @@ state.read_navigation_target_at_index = function(entity, index, lookup, checked_
         checked_at = checked_at,
         x = x,
         y = y,
+        z = z,
         index = index,
         name = name,
     };
@@ -4238,9 +4262,11 @@ local function navigation_context(step)
     local target_npc = primary_destination ~= nil and primary_destination.npc or step.npc;
     local fallback_x = primary_destination ~= nil and primary_destination.target_x or step.target_x;
     local fallback_y = primary_destination ~= nil and primary_destination.target_y or step.target_y;
+    local fallback_z = primary_destination ~= nil and primary_destination.target_z or step.target_z;
     local live_target = find_navigation_target(player, target_npc, fallback_x, fallback_y);
     local target_x = live_target ~= nil and live_target.x or fallback_x;
     local target_y = live_target ~= nil and live_target.y or fallback_y;
+    local target_z = live_target ~= nil and live_target.z or fallback_z;
     if (target_x == nil or target_y == nil) then
         return nil;
     end
@@ -4252,6 +4278,7 @@ local function navigation_context(step)
         live_target = live_target,
         target_x = target_x,
         target_y = target_y,
+        target_z = target_z,
         delta_x = delta_x,
         delta_y = delta_y,
         distance = math.sqrt((delta_x * delta_x) + (delta_y * delta_y)),
@@ -4277,6 +4304,7 @@ state.publish_ashitaminimap_markers = function (force_clear)
         markers[#markers + 1] = {
             x = navigation.target_x,
             y = navigation.target_y,
+            z = navigation.target_z,
             map_id = navigation.target_map_id,
             approximate = step.approximate == true,
         };
@@ -4285,6 +4313,7 @@ state.publish_ashitaminimap_markers = function (force_clear)
                 markers[#markers + 1] = {
                     x = destination.target_x,
                     y = destination.target_y,
+                    z = destination.target_z,
                     map_id = destination.map_id,
                     approximate = step.approximate == true,
                 };
@@ -4299,9 +4328,10 @@ state.publish_ashitaminimap_markers = function (force_clear)
     };
     for _, marker in ipairs(markers) do
         token_parts[#token_parts + 1] = string.format(
-            '%.3f:%.3f:%s:%s',
+            '%.3f:%.3f:%s:%s:%s',
             marker.x,
             marker.y,
+            marker.z ~= nil and string.format('%.3f', marker.z) or '',
             tostring(marker.map_id or ''),
             tostring(marker.approximate));
     end
@@ -4327,9 +4357,10 @@ state.publish_ashitaminimap_markers = function (force_clear)
     };
     for _, marker in ipairs(markers) do
         lines[#lines + 1] = string.format(
-            '        { x = %.6f, y = %.6f, map_id = %s, approximate = %s },',
+            '        { x = %.6f, y = %.6f, z = %s, map_id = %s, approximate = %s },',
             marker.x,
             marker.y,
+            marker.z ~= nil and string.format('%.6f', marker.z) or 'nil',
             marker.map_id ~= nil and tostring(marker.map_id) or 'nil',
             tostring(marker.approximate));
     end
