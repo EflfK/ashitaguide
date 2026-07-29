@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.24.0';
+addon.version = '0.25.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -305,6 +305,9 @@ local state = {
         runtime_pointer_address = 0,
         reported_scale_zone = nil,
         reported_marker_step = nil,
+        bridge_last_token = nil,
+        bridge_last_written_at = 0,
+        bridge_write_error = nil,
     },
     pov_run = nil,
     pov_active = false,
@@ -1800,6 +1803,11 @@ end
 local function auction_sale_guide_file_path()
     local dir = config_dir_path();
     return dir ~= nil and path_join(dir, 'auction_sale_guide.lua') or nil;
+end
+
+state.ashitaminimap_marker_file_path = function ()
+    local dir = config_dir_path();
+    return dir ~= nil and path_join(dir, 'ashitaminimap_markers.lua') or nil;
 end
 
 local function file_exists(path)
@@ -4253,6 +4261,93 @@ local function navigation_context(step)
     };
 end
 
+state.publish_ashitaminimap_markers = function (force_clear)
+    local path = state.ashitaminimap_marker_file_path();
+    if (path == nil) then
+        return;
+    end
+
+    local run = force_clear ~= true and state.active[state.selected_active_key] or nil;
+    local step = run ~= nil and run.guide.steps[run.step_index] or nil;
+    local navigation = state.minimap_marker_enabled[1] == true
+        and navigation_context(step)
+        or nil;
+    local markers = {};
+    if (navigation ~= nil) then
+        markers[#markers + 1] = {
+            x = navigation.target_x,
+            y = navigation.target_y,
+            map_id = navigation.target_map_id,
+            approximate = step.approximate == true,
+        };
+        for _, destination in ipairs(step.destinations or {}) do
+            if (destination ~= navigation.primary_destination) then
+                markers[#markers + 1] = {
+                    x = destination.target_x,
+                    y = destination.target_y,
+                    map_id = destination.map_id,
+                    approximate = step.approximate == true,
+                };
+            end
+        end
+    end
+
+    local token_parts = {
+        navigation ~= nil and tostring(navigation.player.zone_id) or '',
+        run ~= nil and tostring(run.key) or '',
+        run ~= nil and tostring(run.step_index) or '',
+    };
+    for _, marker in ipairs(markers) do
+        token_parts[#token_parts + 1] = string.format(
+            '%.3f:%.3f:%s:%s',
+            marker.x,
+            marker.y,
+            tostring(marker.map_id or ''),
+            tostring(marker.approximate));
+    end
+    local token = table.concat(token_parts, '|');
+    local now = os.time();
+    if (force_clear ~= true
+            and token == state.minimap.bridge_last_token
+            and now == state.minimap.bridge_last_written_at) then
+        return;
+    end
+
+    local lines = {
+        'return {',
+        '    version = 1,',
+        "    source = 'ashitaguide',",
+        string.format('    updated_at = %d,', now),
+        string.format(
+            '    zone_id = %s,',
+            navigation ~= nil and tostring(navigation.player.zone_id) or 'nil'),
+        string.format('    guide_key = %q,', run ~= nil and run.key or ''),
+        string.format('    step_index = %d,', run ~= nil and run.step_index or 0),
+        '    markers = {',
+    };
+    for _, marker in ipairs(markers) do
+        lines[#lines + 1] = string.format(
+            '        { x = %.6f, y = %.6f, map_id = %s, approximate = %s },',
+            marker.x,
+            marker.y,
+            marker.map_id ~= nil and tostring(marker.map_id) or 'nil',
+            tostring(marker.approximate));
+    end
+    lines[#lines + 1] = '    },';
+    lines[#lines + 1] = '}';
+    lines[#lines + 1] = '';
+
+    local ok, error_message = write_text_file(path, table.concat(lines, '\n'));
+    if (ok) then
+        state.minimap.bridge_last_token = token;
+        state.minimap.bridge_last_written_at = now;
+        state.minimap.bridge_write_error = nil;
+    elseif (state.minimap.bridge_write_error ~= tostring(error_message)) then
+        state.minimap.bridge_write_error = tostring(error_message);
+        log_warn('Could not publish AshitaMiniMap markers: ' .. state.minimap.bridge_write_error);
+    end
+end
+
 local function rotate_minimap_delta(x, y, yaw)
     local angle = (-math.pi / 2) - yaw;
     local cosine = math.cos(angle);
@@ -5621,6 +5716,7 @@ ashita.events.register('load', 'load_cb', function ()
 end);
 
 ashita.events.register('unload', 'unload_cb', function ()
+    state.publish_ashitaminimap_markers(true);
     state.save_pov_state_if_needed(true);
     save_settings_if_needed(true);
     state.visible[1] = false;
@@ -5645,6 +5741,7 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     update_key_item_step_completion();
     decision.update();
     decision.pin_legacy_chat_closed();
+    state.publish_ashitaminimap_markers(false);
     render_minimap_destination_marker();
     render_guide_window();
     decision.render();
