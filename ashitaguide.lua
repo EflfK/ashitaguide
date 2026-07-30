@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.25.1';
+addon.version = '0.26.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -295,6 +295,7 @@ local state = {
     observed_text_events = 0,
     observed_log_events = 0,
     navigation_targets = {},
+    zone_ids_by_name = {},
     navigation_target_live_refresh_seconds = 0.25,
     navigation_target_miss_retry_seconds = 5.0,
     navigation_target_fallback_scan_distance = 100.0,
@@ -4288,6 +4289,85 @@ local function navigation_context(step)
     };
 end
 
+state.resolve_zone_id = function (name)
+    local lookup = lower_string(name);
+    if (lookup == '') then
+        return nil;
+    end
+    if (state.zone_ids_by_name[lookup] ~= nil) then
+        return state.zone_ids_by_name[lookup];
+    end
+    local resources = safe_read(function ()
+        return AshitaCore:GetResourceManager();
+    end, nil);
+    if (resources == nil) then
+        return nil;
+    end
+    for zone_id = 0, 1024 do
+        local zone_name = clean_message(safe_read(function ()
+            return resources:GetString('zones.names', zone_id);
+        end, ''));
+        if (zone_name ~= '') then
+            state.zone_ids_by_name[lower_string(zone_name)] = zone_id;
+        end
+    end
+    return state.zone_ids_by_name[lookup];
+end
+
+state.minimap_handoff_context = function (step)
+    if (step == nil) then
+        return nil;
+    end
+    local player = current_navigation_player();
+    if (player == nil) then
+        return nil;
+    end
+    local primary_destination = nil;
+    if (step.target_x == nil and step.target_y == nil and step.npc == '') then
+        primary_destination = type(step.destinations) == 'table'
+            and step.destinations[1]
+            or nil;
+        if (primary_destination == nil) then
+            return nil;
+        end
+    end
+    local destination_zone_id = step.zone ~= ''
+        and state.resolve_zone_id(step.zone)
+        or player.zone_id;
+    if (destination_zone_id == nil) then
+        return nil;
+    end
+    if (destination_zone_id == player.zone_id) then
+        local navigation = navigation_context(step);
+        if (navigation ~= nil) then
+            navigation.destination_zone_id = destination_zone_id;
+        end
+        return navigation;
+    end
+    local target_x = primary_destination ~= nil
+        and primary_destination.target_x
+        or step.target_x;
+    local target_y = primary_destination ~= nil
+        and primary_destination.target_y
+        or step.target_y;
+    if (target_x == nil or target_y == nil) then
+        return nil;
+    end
+    return {
+        player = player,
+        target_x = target_x,
+        target_y = target_y,
+        target_z = primary_destination ~= nil
+            and primary_destination.target_z
+            or step.target_z,
+        target_map_id = primary_destination ~= nil
+            and primary_destination.map_id
+            or step.map_id,
+        primary_destination = primary_destination,
+        destination_zone_id = destination_zone_id,
+    };
+end
+
 state.publish_ashitaminimap_markers = function (force_clear)
     local path = state.ashitaminimap_marker_file_path();
     if (path == nil) then
@@ -4297,7 +4377,7 @@ state.publish_ashitaminimap_markers = function (force_clear)
     local run = force_clear ~= true and state.active[state.selected_active_key] or nil;
     local step = run ~= nil and run.guide.steps[run.step_index] or nil;
     local navigation = state.minimap_marker_enabled[1] == true
-        and navigation_context(step)
+        and state.minimap_handoff_context(step)
         or nil;
     local markers = {};
     if (navigation ~= nil) then
@@ -4323,6 +4403,7 @@ state.publish_ashitaminimap_markers = function (force_clear)
 
     local token_parts = {
         navigation ~= nil and tostring(navigation.player.zone_id) or '',
+        navigation ~= nil and tostring(navigation.destination_zone_id) or '',
         run ~= nil and tostring(run.key) or '',
         run ~= nil and tostring(run.step_index) or '',
     };
@@ -4345,12 +4426,17 @@ state.publish_ashitaminimap_markers = function (force_clear)
 
     local lines = {
         'return {',
-        '    version = 1,',
+        '    version = 2,',
         "    source = 'ashitaguide',",
         string.format('    updated_at = %d,', now),
         string.format(
-            '    zone_id = %s,',
+            '    player_zone_id = %s,',
             navigation ~= nil and tostring(navigation.player.zone_id) or 'nil'),
+        string.format(
+            '    destination_zone_id = %s,',
+            navigation ~= nil
+                and tostring(navigation.destination_zone_id)
+                or 'nil'),
         string.format('    guide_key = %q,', run ~= nil and run.key or ''),
         string.format('    step_index = %d,', run ~= nil and run.step_index or 0),
         '    markers = {',

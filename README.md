@@ -391,6 +391,12 @@ currently visible entity.
 With `minimap_marker_enabled = true`, that same destination is also drawn as a
 gold dot over the loaded Ashita Minimap plugin. This overlay currently requires
 the `square-minimal` theme so its clipping boundary matches the displayed map.
+AshitaGuide also publishes a versioned, display-only destination handoff for
+AshitaMiniMap. Version 2 includes both the player's current zone and the guide
+step's destination zone, so AshitaMiniMap can retain the destination and plan
+verified cross-zone legs before the player reaches the final zone. The handoff
+still contains only destination metadata; it never supplies routes or performs
+travel actions.
 Set optional `map_id` to the destination's verified live Minimap map/floor id;
 the dot is suppressed whenever Minimap is displaying another map in the same
 zone. AshitaGuide reads Minimap's live map id and transform but does not modify
