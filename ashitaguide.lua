@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.26.0';
+addon.version = '0.26.2';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -177,8 +177,8 @@ local DEFAULT_SETTINGS = {
     guide_map_size = 160,
     minimap_marker_enabled = true,
     guide_opacity = 92,
-    decision_enabled = true,
-    decision_hide_native_chat = true,
+    decision_enabled = false,
+    decision_hide_native_chat = false,
     decision_anchor_corner = 'top_left',
     decision_window_x = 80,
     decision_window_y = 180,
@@ -272,8 +272,8 @@ local state = {
     guide_map_size = T{ 160 },
     minimap_marker_enabled = T{ true },
     guide_opacity = T{ 92 },
-    decision_enabled = T{ true },
-    decision_hide_native_chat = T{ true },
+    decision_enabled = T{ false },
+    decision_hide_native_chat = T{ false },
     decision_opacity = T{ 96 },
     valor_opacity = T{ 92 },
     casket_opacity = T{ 92 },
@@ -1067,22 +1067,12 @@ function decision.pin_legacy_chat_window(pointer_address)
 end
 
 function decision.pin_legacy_chat_closed()
-    if (state.decision_enabled[1] ~= true or state.decision_hide_native_chat[1] ~= true) then
-        return;
-    end
-
-    if (AshitaCore:GetChatManager():IsInputOpen() ~= 0x00) then
-        return;
-    end
-
-    if (state.native_chat_win_ptr1 == nil
-        and state.native_chat_win_ptr2 == nil
-        and not decision.find_legacy_chat_windows()) then
-        return;
-    end
-
-    decision.pin_legacy_chat_window(state.native_chat_win_ptr1);
-    decision.pin_legacy_chat_window(state.native_chat_win_ptr2);
+    -- Do not write to cached native chat-window pointers here. FFXI can
+    -- rebuild those windows while a decision selection changes, leaving the
+    -- cached address stale and causing an access violation during Present.
+    -- The recommendation overlay remains read-only and the native menu stays
+    -- visible so the player can make the selection normally.
+    return;
 end
 
 local function normalize_guide(source, index, origin)
@@ -1130,10 +1120,10 @@ local function normalize_settings(source)
             source.minimap_marker_enabled,
             DEFAULT_SETTINGS.minimap_marker_enabled),
         guide_opacity = bounded_number(source.guide_opacity, legacy_opacity, 0, 100),
-        decision_enabled = bounded_boolean(source.decision_enabled, DEFAULT_SETTINGS.decision_enabled),
-        decision_hide_native_chat = bounded_boolean(
-            source.decision_hide_native_chat,
-            DEFAULT_SETTINGS.decision_hide_native_chat),
+        -- Temporarily force the native decision helper off. Its direct menu
+        -- memory integration is unsafe while FFXI changes a Yes/No selection.
+        decision_enabled = false,
+        decision_hide_native_chat = false,
         decision_anchor_corner = decision.normalize_anchor(source.decision_anchor_corner),
         decision_window_x = bounded_number(
             source.decision_window_x,
@@ -5823,9 +5813,6 @@ end
 ashita.events.register('load', 'load_cb', function ()
     load_config();
     seed_chat_log();
-    if (state.decision_hide_native_chat[1] == true and not decision.find_legacy_chat_windows()) then
-        log_warn('Native chat hiding is unavailable: ' .. state.native_chat_pointer_error .. '.');
-    end
     log_info('Loaded. Use /agguide show and /agguide list.');
     if (state.config_error ~= nil) then
         log_warn('Config warning: ' .. state.config_error);
@@ -5856,12 +5843,9 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     update_npc_step_auto_advance();
     update_level_step_auto_advance();
     update_key_item_step_completion();
-    decision.update();
-    decision.pin_legacy_chat_closed();
     state.publish_ashitaminimap_markers(false);
     render_minimap_destination_marker();
     render_guide_window();
-    decision.render();
     render_valor_window();
     render_casket_window();
     render_config_window();
