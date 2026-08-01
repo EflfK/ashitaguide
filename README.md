@@ -27,7 +27,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - manual `<` and `>` step controls
 - single-step guides omit step numbering, the step list, and advancement controls
 - pure-Lua navigation map showing only the player and step destination
-- optional destination marker over the Ashita Minimap `square-minimal` theme
+- optional destination markers over square-derived Ashita Minimap themes
 - world-space arrow above the current step NPC when rendered
 - optional NPC-target auto-advance for find steps
 - optional job-and-level auto-advance for leveling steps
@@ -121,13 +121,14 @@ The Guides tab also controls whether the all-steps section is shown at the
 bottom of the normal guide window. Map size is configurable from 120 to 260
 pixels and defaults to 160 pixels. **Show destination on Minimap** overlays the
 current step destination on the loaded Ashita Minimap plugin when its active
-theme is `square-minimal`. AshitaGuide reads the base theme configuration from
-`config/minimap/` and the active position, scale, zoom, and rotation directly
-from the loaded plugin; distant destinations are held at the edge of the
-visible square until they enter the map view. The marker uses Minimap's live
-frame and mask dimensions so it remains attached to the same map location while
-the player moves or changes zoom. While a destination is outside the visible
-map range, its border marker moves as the player's bearing to it changes.
+theme is square-derived, including `square`, `square-minimal`, and calibrated
+copies whose names begin with `square`. AshitaGuide reads the active theme
+configuration from `config/minimap/` and the active position, scale, zoom, and
+rotation directly from the loaded plugin; distant destinations are held at the
+edge of the visible square until they enter the map view. The marker uses
+Minimap's live frame and mask dimensions so it remains attached to the same map
+location while the player moves or changes zoom. While a destination is outside
+the visible map range, its border marker moves as the player's bearing changes.
 
 An accepted training regime or `Progress x/y` line opens the Pages of Valor window
 automatically. Completion or cancellation closes it. You can close the window
@@ -389,8 +390,9 @@ for fixed spawn possibilities so multiple markers do not collapse onto the one
 currently visible entity.
 
 With `minimap_marker_enabled = true`, that same destination is also drawn as a
-gold dot over the loaded Ashita Minimap plugin. This overlay currently requires
-the `square-minimal` theme so its clipping boundary matches the displayed map.
+gold dot over the loaded Ashita Minimap plugin. This overlay supports bundled
+and custom square-derived themes so its clipping boundary matches the displayed
+map; circular themes remain unsupported.
 AshitaGuide also publishes a versioned, display-only destination handoff for
 AshitaMiniMap. Version 2 includes both the player's current zone and the guide
 step's destination zone, so AshitaMiniMap can retain the destination and plan

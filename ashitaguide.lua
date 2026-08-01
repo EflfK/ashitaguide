@@ -1975,7 +1975,10 @@ local function load_minimap_settings()
 
     local values = parse_ini(settings_text);
     local theme = lower_string(values['theme.name']);
-    if (theme ~= 'square-minimal') then
+    -- Square-derived custom themes use the same rectangular frame and mask
+    -- geometry as the bundled square themes. Read their own theme.ini values
+    -- so calibrated copies retain their exact dimensions.
+    if (theme == '' or theme:match('^square') == nil) then
         state.minimap.settings = nil;
         return nil;
     end

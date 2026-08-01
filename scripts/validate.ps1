@@ -38,7 +38,6 @@ $required = @(
     "map_scale_raw",
     "current_map_id",
     "map_id",
-    "square-minimal",
     "navigation_context",
     "minimap_handoff_context",
     "destination_zone_id",
@@ -317,6 +316,10 @@ if ($content -notmatch "now - cached\.checked_at < state\.navigation_target_miss
 if ($content -notmatch "minimap\.mask_width \* minimap\.zoom\s+/ 100 \* minimap\.scale_x" -or
     $content -notmatch "minimap\.mask_height \* minimap\.zoom\s+/ 100 \* minimap\.scale_y") {
     throw 'Minimap navigation scaling must match the plugin live map transform.'
+}
+
+if ($content -notmatch "theme:match\('\^square'\)") {
+    throw 'Minimap destination overlays must support calibrated square-derived themes.'
 }
 
 if ($content -notmatch "(?s)navigation\.target_map_id ~= nil.+minimap\.current_map_id ~= navigation\.target_map_id.+Minimap marker hidden") {
