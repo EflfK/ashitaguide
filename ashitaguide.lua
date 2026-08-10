@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.26.7';
+addon.version = '0.26.8';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -1077,6 +1077,29 @@ function decision.pin_legacy_chat_closed()
     -- The recommendation overlay remains read-only and the native menu stays
     -- visible so the player can make the selection normally.
     return;
+end
+
+function decision.estimated_native_right_edge()
+    local now = os.clock();
+    if (now >= (state.decision_layout_next_poll or 0)) then
+        state.decision_layout_sample = decision.read_menu();
+        state.decision_layout_next_poll = now + 0.10;
+    end
+
+    local menu = state.decision_layout_sample;
+    if (menu == nil) then
+        return 1088;
+    end
+
+    -- The native client does not publish a panel rectangle. Its query panel
+    -- grows with the longest visible line and wraps very long text. These
+    -- values are calibrated in physical pixels for the Spectral Focus canvas.
+    local longest = math.min(#tostring(menu.prompt or ''), 44);
+    for _, choice in ipairs(menu.choices or {}) do
+        longest = math.max(longest, math.min(#tostring(choice or ''), 44));
+    end
+
+    return math.max(560, math.min(1060, 104 + longest * 18));
 end
 
 local function normalize_guide(source, index, origin)
@@ -5347,7 +5370,7 @@ end
 local function set_next_guide_window_position(width, height)
     local window_x, window_y = guide_window_top_left(width, height);
     if (require('spectralfocus_modal').is_decision()) then
-        window_x = 1120;
+        window_x = decision.estimated_native_right_edge() + 32;
         window_y = (tonumber(state.settings.window_y) or 573) - height;
         imgui.SetNextWindowPos({ window_x, window_y }, IMGUI.cond_always);
         state.guide_decision_was_active = true;
