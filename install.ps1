@@ -9,7 +9,7 @@ $target = Join-Path $AshitaRoot 'addons\ashitaguide'
 $backupRoot = Join-Path $PSScriptRoot '.local-backups'
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $backup = Join-Path $backupRoot $timestamp
-$addonFiles = @('ashitaguide.lua', 'ashitaguide_config.lua')
+$addonFiles = @('ashitaguide.lua', 'ashitaguide_config.lua', 'spectralfocus_modal.lua')
 
 if (-not (Test-Path -LiteralPath $AshitaRoot)) {
     throw "Ashita root does not exist: $AshitaRoot"

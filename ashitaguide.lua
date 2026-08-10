@@ -1,9 +1,10 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.26.2';
+addon.version = '0.26.7';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
+require('spectralfocus_modal');
 
 local chat  = require('chat');
 local imgui = require('imgui');
@@ -5345,11 +5346,24 @@ end
 
 local function set_next_guide_window_position(width, height)
     local window_x, window_y = guide_window_top_left(width, height);
-    imgui.SetNextWindowPos({ window_x, window_y }, IMGUI.cond_appearing);
+    if (require('spectralfocus_modal').is_decision()) then
+        window_x = 1120;
+        window_y = (tonumber(state.settings.window_y) or 573) - height;
+        imgui.SetNextWindowPos({ window_x, window_y }, IMGUI.cond_always);
+        state.guide_decision_was_active = true;
+    elseif (state.guide_decision_was_active) then
+        imgui.SetNextWindowPos({ window_x, window_y }, IMGUI.cond_always);
+        state.guide_decision_was_active = false;
+    else
+        imgui.SetNextWindowPos({ window_x, window_y }, IMGUI.cond_appearing);
+    end
     return window_x, window_y;
 end
 
 local function capture_guide_window_anchor(expected_x, expected_y)
+    if (require('spectralfocus_modal').is_decision()) then
+        return;
+    end
     if (type(imgui.GetWindowPos) ~= 'function' or type(imgui.GetWindowSize) ~= 'function') then
         return;
     end
@@ -5425,6 +5439,8 @@ local function render_valor_window()
         or state.pov_run == nil) then
         return;
     end
+
+    if (require('spectralfocus_modal').is_active()) then return; end
 
     imgui.SetNextWindowPos(
         { state.settings.valor_window_x, state.settings.valor_window_y },
