@@ -116,6 +116,7 @@ local IMGUI = {
     style_window_border_size = imgui_const('ImGuiStyleVar_WindowBorderSize'),
     style_frame_padding = imgui_const('ImGuiStyleVar_FramePadding'),
     cond_first_use = imgui_const('ImGuiCond_FirstUseEver'),
+    cond_appearing = rawget(_G, 'ImGuiCond_Appearing') or imgui_const('ImGuiCond_FirstUseEver'),
     window_no_collapse = imgui_const('ImGuiWindowFlags_NoCollapse'),
     window_no_title_bar = imgui_const('ImGuiWindowFlags_NoTitleBar'),
     window_no_resize = imgui_const('ImGuiWindowFlags_NoResize'),
@@ -5327,7 +5328,7 @@ end
 
 local function set_next_guide_window_position(width, height)
     local window_x, window_y = guide_window_top_left(width, height);
-    imgui.SetNextWindowPos({ window_x, window_y }, IMGUI.cond_first_use);
+    imgui.SetNextWindowPos({ window_x, window_y }, IMGUI.cond_appearing);
     return window_x, window_y;
 end
 
@@ -5410,10 +5411,10 @@ local function render_valor_window()
 
     imgui.SetNextWindowPos(
         { state.settings.valor_window_x, state.settings.valor_window_y },
-        IMGUI.cond_first_use);
+        IMGUI.cond_appearing);
     imgui.SetNextWindowSize(
         { state.settings.valor_window_width, state.settings.valor_window_height },
-        IMGUI.cond_first_use);
+        IMGUI.cond_appearing);
     push_display_window_style(state.valor_opacity);
     local flags = bit.bor(IMGUI.window_no_title_bar, IMGUI.window_no_collapse);
     local visible = imgui.Begin('Pages of Valor###AshitaGuideValor', state.valor_visible, flags);
