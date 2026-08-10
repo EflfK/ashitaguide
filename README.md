@@ -323,6 +323,7 @@ return {
         guide_opacity = 92,
         -- window_x/window_y are the screen coordinates of this stationary corner.
         guide_anchor_corner = 'top_left',
+        guide_tabs_bottom = false,
         decision_enabled = true,
         decision_anchor_corner = 'top_left',
         decision_window_x = 80,

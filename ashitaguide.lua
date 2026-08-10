@@ -175,6 +175,7 @@ local DEFAULT_SETTINGS = {
     window_y = 160,
     guide_anchor_corner = 'top_left',
     guide_show_step_list = true,
+    guide_tabs_bottom = false,
     guide_map_size = 160,
     minimap_marker_enabled = true,
     guide_opacity = 92,
@@ -270,6 +271,7 @@ local state = {
     casket_visible = T{ false },
     casket_enabled = T{ true },
     guide_show_step_list = T{ true },
+    guide_tabs_bottom = T{ false },
     guide_map_size = T{ 160 },
     minimap_marker_enabled = T{ true },
     guide_opacity = T{ 92 },
@@ -1116,6 +1118,7 @@ local function normalize_settings(source)
         window_y = bounded_number(source.window_y, DEFAULT_SETTINGS.window_y, 0, 10000),
         guide_anchor_corner = normalize_guide_anchor_corner(source.guide_anchor_corner),
         guide_show_step_list = bounded_boolean(source.guide_show_step_list, DEFAULT_SETTINGS.guide_show_step_list),
+        guide_tabs_bottom = bounded_boolean(source.guide_tabs_bottom, DEFAULT_SETTINGS.guide_tabs_bottom),
         guide_map_size = bounded_number(source.guide_map_size, DEFAULT_SETTINGS.guide_map_size, 120, 260),
         minimap_marker_enabled = bounded_boolean(
             source.minimap_marker_enabled,
@@ -2447,6 +2450,7 @@ local function load_config()
     state.valor_show_totals[1] = state.settings.valor_show_totals;
     state.casket_enabled[1] = state.settings.casket_enabled;
     state.guide_show_step_list[1] = state.settings.guide_show_step_list;
+    state.guide_tabs_bottom[1] = state.settings.guide_tabs_bottom;
     state.guide_map_size[1] = state.settings.guide_map_size;
     state.minimap_marker_enabled[1] = state.settings.minimap_marker_enabled;
     state.guide_opacity[1] = state.settings.guide_opacity;
@@ -2674,6 +2678,7 @@ local function settings_text()
         string.format('    window_y = %d,', bounded_number(values.window_y, DEFAULT_SETTINGS.window_y, 0, 10000)),
         string.format('    guide_anchor_corner = %q,', normalize_guide_anchor_corner(values.guide_anchor_corner)),
         string.format('    guide_show_step_list = %s,', lua_boolean(state.guide_show_step_list[1])),
+        string.format('    guide_tabs_bottom = %s,', lua_boolean(state.guide_tabs_bottom[1])),
         string.format('    guide_map_size = %d,', bounded_number(state.guide_map_size[1], DEFAULT_SETTINGS.guide_map_size, 120, 260)),
         string.format('    minimap_marker_enabled = %s,', lua_boolean(state.minimap_marker_enabled[1])),
         string.format('    guide_opacity = %d,', bounded_number(state.guide_opacity[1], DEFAULT_SETTINGS.guide_opacity, 0, 100)),
@@ -3662,6 +3667,7 @@ local function render_guide_selector()
     imgui.PopItemWidth();
     render_guide_anchor_selector();
     imgui.Checkbox('Show step list##ashitaguide_guide_show_step_list', state.guide_show_step_list);
+    imgui.Checkbox('Tabs on bottom##ashitaguide_guide_tabs_bottom', state.guide_tabs_bottom);
     imgui.Checkbox('Show destination on Minimap##ashitaguide_minimap_marker', state.minimap_marker_enabled);
     imgui.PushItemWidth(220);
     imgui.SliderInt('Map size##ashitaguide_guide_map_size', state.guide_map_size, 120, 260, '%d px');
@@ -5224,15 +5230,7 @@ function decision.render()
     imgui.PopStyleVar(2);
 end
 
-local function render_active_tabs()
-    if (#state.active_order == 0) then
-        imgui.TextColored(COLORS.muted, 'No active guides. Open Guide Config to start one.');
-        if (imgui.Button('Open Guide Config##ashitaguide_open_config', { 150, 0 })) then
-            state.config_visible[1] = true;
-        end
-        return;
-    end
-
+function state.render_active_tab_buttons()
     local close_keys = {};
     local tab_row_width = 0;
     for _, key in ipairs(state.active_order) do
@@ -5267,8 +5265,27 @@ local function render_active_tabs()
     for _, key in ipairs(close_keys) do
         close_guide_tab(key);
     end
-    imgui.Separator();
-    render_active_guide(state.active[state.selected_active_key] or state.active[state.active_order[1]]);
+end
+
+local function render_active_tabs()
+    if (#state.active_order == 0) then
+        imgui.TextColored(COLORS.muted, 'No active guides. Open Guide Config to start one.');
+        if (imgui.Button('Open Guide Config##ashitaguide_open_config', { 150, 0 })) then
+            state.config_visible[1] = true;
+        end
+        return;
+    end
+
+    local run = state.active[state.selected_active_key] or state.active[state.active_order[1]];
+    if (state.guide_tabs_bottom[1] == true) then
+        render_active_guide(run);
+        imgui.Separator();
+        state.render_active_tab_buttons();
+    else
+        state.render_active_tab_buttons();
+        imgui.Separator();
+        render_active_guide(run);
+    end
 end
 
 local function push_display_window_style(opacity)
