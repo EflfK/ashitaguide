@@ -238,12 +238,14 @@ if ($content -notmatch "tab_row_width \+ 3 \+ tab_group_width <= GUIDE_TEXT_WRAP
 
 if ($content -notmatch 'local function text_colored_wrapped\(color, text, wrap_position\)' -or
     $content -notmatch 'text_colored_wrapped\(COLORS\.muted, hunt\.details, width - 12\)') {
-    throw 'The compact NM Hunt drawer must use its own text-wrap boundary.'
+    throw 'The NM Hunt window must use its own text-wrap boundary.'
 }
 
-if ($content -notmatch 'local height = open and math\.max\(120, minimap\.size - 44\) or 32' -or
+if ($content -notmatch "capture_window_geometry\(\s*'nm_hunt_window_x'" -or
+    $content -notmatch "SetNextWindowSizeConstraints\(\{ 320, 240 \}, \{ 700, 900 \}\)" -or
+    $content -notmatch 'Show all on minimap##nm_hunt_all' -or
     $content -notmatch 'Open or reopen Widescan after filtering') {
-    throw 'The NM Hunt drawer must remain scrollable and explain empty exact-ID Filterscan results.'
+    throw 'The NM Hunt window must remain movable, resizable, and retain its minimap visibility control.'
 }
 
 if ($content -notmatch "(?s)previous == nil and guide\.type ~= 'pages_of_valor'.+state\.settings\.guide_steps\[guide\.key\]") {

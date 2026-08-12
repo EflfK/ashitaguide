@@ -222,6 +222,10 @@ local DEFAULT_SETTINGS = {
     key_item_step_completions = {},
     respawn_timer_expirations = {},
     nm_hunt_drawer_open = true,
+    nm_hunt_window_x = 360,
+    nm_hunt_window_y = 100,
+    nm_hunt_window_width = 360,
+    nm_hunt_window_height = 520,
     nm_hunt_show_all = true,
     nm_hunt_hidden = {},
     nm_hunt_selected = 'Valkurm Emperor',
@@ -1331,6 +1335,14 @@ local function normalize_settings(source)
             source.respawn_timer_expirations or DEFAULT_SETTINGS.respawn_timer_expirations),
         nm_hunt_drawer_open = bounded_boolean(
             source.nm_hunt_drawer_open, DEFAULT_SETTINGS.nm_hunt_drawer_open),
+        nm_hunt_window_x = bounded_number(
+            source.nm_hunt_window_x, DEFAULT_SETTINGS.nm_hunt_window_x, 0, 10000),
+        nm_hunt_window_y = bounded_number(
+            source.nm_hunt_window_y, DEFAULT_SETTINGS.nm_hunt_window_y, 0, 10000),
+        nm_hunt_window_width = bounded_number(
+            source.nm_hunt_window_width, DEFAULT_SETTINGS.nm_hunt_window_width, 320, 700),
+        nm_hunt_window_height = bounded_number(
+            source.nm_hunt_window_height, DEFAULT_SETTINGS.nm_hunt_window_height, 240, 900),
         nm_hunt_show_all = bounded_boolean(
             source.nm_hunt_show_all, DEFAULT_SETTINGS.nm_hunt_show_all),
         nm_hunt_hidden = copy_boolean_map(source.nm_hunt_hidden or DEFAULT_SETTINGS.nm_hunt_hidden),
@@ -2943,6 +2955,10 @@ local function settings_text()
             '    respawn_timer_expirations = %s,',
             state.lua_timestamp_map(values.respawn_timer_expirations)),
         string.format('    nm_hunt_drawer_open = %s,', lua_boolean(values.nm_hunt_drawer_open)),
+        string.format('    nm_hunt_window_x = %d,', bounded_number(values.nm_hunt_window_x, DEFAULT_SETTINGS.nm_hunt_window_x, 0, 10000)),
+        string.format('    nm_hunt_window_y = %d,', bounded_number(values.nm_hunt_window_y, DEFAULT_SETTINGS.nm_hunt_window_y, 0, 10000)),
+        string.format('    nm_hunt_window_width = %d,', bounded_number(values.nm_hunt_window_width, DEFAULT_SETTINGS.nm_hunt_window_width, 320, 700)),
+        string.format('    nm_hunt_window_height = %d,', bounded_number(values.nm_hunt_window_height, DEFAULT_SETTINGS.nm_hunt_window_height, 240, 900)),
         string.format('    nm_hunt_show_all = %s,', lua_boolean(values.nm_hunt_show_all)),
         string.format('    nm_hunt_hidden = %s,', lua_boolean_map(values.nm_hunt_hidden)),
         string.format('    nm_hunt_selected = %q,', values.nm_hunt_selected),
@@ -6243,49 +6259,47 @@ end
 
 state.render_nm_hunt_window = function ()
     local player = current_navigation_player();
-    local minimap = state.load_ashitaminimap_window_settings();
     local catalog = player ~= nil and state.NM_HUNTS_BY_ZONE[player.zone_id] or nil;
-    if (catalog == nil or minimap == nil or minimap.visible ~= true) then
+    if (catalog == nil) then
         return;
     end
-    local open = state.settings.nm_hunt_drawer_open == true;
-    local width = open and 304 or 38;
-    local height = open and math.max(120, minimap.size - 44) or 32;
-    local window_x = minimap.x + minimap.size - width;
-    local window_y = minimap.y + 44;
-    imgui.SetNextWindowPos({ window_x, window_y }, 0);
-    imgui.SetNextWindowSize({ width, height }, 0);
+    imgui.SetNextWindowPos(
+        { state.settings.nm_hunt_window_x, state.settings.nm_hunt_window_y },
+        IMGUI.cond_first_use);
+    imgui.SetNextWindowSize(
+        { state.settings.nm_hunt_window_width, state.settings.nm_hunt_window_height },
+        IMGUI.cond_first_use);
+    if (type(imgui.SetNextWindowSizeConstraints) == 'function') then
+        imgui.SetNextWindowSizeConstraints({ 320, 240 }, { 700, 900 });
+    end
     push_display_window_style(state.guide_opacity);
     imgui.PushStyleVar(IMGUI.style_frame_padding, { 4, 2 });
     imgui.PushStyleVar(IMGUI.style_window_rounding, 7.0);
     imgui.PushStyleVar(IMGUI.style_frame_rounding, 3.0);
-    local flags = bit.bor(
-        IMGUI.window_no_title_bar,
-        IMGUI.window_no_collapse,
-        IMGUI.window_no_resize,
-        IMGUI.window_no_move,
-        IMGUI.window_no_saved_settings);
+    local flags = IMGUI.window_no_saved_settings;
     local visible = imgui.Begin('NM Hunt###AshitaGuideNmHunt', true, flags);
+    capture_window_geometry(
+        'nm_hunt_window_x',
+        'nm_hunt_window_y',
+        'nm_hunt_window_width',
+        'nm_hunt_window_height',
+        320,
+        700,
+        240,
+        900);
     if (visible) then
-        if (open) then
-            imgui.TextColored(COLORS.header, 'NM HUNT');
-            imgui.SameLine();
-            imgui.SetCursorPosX(width - 27);
-            if (imgui.SmallButton('>##nm_hunt_close')) then
-                state.settings.nm_hunt_drawer_open = false;
-            end
-            imgui.Separator();
-            imgui.TextColored(COLORS.muted, string.upper(player.zone));
-            imgui.SameLine();
-            local alarm = T{ state.settings.nm_hunt_alarm == true };
-            if (imgui.Checkbox('Alarm##nm_hunt_alarm', alarm)) then
-                state.settings.nm_hunt_alarm = alarm[1] == true;
-            end
-            imgui.SameLine();
-            local show_all = T{ state.settings.nm_hunt_show_all == true };
-            if (imgui.Checkbox('All##nm_hunt_all', show_all)) then
-                state.settings.nm_hunt_show_all = show_all[1] == true;
-            end
+        local width = state.settings.nm_hunt_window_width;
+        imgui.TextColored(COLORS.muted, string.upper(player.zone));
+        imgui.SameLine();
+        local alarm = T{ state.settings.nm_hunt_alarm == true };
+        if (imgui.Checkbox('Alarm##nm_hunt_alarm', alarm)) then
+            state.settings.nm_hunt_alarm = alarm[1] == true;
+        end
+        imgui.SameLine();
+        local show_all = T{ state.settings.nm_hunt_show_all == true };
+        if (imgui.Checkbox('Show all on minimap##nm_hunt_all', show_all)) then
+            state.settings.nm_hunt_show_all = show_all[1] == true;
+        end
 
             state.nm_hunt.hovered_name = nil;
             for _, hunt in ipairs(catalog) do
@@ -6369,12 +6383,6 @@ state.render_nm_hunt_window = function ()
                     state.render_nm_hunt_timer_line(hunt, 'nm', 'NM');
                 end
             end
-        else
-            imgui.SetCursorPosX(11);
-            if (imgui.SmallButton('<##nm_hunt_open')) then
-                state.settings.nm_hunt_drawer_open = true;
-            end
-        end
     end
     imgui.End();
     imgui.PopStyleVar(3);

@@ -420,21 +420,22 @@ then draws one damselfly icon per explicit placeholder location without gold
 guide dots or a route, while retaining its separate NM relocation blob. Do not
 use the NM's possible relocation points as placeholder locations.
 
-In Valkurm Dunes, AshitaGuide attaches a compact **NM Hunt** drawer to
-AshitaMiniMap. It provides per-NM map visibility, creature graphics with hover
+In Valkurm Dunes, AshitaGuide opens a separate **NM Hunt** window. The window
+can be moved and resized independently of AshitaMiniMap, and its geometry is
+remembered between sessions. It provides per-NM map visibility, creature graphics with hover
 details, fixed official CatsEyeXI links, and only the attended actions supported
 by that NM. Valkurm Emperor includes Filterscan, manual five-minute PH and
 60-minute NM timer buttons, persistent countdown rows, reset/clear controls,
 and an optional system alarm when either countdown reaches zero. The existing
 exact-14A defeat detection and the manual PH button share the same countdown.
 
-South Gustaberg uses the same drawer for Leaping Lizzy alone. Its two exact
+South Gustaberg uses the same window for Leaping Lizzy alone. Its two exact
 Rock Lizard placeholders (`17B` lowland and `18F` northwest upland) receive
 separate lizard map markers and independent 5:30 manual countdowns. The
 Filterscan action includes Lizzy and both PH indices. CatsEyeXI's current
-server script has no meaningful post-kill Lizzy lockout, so the drawer does
-not claim a separate NM cooldown. The drawer wraps to its compact width and
-scrolls vertically when its contents exceed the space beside AshitaMiniMap.
+server script has no meaningful post-kill Lizzy lockout, so the window does
+not claim a separate NM cooldown. The window wraps to its current width and
+scrolls vertically when its contents exceed its current height.
 After applying a filter, open or reopen Widescan; an empty exact-ID result means
 the matching placeholder or NM is currently down or outside Widescan range.
 
