@@ -6199,12 +6199,13 @@ state.render_nm_hunt_window = function ()
         IMGUI.window_no_saved_settings);
     local visible = imgui.Begin('NM Hunt###AshitaGuideNmHunt', true, flags);
     if (visible) then
-        if (imgui.SmallButton(open and '<##nm_hunt_close' or '>##nm_hunt_open')) then
-            state.settings.nm_hunt_drawer_open = not open;
-        end
         if (open) then
-            imgui.SameLine();
             imgui.TextColored(COLORS.header, 'NM HUNT');
+            imgui.SameLine();
+            imgui.SetCursorPosX(width - 32);
+            if (imgui.SmallButton('>##nm_hunt_close')) then
+                state.settings.nm_hunt_drawer_open = false;
+            end
             imgui.Separator();
             imgui.TextColored(COLORS.muted, 'VALKURM DUNES');
             imgui.SameLine();
@@ -6278,6 +6279,8 @@ state.render_nm_hunt_window = function ()
                 state.render_nm_hunt_timer_line(hunt, 'ph', 'PH');
                 state.render_nm_hunt_timer_line(hunt, 'nm', 'NM');
             end
+        elseif (imgui.SmallButton('<##nm_hunt_open')) then
+            state.settings.nm_hunt_drawer_open = true;
         end
     end
     imgui.End();
