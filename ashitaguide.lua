@@ -4842,7 +4842,7 @@ local function rotate_minimap_delta(x, y, yaw)
     return (x * cosine) - (y * sine), (x * sine) + (y * cosine);
 end
 
-local function draw_damselfly_marker(draw_list, x, y)
+state.draw_damselfly_marker = function (draw_list, x, y)
     local shadow = imgui.GetColorU32({ 0.01, 0.02, 0.025, 0.94 });
     local wing = imgui.GetColorU32({ 0.52, 0.92, 1.00, 0.82 });
     local body = imgui.GetColorU32({ 0.98, 0.67, 0.18, 1.00 });
@@ -5031,7 +5031,7 @@ local function render_minimap_destination_marker()
             or imgui.GetColorU32({ COLORS.header[1], COLORS.header[2], COLORS.header[3], pulse });
         local outline_color = imgui.GetColorU32({ 0.02, 0.02, 0.02, 0.96 });
         if (step.marker_style == 'damselfly') then
-            draw_damselfly_marker(draw_list, marker_x, marker_y);
+            state.draw_damselfly_marker(draw_list, marker_x, marker_y);
         elseif (step.approximate == true) then
             local radius = clamped and 9.0 or 8.0;
             draw_list:AddLine({ marker_x, marker_y - radius }, { marker_x + radius, marker_y }, outline_color, 5.0);
@@ -5092,7 +5092,7 @@ local function render_minimap_destination_marker()
                     and imgui.GetColorU32(COLORS.accent)
                     or imgui.GetColorU32({ COLORS.header[1], COLORS.header[2], COLORS.header[3], pulse });
                 if (step.marker_style == 'damselfly') then
-                    draw_damselfly_marker(
+                    state.draw_damselfly_marker(
                         draw_list,
                         destination_marker_x,
                         destination_marker_y);
