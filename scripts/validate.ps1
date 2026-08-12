@@ -225,6 +225,12 @@ if ($content -notmatch "respawn_target_server_id = 17199434" -or
     $content -notmatch "respawn_seconds = 300") {
     throw 'The Valkurm Emperor guide must track the verified 14A placeholder with a five-minute timer.'
 }
+if ($content -notmatch "target_x = -228\.957" -or
+    $content -notmatch "target_y = -101\.226" -or
+    $content -notmatch "marker_style = 'damselfly'" -or
+    $content -notmatch "path_enabled = false") {
+    throw 'The Valkurm Emperor guide must show one damselfly marker at the verified 14A anchor without pathing.'
+}
 if ($content -notmatch "tab_row_width \+ 3 \+ tab_group_width <= GUIDE_TEXT_WRAP_POS_X") {
     throw 'Guide tabs must wrap within the existing guide window width.'
 }

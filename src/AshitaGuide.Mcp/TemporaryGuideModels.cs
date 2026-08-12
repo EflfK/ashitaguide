@@ -67,11 +67,11 @@ public sealed class TemporaryGuideStepInput
     [Description("Optional comma-separated Filterscan value for a player-clicked local Filter Widescan button, such as Valk, 14A. This never targets or claims a monster.")]
     public string? FilterScan { get; init; }
 
-    [Description("Optional exact AshitaMiniMap NM spawn-range name. The minimap resolves its own verified spawn coordinates instead of copying them into the guide.")]
+    [Description("Optional exact AshitaMiniMap NM spawn-range name to hide while this guide supplies explicit placeholder markers.")]
     public string? NmSpawnName { get; init; }
 
-    [Description("Optional NM marker style. Currently supported: damselfly.")]
-    public string? NmMarkerStyle { get; init; }
+    [Description("Optional marker style for the step's explicit coordinates. Currently supported: damselfly.")]
+    public string? MarkerStyle { get; init; }
 
     [Description("Set false for a marker-only step that must not create a guide route. Defaults to true.")]
     public bool? PathEnabled { get; init; }

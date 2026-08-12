@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.28.0';
+addon.version = '0.28.1';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -701,9 +701,13 @@ local function builtin_guides()
                     text = 'Click Filter Widescan and kill only Damselfly target index 14A. When Valkurm Emperor replaces it, claim and defeat the NM. Keep this guide open and repeat after the placeholder returns.',
                     zone = 'Valkurm Dunes',
                     location = 'D-8 to F-8',
-                    note = 'Damselfly icons mark the 50 server-defined possible Emperor spawn positions. They are not 50 placeholders: only Damselfly target index 14A is the placeholder.',
+                    note = 'The single Damselfly icon marks the server-defined spawn anchor for placeholder 14A. Emperor may appear elsewhere after replacing it; do not kill the other Damselflies.',
+                    target_x = -228.957,
+                    target_y = -101.226,
+                    target_z = 2.776,
+                    map_id = 0,
                     nm_spawn_name = 'Valkurm Emperor',
-                    nm_marker_style = 'damselfly',
+                    marker_style = 'damselfly',
                     path_enabled = false,
                     filter_scan = 'Valk, 14A',
                     respawn_target_index = 0x14A,
@@ -919,9 +923,9 @@ local function normalize_step(source, index)
     if (#nm_spawn_name > 96) then
         nm_spawn_name = '';
     end
-    local nm_marker_style = trim_string(source.nm_marker_style or source.nmMarkerStyle):lower();
-    if (nm_marker_style ~= 'damselfly') then
-        nm_marker_style = '';
+    local marker_style = trim_string(source.marker_style or source.markerStyle):lower();
+    if (marker_style ~= 'damselfly') then
+        marker_style = '';
     end
     local path_enabled = source.path_enabled;
     if (path_enabled == nil) then
@@ -947,7 +951,7 @@ local function normalize_step(source, index)
         filter_scan = state.normalize_filter_scan(
             source.filter_scan or source.filterScan or source.filterscan),
         nm_spawn_name = nm_spawn_name,
-        nm_marker_style = nm_marker_style,
+        marker_style = marker_style,
         path_enabled = bounded_boolean(path_enabled, true),
         respawn_target_index = respawn_target_index,
         respawn_target_server_id = respawn_target_server_id,
@@ -2478,9 +2482,11 @@ local function guide_storage_text(guides)
                 table.insert(lines, string.format(
                     '                    nm_spawn_name = %s,',
                     lua_quoted(step.nm_spawn_name)));
+            end
+            if (step.marker_style ~= '') then
                 table.insert(lines, string.format(
-                    '                    nm_marker_style = %s,',
-                    lua_quoted(step.nm_marker_style)));
+                    '                    marker_style = %s,',
+                    lua_quoted(step.marker_style)));
             end
             if (step.path_enabled == false) then
                 table.insert(lines, '                    path_enabled = false,');
@@ -4726,7 +4732,6 @@ state.publish_ashitaminimap_markers = function (force_clear)
             marker_reference = {
                 kind = 'nm_spawn_range',
                 name = step.nm_spawn_name,
-                style = step.nm_marker_style,
             };
         end
     end
@@ -4738,6 +4743,7 @@ state.publish_ashitaminimap_markers = function (force_clear)
             z = navigation.target_z,
             map_id = navigation.target_map_id,
             approximate = step.approximate == true,
+            style = step.marker_style,
         };
         for _, destination in ipairs(step.destinations or {}) do
             if (destination ~= navigation.primary_destination) then
@@ -4747,6 +4753,7 @@ state.publish_ashitaminimap_markers = function (force_clear)
                     z = destination.target_z,
                     map_id = destination.map_id,
                     approximate = step.approximate == true,
+                    style = step.marker_style,
                 };
             end
         end
@@ -4758,17 +4765,18 @@ state.publish_ashitaminimap_markers = function (force_clear)
         run ~= nil and tostring(run.key) or '',
         run ~= nil and tostring(run.step_index) or '',
         marker_reference ~= nil and marker_reference.name or '',
-        marker_reference ~= nil and marker_reference.style or '',
+        step ~= nil and tostring(step.marker_style or '') or '',
         step ~= nil and tostring(step.path_enabled ~= false) or '',
     };
     for _, marker in ipairs(markers) do
         token_parts[#token_parts + 1] = string.format(
-            '%.3f:%.3f:%s:%s:%s',
+            '%.3f:%.3f:%s:%s:%s:%s',
             marker.x,
             marker.y,
             marker.z ~= nil and string.format('%.3f', marker.z) or '',
             tostring(marker.map_id or ''),
-            tostring(marker.approximate));
+            tostring(marker.approximate),
+            tostring(marker.style or ''));
     end
     local token = table.concat(token_parts, '|');
     local now = os.time();
@@ -4798,19 +4806,19 @@ state.publish_ashitaminimap_markers = function (force_clear)
     };
     for _, marker in ipairs(markers) do
         lines[#lines + 1] = string.format(
-            '        { x = %.6f, y = %.6f, z = %s, map_id = %s, approximate = %s },',
+            '        { x = %.6f, y = %.6f, z = %s, map_id = %s, approximate = %s, style = %q },',
             marker.x,
             marker.y,
             marker.z ~= nil and string.format('%.6f', marker.z) or 'nil',
             marker.map_id ~= nil and tostring(marker.map_id) or 'nil',
-            tostring(marker.approximate));
+            tostring(marker.approximate),
+            marker.style or '');
     end
     lines[#lines + 1] = '    },';
     if (marker_reference ~= nil) then
         lines[#lines + 1] = '    marker_reference = {';
         lines[#lines + 1] = string.format('        kind = %q,', marker_reference.kind);
         lines[#lines + 1] = string.format('        name = %q,', marker_reference.name);
-        lines[#lines + 1] = string.format('        style = %q,', marker_reference.style);
         lines[#lines + 1] = '    },';
     end
     lines[#lines + 1] = '}';
@@ -4832,6 +4840,27 @@ local function rotate_minimap_delta(x, y, yaw)
     local cosine = math.cos(angle);
     local sine = math.sin(angle);
     return (x * cosine) - (y * sine), (x * sine) + (y * cosine);
+end
+
+local function draw_damselfly_marker(draw_list, x, y)
+    local shadow = imgui.GetColorU32({ 0.01, 0.02, 0.025, 0.94 });
+    local wing = imgui.GetColorU32({ 0.52, 0.92, 1.00, 0.82 });
+    local body = imgui.GetColorU32({ 0.98, 0.67, 0.18, 1.00 });
+    for _, tip in ipairs({
+            { x - 7.0, y - 5.0 },
+            { x + 7.0, y - 5.0 },
+            { x - 6.0, y + 4.0 },
+            { x + 6.0, y + 4.0 },
+        }) do
+        local root_y = tip[2] < y and y - 1.5 or y + 1.5;
+        draw_list:AddLine({ x, root_y }, tip, shadow, 4.0);
+        draw_list:AddLine({ x, root_y }, tip, wing, 2.4);
+        draw_list:AddCircleFilled(tip, 1.7, wing, 10);
+    end
+    draw_list:AddLine({ x, y - 5.5 }, { x, y + 6.5 }, shadow, 4.0);
+    draw_list:AddLine({ x, y - 5.5 }, { x, y + 6.5 }, body, 2.2);
+    draw_list:AddCircleFilled({ x, y - 6.2 }, 2.3, shadow, 12);
+    draw_list:AddCircleFilled({ x, y - 6.2 }, 1.5, body, 12);
 end
 
 local function render_minimap_destination_marker()
@@ -5001,7 +5030,9 @@ local function render_minimap_destination_marker()
             and imgui.GetColorU32(COLORS.accent)
             or imgui.GetColorU32({ COLORS.header[1], COLORS.header[2], COLORS.header[3], pulse });
         local outline_color = imgui.GetColorU32({ 0.02, 0.02, 0.02, 0.96 });
-        if (step.approximate == true) then
+        if (step.marker_style == 'damselfly') then
+            draw_damselfly_marker(draw_list, marker_x, marker_y);
+        elseif (step.approximate == true) then
             local radius = clamped and 9.0 or 8.0;
             draw_list:AddLine({ marker_x, marker_y - radius }, { marker_x + radius, marker_y }, outline_color, 5.0);
             draw_list:AddLine({ marker_x + radius, marker_y }, { marker_x, marker_y + radius }, outline_color, 5.0);
@@ -5060,22 +5091,29 @@ local function render_minimap_destination_marker()
                 local destination_fill = destination_distance <= 2.5
                     and imgui.GetColorU32(COLORS.accent)
                     or imgui.GetColorU32({ COLORS.header[1], COLORS.header[2], COLORS.header[3], pulse });
-                draw_list:AddCircleFilled(
-                    { destination_marker_x, destination_marker_y },
-                    6.0,
-                    outline_color,
-                    20);
-                draw_list:AddCircleFilled(
-                    { destination_marker_x, destination_marker_y },
-                    4.0,
-                    destination_fill,
-                    20);
-                draw_list:AddCircle(
-                    { destination_marker_x, destination_marker_y },
-                    destination_clamped and 9.0 or 8.0,
-                    destination_fill,
-                    20,
-                    2.0);
+                if (step.marker_style == 'damselfly') then
+                    draw_damselfly_marker(
+                        draw_list,
+                        destination_marker_x,
+                        destination_marker_y);
+                else
+                    draw_list:AddCircleFilled(
+                        { destination_marker_x, destination_marker_y },
+                        6.0,
+                        outline_color,
+                        20);
+                    draw_list:AddCircleFilled(
+                        { destination_marker_x, destination_marker_y },
+                        4.0,
+                        destination_fill,
+                        20);
+                    draw_list:AddCircle(
+                        { destination_marker_x, destination_marker_y },
+                        destination_clamped and 9.0 or 8.0,
+                        destination_fill,
+                        20,
+                        2.0);
+                end
             end
         end
     end
@@ -5087,7 +5125,7 @@ local function navigation_world_radius(distance)
 end
 
 local function render_navigation_map(step, navigation)
-    if (navigation == nil) then
+    if (navigation == nil or step.path_enabled == false) then
         return;
     end
 
