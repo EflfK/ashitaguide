@@ -128,6 +128,15 @@ $required = @(
     "state.normalize_filter_scan",
     "state.render_filter_scan_button",
     "Filter Widescan:",
+    "respawn_target_index",
+    "respawn_target_server_id",
+    "respawn_replacement_index",
+    "respawn_seconds",
+    "respawn_timer_expirations",
+    "state.update_respawn_timers",
+    "state.process_respawn_text",
+    "state.render_respawn_timer",
+    "Expected respawn in %02d:%02d",
     "Progress",
     "ReadProcessMemory",
     "guarded_read_bytes",
@@ -203,6 +212,18 @@ if ($queueCommands.Count -ne 1 -or
 
 if ($content -notmatch [regex]::Escape('filter:match("^[%w%s,_''%-]+$")')) {
     throw 'Filterscan values must remain restricted to safe local filter characters.'
+}
+
+if ($content -notmatch "GetHPPercent\(index\)" -or
+    $content -notmatch "tracker\.last_hp > 0" -or
+    $content -notmatch "clock - tracker\.targeted_at <= 15") {
+    throw 'Respawn timers must require an exact observed HP transition or a recent exact target before defeat text can start them.'
+}
+
+if ($content -notmatch "respawn_target_server_id = 17199434" -or
+    $content -notmatch "respawn_target_index = 0x14A" -or
+    $content -notmatch "respawn_seconds = 300") {
+    throw 'The Valkurm Emperor guide must track the verified 14A placeholder with a five-minute timer.'
 }
 if ($content -notmatch "tab_row_width \+ 3 \+ tab_group_width <= GUIDE_TEXT_WRAP_POS_X") {
     throw 'Guide tabs must wrap within the existing guide window width.'

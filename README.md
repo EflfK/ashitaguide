@@ -424,6 +424,24 @@ a **Filter Widescan** button. Clicking it runs `/filterscan <value>` locally;
 it does not select, target, claim, move toward, or attack any entity. Filterscan
 must be loaded separately, normally from Ashita's `scripts/default.txt`.
 
+Monster-hunt steps may also display a read-only respawn countdown:
+
+```lua
+respawn_target_index = 0x14A,
+respawn_target_server_id = 17199434,
+respawn_target_name = 'Damselfly',
+respawn_replacement_index = 0x14E,
+respawn_replacement_server_id = 17199438,
+respawn_replacement_name = 'Valkurm Emperor',
+respawn_seconds = 300,
+```
+
+The timer starts only after the configured entity is observed alive and then
+reaches zero HP, or when matching defeat text arrives within 15 seconds of the
+player targeting that exact entity index. Merely leaving render range never
+starts a timer. Countdown expirations are saved per character and survive an
+addon reload. This display does not target, claim, move toward, or attack.
+
 Set `advance_on_text` to a specific confirmation phrase to advance when that
 phrase appears in a new incoming chat event. Matching ignores case,
 punctuation, and repeated whitespace, so typographic quotation marks do not

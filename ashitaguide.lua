@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.26.9';
+addon.version = '0.27.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -214,6 +214,7 @@ local DEFAULT_SETTINGS = {
     default_active_guides = {},
     guide_steps = {},
     key_item_step_completions = {},
+    respawn_timer_expirations = {},
 };
 
 local JOB_NAMES = {
@@ -706,10 +707,32 @@ local function builtin_guides()
                     target_z = 2.776,
                     map_id = 0,
                     filter_scan = 'Valk, 14A',
+                    respawn_target_index = 0x14A,
+                    respawn_target_server_id = 17199434,
+                    respawn_target_name = 'Damselfly',
+                    respawn_replacement_index = 0x14E,
+                    respawn_replacement_server_id = 17199438,
+                    respawn_replacement_name = 'Valkurm Emperor',
+                    respawn_seconds = 300,
                 },
             },
         },
     };
+end
+
+state.copy_timestamp_map = function (values)
+    local output = {};
+    if (type(values) ~= 'table') then
+        return output;
+    end
+    for key, value in pairs(values) do
+        local timestamp = tonumber(value);
+        if (type(key) == 'string' and trim_string(key) ~= ''
+            and timestamp ~= nil and timestamp >= 0 and timestamp <= 0xFFFFFFFF) then
+            output[key] = math.floor(timestamp);
+        end
+    end
+    return output;
 end
 
 local function normalize_categories(source)
@@ -855,6 +878,44 @@ local function normalize_step(source, index)
             key_item_id = nil;
         end
     end
+    local respawn_target_index = tonumber(source.respawn_target_index or source.respawnTargetIndex);
+    if (respawn_target_index ~= nil) then
+        respawn_target_index = math.floor(respawn_target_index);
+        if (respawn_target_index < 1 or respawn_target_index > 0x8FF) then
+            respawn_target_index = nil;
+        end
+    end
+    local respawn_target_server_id = tonumber(
+        source.respawn_target_server_id or source.respawnTargetServerId);
+    if (respawn_target_server_id ~= nil) then
+        respawn_target_server_id = math.floor(respawn_target_server_id);
+        if (respawn_target_server_id < 1 or respawn_target_server_id > 0xFFFFFFFF) then
+            respawn_target_server_id = nil;
+        end
+    end
+    local respawn_replacement_index = tonumber(
+        source.respawn_replacement_index or source.respawnReplacementIndex);
+    if (respawn_replacement_index ~= nil) then
+        respawn_replacement_index = math.floor(respawn_replacement_index);
+        if (respawn_replacement_index < 1 or respawn_replacement_index > 0x8FF) then
+            respawn_replacement_index = nil;
+        end
+    end
+    local respawn_replacement_server_id = tonumber(
+        source.respawn_replacement_server_id or source.respawnReplacementServerId);
+    if (respawn_replacement_server_id ~= nil) then
+        respawn_replacement_server_id = math.floor(respawn_replacement_server_id);
+        if (respawn_replacement_server_id < 1 or respawn_replacement_server_id > 0xFFFFFFFF) then
+            respawn_replacement_server_id = nil;
+        end
+    end
+    local respawn_seconds = tonumber(source.respawn_seconds or source.respawnSeconds);
+    if (respawn_seconds ~= nil) then
+        respawn_seconds = math.floor(respawn_seconds);
+        if (respawn_seconds < 1 or respawn_seconds > 3600) then
+            respawn_seconds = nil;
+        end
+    end
 
     return {
         title = title,
@@ -874,6 +935,14 @@ local function normalize_step(source, index)
         travel_guide_label = trim_string(source.travel_guide_label or source.travelGuideLabel),
         filter_scan = state.normalize_filter_scan(
             source.filter_scan or source.filterScan or source.filterscan),
+        respawn_target_index = respawn_target_index,
+        respawn_target_server_id = respawn_target_server_id,
+        respawn_target_name = trim_string(source.respawn_target_name or source.respawnTargetName),
+        respawn_replacement_index = respawn_replacement_index,
+        respawn_replacement_server_id = respawn_replacement_server_id,
+        respawn_replacement_name = trim_string(
+            source.respawn_replacement_name or source.respawnReplacementName),
+        respawn_seconds = respawn_seconds,
         destinations = state.normalize_destinations(source.destinations or source.markers),
         key_item = trim_string(source.key_item or source.keyItem),
         key_item_id = key_item_id,
@@ -1220,6 +1289,8 @@ local function normalize_settings(source)
         guide_steps = copy_step_map(source.guide_steps or DEFAULT_SETTINGS.guide_steps),
         key_item_step_completions = copy_boolean_map(
             source.key_item_step_completions or DEFAULT_SETTINGS.key_item_step_completions),
+        respawn_timer_expirations = state.copy_timestamp_map(
+            source.respawn_timer_expirations or DEFAULT_SETTINGS.respawn_timer_expirations),
     };
 end
 
@@ -2389,6 +2460,35 @@ local function guide_storage_text(guides)
                     '                    filter_scan = %s,',
                     lua_quoted(step.filter_scan)));
             end
+            if (step.respawn_target_index ~= nil and step.respawn_seconds ~= nil) then
+                table.insert(lines, string.format(
+                    '                    respawn_target_index = %d,',
+                    step.respawn_target_index));
+                if (step.respawn_target_server_id ~= nil) then
+                    table.insert(lines, string.format(
+                        '                    respawn_target_server_id = %d,',
+                        step.respawn_target_server_id));
+                end
+                table.insert(lines, string.format(
+                    '                    respawn_target_name = %s,',
+                    lua_quoted(step.respawn_target_name)));
+                if (step.respawn_replacement_index ~= nil) then
+                    table.insert(lines, string.format(
+                        '                    respawn_replacement_index = %d,',
+                        step.respawn_replacement_index));
+                end
+                if (step.respawn_replacement_server_id ~= nil) then
+                    table.insert(lines, string.format(
+                        '                    respawn_replacement_server_id = %d,',
+                        step.respawn_replacement_server_id));
+                end
+                table.insert(lines, string.format(
+                    '                    respawn_replacement_name = %s,',
+                    lua_quoted(step.respawn_replacement_name)));
+                table.insert(lines, string.format(
+                    '                    respawn_seconds = %d,',
+                    step.respawn_seconds));
+            end
             if (type(step.destinations) == 'table' and #step.destinations > 0) then
                 table.insert(lines, '                    destinations = {');
                 for _, destination in ipairs(step.destinations) do
@@ -2717,6 +2817,21 @@ local function lua_boolean_map(values)
     return #pieces > 0 and ('{ ' .. table.concat(pieces, ', ') .. ' }') or '{}';
 end
 
+state.lua_timestamp_map = function (values)
+    local keys = {};
+    for key, value in pairs(type(values) == 'table' and values or {}) do
+        if (type(key) == 'string' and tonumber(value) ~= nil) then
+            table.insert(keys, key);
+        end
+    end
+    table.sort(keys);
+    local pieces = {};
+    for _, key in ipairs(keys) do
+        table.insert(pieces, string.format('[%q] = %d', key, math.floor(tonumber(values[key]))));
+    end
+    return #pieces > 0 and ('{ ' .. table.concat(pieces, ', ') .. ' }') or '{}';
+end
+
 local function settings_text()
     local values = state.settings;
     local lines = {
@@ -2766,6 +2881,9 @@ local function settings_text()
         string.format(
             '    key_item_step_completions = %s,',
             lua_boolean_map(values.key_item_step_completions)),
+        string.format(
+            '    respawn_timer_expirations = %s,',
+            state.lua_timestamp_map(values.respawn_timer_expirations)),
         '};',
         '',
     };
@@ -3260,6 +3378,9 @@ local function process_observed_text(text, source, mode, alternate_mode)
 
     local handled = process_casket_text(cleaned, source, mode, alternate_mode);
     if (source == 'text') then
+        handled = state.process_respawn_text ~= nil
+            and state.process_respawn_text(cleaned)
+            or handled;
         local run = state.active[state.selected_active_key];
         local step = run ~= nil and run.guide.steps[run.step_index] or nil;
         local trigger = step ~= nil and trim_string(step.advance_on_text) or '';
@@ -4208,6 +4329,144 @@ local function current_target_index()
     return sub_active and sub or primary;
 end
 
+state.respawn_timer_token = function (run, step_index, step)
+    local character = lower_string(state.current_character_name() or 'unknown');
+    return string.format(
+        '%s|%s|%d|%d',
+        character,
+        run.key,
+        step_index,
+        tonumber(step.respawn_target_index) or 0);
+end
+
+state.start_respawn_timer = function (run, step_index, step, tracker, reason)
+    local now = os.time();
+    if (tracker.last_death_at ~= nil and now - tracker.last_death_at <= 2) then
+        return;
+    end
+    local token = state.respawn_timer_token(run, step_index, step);
+    local seconds = tonumber(step.respawn_seconds) or 0;
+    if (seconds <= 0) then
+        return;
+    end
+    tracker.last_death_at = now;
+    tracker.last_start_reason = reason;
+    tracker.observed_alive = false;
+    tracker.last_hp = 0;
+    state.settings.respawn_timer_expirations[token] = now + seconds;
+    log_info(string.format(
+        '%s defeated; expected respawn timer started for %d:%02d.',
+        step.respawn_target_name ~= '' and step.respawn_target_name or 'Placeholder',
+        math.floor(seconds / 60),
+        seconds % 60));
+end
+
+state.respawn_entity_snapshot = function (entity, index, expected_server_id, expected_name)
+    if (entity == nil or index == nil) then
+        return nil;
+    end
+    local name = clean_message(safe_read(function () return entity:GetName(index); end, ''));
+    local server_id = tonumber(safe_read(function () return entity:GetServerId(index); end, 0)) or 0;
+    if (name == '' or server_id == 0) then
+        return nil;
+    end
+    if (expected_server_id ~= nil and server_id ~= expected_server_id) then
+        return nil;
+    end
+    if (expected_name ~= '' and name:lower() ~= expected_name:lower()) then
+        return nil;
+    end
+    return {
+        name = name,
+        server_id = server_id,
+        hp = tonumber(safe_read(function () return entity:GetHPPercent(index); end, nil)),
+    };
+end
+
+state.update_respawn_timers = function ()
+    local clock = os.clock();
+    if (clock - (state.respawn_last_poll or 0) < 0.10) then
+        return;
+    end
+    state.respawn_last_poll = clock;
+    local memory = safe_read(function () return AshitaCore:GetMemoryManager(); end, nil);
+    local entity = memory ~= nil and safe_read(function () return memory:GetEntity(); end, nil) or nil;
+    local target_index = current_target_index();
+    local zone = lower_string(state.current_zone_name() or '');
+
+    for _, key in ipairs(state.active_order) do
+        local run = state.active[key];
+        local step_index = run ~= nil and run.step_index or 0;
+        local step = run ~= nil and run.guide.steps[step_index] or nil;
+        if (step ~= nil and step.respawn_target_index ~= nil and step.respawn_seconds ~= nil
+            and (step.zone == '' or lower_string(step.zone) == zone)) then
+            run.respawn_trackers = run.respawn_trackers or {};
+            local tracker = run.respawn_trackers[step_index] or {};
+            run.respawn_trackers[step_index] = tracker;
+            tracker.target_visible = false;
+            tracker.replacement_visible = false;
+
+            local target = state.respawn_entity_snapshot(
+                entity,
+                step.respawn_target_index,
+                step.respawn_target_server_id,
+                step.respawn_target_name);
+            if (target ~= nil) then
+                tracker.target_visible = target.hp ~= nil and target.hp > 0;
+                tracker.last_seen_at = clock;
+                if (target_index == step.respawn_target_index) then
+                    tracker.targeted_at = clock;
+                end
+                if (target.hp ~= nil and target.hp <= 0
+                    and tracker.observed_alive == true
+                    and tracker.last_hp ~= nil and tracker.last_hp > 0) then
+                    state.start_respawn_timer(run, step_index, step, tracker, 'hp');
+                elseif (target.hp ~= nil and target.hp > 0) then
+                    tracker.observed_alive = true;
+                end
+                tracker.last_hp = target.hp;
+            end
+
+            local replacement = state.respawn_entity_snapshot(
+                entity,
+                step.respawn_replacement_index,
+                step.respawn_replacement_server_id,
+                step.respawn_replacement_name);
+            if (replacement ~= nil and replacement.hp ~= nil and replacement.hp > 0) then
+                tracker.replacement_visible = true;
+                tracker.replacement_seen_at = clock;
+            end
+        end
+    end
+end
+
+state.process_respawn_text = function (text)
+    local defeated_name = clean_message(text):match('defeats the ([^%.]+)%.')
+        or clean_message(text):match('^The (.-) falls to the ground%.$');
+    if (defeated_name == nil) then
+        return false;
+    end
+    local clock = os.clock();
+    for _, key in ipairs(state.active_order) do
+        local run = state.active[key];
+        local step_index = run ~= nil and run.step_index or 0;
+        local step = run ~= nil and run.guide.steps[step_index] or nil;
+        local tracker = run ~= nil and run.respawn_trackers ~= nil
+            and run.respawn_trackers[step_index] or nil;
+        if (step ~= nil and tracker ~= nil
+            and step.respawn_target_index ~= nil
+            and step.respawn_target_name ~= ''
+            and defeated_name:lower() == step.respawn_target_name:lower()
+            and tracker.observed_alive == true
+            and tracker.targeted_at ~= nil
+            and clock - tracker.targeted_at <= 15) then
+            state.start_respawn_timer(run, step_index, step, tracker, 'defeat text');
+            return true;
+        end
+    end
+    return false;
+end
+
 local function update_npc_step_auto_advance()
     local run = state.active[state.selected_active_key];
     if (run == nil) then
@@ -5108,6 +5367,52 @@ state.render_filter_scan_button = function (step, run)
     imgui.PopStyleColor(4);
 end
 
+state.render_respawn_timer = function (step, run)
+    if (step.respawn_target_index == nil or step.respawn_seconds == nil) then
+        return;
+    end
+    local tracker = run.respawn_trackers ~= nil and run.respawn_trackers[run.step_index] or nil;
+    local token = state.respawn_timer_token(run, run.step_index, step);
+    local expiration = tonumber(state.settings.respawn_timer_expirations[token]);
+    local target_label = step.respawn_target_name ~= ''
+        and step.respawn_target_name
+        or string.format('target %03X', step.respawn_target_index);
+
+    if (tracker ~= nil and tracker.replacement_visible == true) then
+        text_colored_wrapped(
+            COLORS.accent,
+            (step.respawn_replacement_name ~= ''
+                and step.respawn_replacement_name
+                or 'Replacement NM') .. ' detected nearby.');
+        return;
+    end
+
+    if (expiration == nil or expiration <= 0) then
+        if (tracker ~= nil and tracker.target_visible == true) then
+            text_colored_wrapped(COLORS.accent, target_label .. ' is currently up.');
+        else
+            text_colored_wrapped(
+                COLORS.muted,
+                'Respawn timer: waiting for a confirmed ' .. target_label .. ' defeat.');
+        end
+        return;
+    end
+
+    local remaining = math.max(0, math.ceil(expiration - os.time()));
+    if (remaining > 0) then
+        text_colored_wrapped(
+            COLORS.warning,
+            string.format(
+                'Expected respawn in %02d:%02d',
+                math.floor(remaining / 60),
+                remaining % 60));
+    elseif (tracker ~= nil and tracker.target_visible == true) then
+        text_colored_wrapped(COLORS.accent, target_label .. ' is up again.');
+    else
+        text_colored_wrapped(COLORS.accent, 'Respawn due - use Widescan now.');
+    end
+end
+
 local function render_active_guide(run)
     if (run == nil) then
         imgui.TextColored(COLORS.muted, 'No active guide selected.');
@@ -5136,6 +5441,7 @@ local function render_active_guide(run)
     end
     text_wrapped(step.text);
     state.render_filter_scan_button(step, run);
+    state.render_respawn_timer(step, run);
     local navigation = navigation_context(step);
     render_destination_strip(step, navigation);
     render_step_fields(step);
@@ -5930,6 +6236,7 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     poll_chat_log();
     poll_ai_guides_file();
     poll_auction_sale_guide_file();
+    state.update_respawn_timers();
     update_npc_step_auto_advance();
     update_level_step_auto_advance();
     update_key_item_step_completion();
