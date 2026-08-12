@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.29.1';
+addon.version = '0.30.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -4443,6 +4443,30 @@ state.DUNES_NM_HUNTS = {
     },
 };
 
+state.SOUTH_GUSTABERG_NM_HUNTS = {
+    {
+        name = 'Leaping Lizzy', level = '10-11', mob_id = 17215868,
+        zone_id = 107, zone_name = 'South Gustaberg', icon = 'lizard',
+        spawn_type = 'Lottery/random start', placeholder_count = 2,
+        details = 'Two independent Rock Lizard PHs: 17B lowland and 18F northwest upland. Lizzy has no meaningful post-kill lockout.',
+        official_url = 'https://catseyexi.com/mob/17215868',
+        filter_scan = 'Lizzy, 17B, 18F',
+        timers = {
+            { kind = 'ph17b', label = 'PH 17B', button = '17B +5:30', seconds = 330 },
+            { kind = 'ph18f', label = 'PH 18F', button = '18F +5:30', seconds = 330 },
+        },
+        markers = {
+            { x = -275.441, y = -347.294, z = 20.451, style = 'lizard' },
+            { x = -322.871, y = -401.184, z = 30.052, style = 'lizard' },
+        },
+    },
+};
+
+state.NM_HUNTS_BY_ZONE = {
+    [103] = state.DUNES_NM_HUNTS,
+    [107] = state.SOUTH_GUSTABERG_NM_HUNTS,
+};
+
 state.nm_hunt_timer_token = function (hunt, kind)
     if (tonumber(hunt.mob_id) == 17199438 and kind == 'ph') then
         return string.format(
@@ -4450,8 +4474,9 @@ state.nm_hunt_timer_token = function (hunt, kind)
             lower_string(state.current_character_name() or 'unknown'));
     end
     return string.format(
-        '%s|nmhunt|103|%d|%s',
+        '%s|nmhunt|%d|%d|%s',
         lower_string(state.current_character_name() or 'unknown'),
+        tonumber(hunt.zone_id) or 103,
         tonumber(hunt.mob_id) or 0,
         tostring(kind or ''));
 end
@@ -4470,9 +4495,10 @@ state.respawn_timer_token = function (run, step_index, step)
 end
 
 state.start_nm_hunt_timer = function (hunt, kind)
-    local seconds = kind == 'ph'
-        and tonumber(hunt.placeholder_seconds)
-        or tonumber(hunt.nm_seconds);
+    local seconds = kind == 'ph' and tonumber(hunt.placeholder_seconds) or tonumber(hunt.nm_seconds);
+    for _, timer in ipairs(hunt.timers or {}) do
+        if (timer.kind == kind) then seconds = tonumber(timer.seconds); end
+    end
     if (seconds == nil or seconds <= 0) then
         return;
     end
@@ -4493,8 +4519,11 @@ end
 
 state.update_nm_hunt_alarms = function ()
     local now = os.time();
-    for _, hunt in ipairs(state.DUNES_NM_HUNTS) do
-        for _, kind in ipairs({ 'ph', 'nm' }) do
+    for _, catalog in pairs(state.NM_HUNTS_BY_ZONE) do
+    for _, hunt in ipairs(catalog) do
+        local kinds = { 'ph', 'nm' };
+        for _, timer in ipairs(hunt.timers or {}) do kinds[#kinds + 1] = timer.kind; end
+        for _, kind in ipairs(kinds) do
             local token = state.nm_hunt_timer_token(hunt, kind);
             local expiration = tonumber(state.settings.respawn_timer_expirations[token]);
             if (expiration ~= nil and expiration > now) then
@@ -4511,6 +4540,7 @@ state.update_nm_hunt_alarms = function ()
                 end
             end
         end
+    end
     end
 end
 
@@ -4865,19 +4895,30 @@ end
 
 state.nm_hunt_handoff = function ()
     local player = current_navigation_player();
-    if (player == nil or player.zone_id ~= 103) then
+    local catalog = player ~= nil and state.NM_HUNTS_BY_ZONE[player.zone_id] or nil;
+    if (catalog == nil) then
         return nil;
     end
     local hidden = {};
-    for _, hunt in ipairs(state.DUNES_NM_HUNTS) do
+    for _, hunt in ipairs(catalog) do
         if (state.settings.nm_hunt_hidden[hunt.name] == true) then
             hidden[#hidden + 1] = hunt.name;
         end
     end
+    local selected = nil;
+    for _, hunt in ipairs(catalog) do
+        if (hunt.name == state.settings.nm_hunt_selected) then selected = hunt; end
+    end
+    selected = selected or catalog[1];
     return {
-        zone_id = 103,
+        zone_id = player.zone_id,
         visible = state.settings.nm_hunt_show_all == true,
         hidden = hidden,
+        markers = selected ~= nil
+            and state.settings.nm_hunt_show_all == true
+            and state.settings.nm_hunt_hidden[selected.name] ~= true
+            and selected.markers
+            or {},
     };
 end
 
@@ -4949,6 +4990,10 @@ state.publish_ashitaminimap_markers = function (force_clear)
         for _, name in ipairs(nm_hunt.hidden) do
             token_parts[#token_parts + 1] = name;
         end
+        for _, marker in ipairs(nm_hunt.markers or {}) do
+            token_parts[#token_parts + 1] = string.format(
+                'hunt:%.3f:%.3f:%s', marker.x, marker.y, tostring(marker.style or ''));
+        end
     end
     for _, marker in ipairs(markers) do
         token_parts[#token_parts + 1] = string.format(
@@ -5012,6 +5057,16 @@ state.publish_ashitaminimap_markers = function (force_clear)
         lines[#lines + 1] = '        hidden = {';
         for _, name in ipairs(nm_hunt.hidden) do
             lines[#lines + 1] = string.format('            [%q] = true,', name);
+        end
+        lines[#lines + 1] = '        },';
+        lines[#lines + 1] = '        markers = {';
+        for _, marker in ipairs(nm_hunt.markers or {}) do
+            lines[#lines + 1] = string.format(
+                '            { x = %.6f, y = %.6f, z = %s, style = %q },',
+                marker.x,
+                marker.y,
+                marker.z ~= nil and string.format('%.6f', marker.z) or 'nil',
+                marker.style or '');
         end
         lines[#lines + 1] = '        },';
         lines[#lines + 1] = '    },';
@@ -6138,6 +6193,13 @@ state.draw_nm_hunt_icon = function (draw_list, kind, x, y)
         for offset = -4, 4, 2 do
             draw_list:AddLine({ x + offset, y + 1 }, { x + offset - 1, y + 7 }, wing, 1.4);
         end
+    elseif (kind == 'lizard') then
+        draw_list:AddCircleFilled({ x - 1, y }, 4.2, body, 14);
+        draw_list:AddCircleFilled({ x + 4, y - 2 }, 2.6, body, 12);
+        draw_list:AddLine({ x - 4, y + 1 }, { x - 9, y + 5 }, wing, 2.0);
+        draw_list:AddLine({ x - 2, y + 3 }, { x - 5, y + 7 }, body, 1.5);
+        draw_list:AddLine({ x + 1, y + 3 }, { x + 5, y + 6 }, body, 1.5);
+        draw_list:AddCircleFilled({ x + 5, y - 3 }, 0.8, outline, 6);
     else
         draw_list:AddCircleFilled({ x, y }, 6.0, body, 16);
         draw_list:AddTriangleFilled({ x - 4, y - 4 }, { x - 8, y - 8 }, { x - 1, y - 6 }, wing);
@@ -6145,11 +6207,11 @@ state.draw_nm_hunt_icon = function (draw_list, kind, x, y)
     end
 end
 
-state.nm_hunt_by_name = function (name)
-    for _, hunt in ipairs(state.DUNES_NM_HUNTS) do
+state.nm_hunt_by_name = function (catalog, name)
+    for _, hunt in ipairs(catalog or {}) do
         if (hunt.name == name) then return hunt; end
     end
-    return state.DUNES_NM_HUNTS[3];
+    return type(catalog) == 'table' and catalog[1] or nil;
 end
 
 state.render_nm_hunt_timer_line = function (hunt, kind, label)
@@ -6181,7 +6243,8 @@ end
 state.render_nm_hunt_window = function ()
     local player = current_navigation_player();
     local minimap = state.load_ashitaminimap_window_settings();
-    if (player == nil or player.zone_id ~= 103 or minimap == nil or minimap.visible ~= true) then
+    local catalog = player ~= nil and state.NM_HUNTS_BY_ZONE[player.zone_id] or nil;
+    if (catalog == nil or minimap == nil or minimap.visible ~= true) then
         return;
     end
     local open = state.settings.nm_hunt_drawer_open == true;
@@ -6213,7 +6276,7 @@ state.render_nm_hunt_window = function ()
                 state.settings.nm_hunt_drawer_open = false;
             end
             imgui.Separator();
-            imgui.TextColored(COLORS.muted, 'VALKURM DUNES');
+            imgui.TextColored(COLORS.muted, string.upper(player.zone));
             imgui.SameLine();
             local alarm = T{ state.settings.nm_hunt_alarm == true };
             if (imgui.Checkbox('Alarm##nm_hunt_alarm', alarm)) then
@@ -6226,7 +6289,7 @@ state.render_nm_hunt_window = function ()
             end
 
             state.nm_hunt.hovered_name = nil;
-            for _, hunt in ipairs(state.DUNES_NM_HUNTS) do
+            for _, hunt in ipairs(catalog) do
                 local shown = state.settings.nm_hunt_hidden[hunt.name] ~= true;
                 local shown_ref = T{ shown };
                 if (imgui.Checkbox('##nm_hunt_show_' .. tostring(hunt.mob_id), shown_ref)) then
@@ -6254,7 +6317,7 @@ state.render_nm_hunt_window = function ()
             end
 
             local hunt = state.nm_hunt_by_name(
-                state.nm_hunt.hovered_name or state.settings.nm_hunt_selected);
+                catalog, state.nm_hunt.hovered_name or state.settings.nm_hunt_selected);
             imgui.Separator();
             local icon_x, icon_y = imgui.GetCursorScreenPos();
             imgui.Dummy({ 22, 21 });
@@ -6274,20 +6337,34 @@ state.render_nm_hunt_window = function ()
                     tonumber(hunt.placeholder_count) or 0));
             text_colored_wrapped(COLORS.muted, hunt.details);
             if (hunt.filter_scan ~= nil) then
-                if (imgui.SmallButton('Scan 14A##nm_hunt_scan_' .. tostring(hunt.mob_id))) then
+                local scan_label = player.zone_id == 107 and 'Scan Lizzy PHs' or 'Scan 14A';
+                if (imgui.SmallButton(scan_label .. '##nm_hunt_scan_' .. tostring(hunt.mob_id))) then
                     AshitaCore:GetChatManager():QueueCommand(-1, '/filterscan ' .. hunt.filter_scan);
                 end
-                imgui.SameLine();
-                if (imgui.SmallButton('PH +5m##nm_hunt_ph_' .. tostring(hunt.mob_id))) then
-                    state.start_nm_hunt_timer(hunt, 'ph');
+                if (#(hunt.timers or {}) > 0) then
+                    for _, timer in ipairs(hunt.timers) do
+                        imgui.SameLine();
+                        if (imgui.SmallButton(timer.button .. '##nm_hunt_' .. timer.kind)) then
+                            state.start_nm_hunt_timer(hunt, timer.kind);
+                        end
+                    end
+                    imgui.Separator();
+                    for _, timer in ipairs(hunt.timers) do
+                        state.render_nm_hunt_timer_line(hunt, timer.kind, timer.label);
+                    end
+                else
+                    imgui.SameLine();
+                    if (imgui.SmallButton('PH +5m##nm_hunt_ph_' .. tostring(hunt.mob_id))) then
+                        state.start_nm_hunt_timer(hunt, 'ph');
+                    end
+                    imgui.SameLine();
+                    if (imgui.SmallButton('NM +60m##nm_hunt_nm_' .. tostring(hunt.mob_id))) then
+                        state.start_nm_hunt_timer(hunt, 'nm');
+                    end
+                    imgui.Separator();
+                    state.render_nm_hunt_timer_line(hunt, 'ph', 'PH');
+                    state.render_nm_hunt_timer_line(hunt, 'nm', 'NM');
                 end
-                imgui.SameLine();
-                if (imgui.SmallButton('NM +60m##nm_hunt_nm_' .. tostring(hunt.mob_id))) then
-                    state.start_nm_hunt_timer(hunt, 'nm');
-                end
-                imgui.Separator();
-                state.render_nm_hunt_timer_line(hunt, 'ph', 'PH');
-                state.render_nm_hunt_timer_line(hunt, 'nm', 'NM');
             end
         else
             imgui.SetCursorPosX(11);

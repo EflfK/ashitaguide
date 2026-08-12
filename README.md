@@ -428,6 +428,13 @@ by that NM. Valkurm Emperor includes Filterscan, manual five-minute PH and
 and an optional system alarm when either countdown reaches zero. The existing
 exact-14A defeat detection and the manual PH button share the same countdown.
 
+South Gustaberg uses the same drawer for Leaping Lizzy alone. Its two exact
+Rock Lizard placeholders (`17B` lowland and `18F` northwest upland) receive
+separate lizard map markers and independent 5:30 manual countdowns. The
+Filterscan action includes Lizzy and both PH indices. CatsEyeXI's current
+server script has no meaningful post-kill Lizzy lockout, so the drawer does
+not claim a separate NM cooldown.
+
 Set `advance_on_target = true` on find/select steps to advance once the player
 selects that NPC. Leave it false or omit it on talk/interact steps so keeping
 the NPC selected does not skip later instructions. NPC destinations remain on
