@@ -692,12 +692,12 @@ local function builtin_guides()
             key = 'valkurm_emperor_hunt',
             name = 'Valkurm Emperor Hunt',
             type = 'manual',
-            description = 'Repeatable manual circuit for the Valkurm Emperor lottery camp. CatsEyeXI uses one true Damselfly placeholder, ID 17199434 (16A).',
+            description = 'Repeatable manual circuit for the Valkurm Emperor lottery camp. CatsEyeXI uses one true Damselfly placeholder, server ID 17199434 (target index 14A).',
             categories = { 'Built-in', 'Hunt', 'NM', 'Repeatable', 'Valkurm Dunes' },
             steps = {
                 {
                     title = 'Sweep the Emperor camp',
-                    text = 'Click Filter Widescan, then run markers 1 -> 2 -> 3 -> 4 -> 1. Kill Damselfly ID 16A when it appears; if Valkurm Emperor replaces it, claim and defeat the NM, then keep this guide open for the next circuit.',
+                    text = 'Click Filter Widescan, then run markers 1 -> 2 -> 3 -> 4 -> 1. Kill Damselfly target index 14A when it appears; if Valkurm Emperor replaces it, claim and defeat the NM, then keep this guide open for the next circuit.',
                     zone = 'Valkurm Dunes',
                     location = 'D-8 to F-8',
                     note = 'Only marker 1 is the true placeholder anchor; MiniMap routes this circuit, but Valkurm Dunes stock-map calibration remains partial.',
@@ -705,7 +705,7 @@ local function builtin_guides()
                     target_y = -101.226,
                     target_z = 2.776,
                     map_id = 0,
-                    filter_scan = 'Valk, 16A',
+                    filter_scan = 'Valk, 14A',
                     destinations = {
                         {
                             label = 'Damselfly anchor 2',

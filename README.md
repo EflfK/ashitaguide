@@ -207,7 +207,7 @@ return {
                             map_id = 15,
                         },
                     },
-                    filter_scan = 'Valk, 16A',
+                    filter_scan = 'Valk, 14A',
                     advance_on_target = false,
                 },
             },
@@ -418,7 +418,7 @@ the NPC selected does not skip later instructions. NPC destinations remain on
 the guide navigation map and Minimap overlay; AshitaGuide intentionally does
 not draw world-space markers over NPC models.
 
-Set `filter_scan` to a comma-separated Filterscan value such as `Valk, 16A` on
+Set `filter_scan` to a comma-separated Filterscan value such as `Valk, 14A` on
 a step that hunts a specific monster. AshitaGuide validates the value and shows
 a **Filter Widescan** button. Clicking it runs `/filterscan <value>` locally;
 it does not select, target, claim, move toward, or attack any entity. Filterscan

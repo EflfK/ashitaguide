@@ -97,7 +97,7 @@ public static partial class TemporaryGuideStorage
                         MarkerLabel = "H8",
                         TravelGuideKey = "travel_to_lower_jeuno",
                         TravelGuideLabel = "Walk to Lower Jeuno",
-                        FilterScan = "Valk, 16A",
+                        FilterScan = "Valk, 14A",
                         Destinations = new[]
                         {
                             new TemporaryGuideDestinationInput
@@ -151,7 +151,7 @@ public static partial class TemporaryGuideStorage
                 || !firstContents.Contains("marker_label = \"H8\"", StringComparison.Ordinal)
                 || !firstContents.Contains("travel_guide_key = \"travel_to_lower_jeuno\"", StringComparison.Ordinal)
                 || !firstContents.Contains("travel_guide_label = \"Walk to Lower Jeuno\"", StringComparison.Ordinal)
-                || !firstContents.Contains("filter_scan = \"Valk, 16A\"", StringComparison.Ordinal)
+                || !firstContents.Contains("filter_scan = \"Valk, 14A\"", StringComparison.Ordinal)
                 || !firstContents.Contains("label = \"Alternate\"", StringComparison.Ordinal)
                 || !firstContents.Contains("target_x = -40.25", StringComparison.Ordinal)
                 || !firstContents.Contains("key_item = \"Exoray mold crumb\"", StringComparison.Ordinal)

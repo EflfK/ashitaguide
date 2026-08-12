@@ -64,7 +64,7 @@ public sealed class TemporaryGuideStepInput
     [Description("Optional short button label for travelGuideKey, such as Walk to San d'Oria.")]
     public string? TravelGuideLabel { get; init; }
 
-    [Description("Optional comma-separated Filterscan value for a player-clicked local Filter Widescan button, such as Valk, 16A. This never targets or claims a monster.")]
+    [Description("Optional comma-separated Filterscan value for a player-clicked local Filter Widescan button, such as Valk, 14A. This never targets or claims a monster.")]
     public string? FilterScan { get; init; }
 
     [Description("Optional additional destinations rendered together on the guide map and Minimap. Use this for one-step guides that need several simultaneous markers.")]
