@@ -124,6 +124,10 @@ $required = @(
     "target_x",
     "state.normalize_destinations",
     "step.destinations",
+    "filter_scan",
+    "state.normalize_filter_scan",
+    "state.render_filter_scan_button",
+    "Filter Widescan:",
     "Progress",
     "ReadProcessMemory",
     "guarded_read_bytes",
@@ -153,7 +157,6 @@ foreach ($needle in $required) {
 }
 
 $blocked = @(
-    'QueueCommand',
     'InjectPacket',
     'SendPacket',
     'SetTarget',
@@ -190,6 +193,16 @@ if ($content -match 'render_npc_world_marker|world_to_screen|ashitaguide_npc_wor
 
 if ($content -notmatch "for _, key in ipairs\(close_keys\) do\s+close_guide_tab\(key\)") {
     throw 'Guide tab close controls do not use the lifecycle-aware close handler.'
+}
+
+$queueCommands = [regex]::Matches($content, 'QueueCommand')
+if ($queueCommands.Count -ne 1 -or
+    $content -notmatch "QueueCommand\(-1, '/filterscan ' \.\. step\.filter_scan\)") {
+    throw 'Only the attended local Filterscan button may queue a command.'
+}
+
+if ($content -notmatch [regex]::Escape('filter:match("^[%w%s,_''%-]+$")')) {
+    throw 'Filterscan values must remain restricted to safe local filter characters.'
 }
 if ($content -notmatch "tab_row_width \+ 3 \+ tab_group_width <= GUIDE_TEXT_WRAP_POS_X") {
     throw 'Guide tabs must wrap within the existing guide window width.'

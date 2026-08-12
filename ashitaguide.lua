@@ -688,6 +688,50 @@ local function builtin_guides()
                 },
             },
         },
+        {
+            key = 'valkurm_emperor_hunt',
+            name = 'Valkurm Emperor Hunt',
+            type = 'manual',
+            description = 'Repeatable manual circuit for the Valkurm Emperor lottery camp. CatsEyeXI uses one true Damselfly placeholder, ID 17199434 (16A).',
+            categories = { 'Built-in', 'Hunt', 'NM', 'Repeatable', 'Valkurm Dunes' },
+            steps = {
+                {
+                    title = 'Sweep the Emperor camp',
+                    text = 'Click Filter Widescan, then run markers 1 -> 2 -> 3 -> 4 -> 1. Kill Damselfly ID 16A when it appears; if Valkurm Emperor replaces it, claim and defeat the NM, then keep this guide open for the next circuit.',
+                    zone = 'Valkurm Dunes',
+                    location = 'D-8 to F-8',
+                    note = 'Only marker 1 is the true placeholder anchor; MiniMap routes this circuit, but Valkurm Dunes stock-map calibration remains partial.',
+                    target_x = -228.957,
+                    target_y = -101.226,
+                    target_z = 2.776,
+                    map_id = 0,
+                    filter_scan = 'Valk, 16A',
+                    destinations = {
+                        {
+                            label = 'Damselfly anchor 2',
+                            target_x = -264.829,
+                            target_y = -91.306,
+                            target_z = -0.843,
+                            map_id = 0,
+                        },
+                        {
+                            label = 'Damselfly anchor 3',
+                            target_x = -327.000,
+                            target_y = -21.000,
+                            target_z = -1.000,
+                            map_id = 0,
+                        },
+                        {
+                            label = 'Damselfly anchor 4',
+                            target_x = -270.823,
+                            target_y = -16.349,
+                            target_z = -2.168,
+                            map_id = 0,
+                        },
+                    },
+                },
+            },
+        },
     };
 end
 
@@ -785,6 +829,25 @@ state.normalize_destinations = function (source)
     return output;
 end
 
+state.normalize_filter_scan = function (value)
+    local filter = trim_string(value);
+    if (filter == '' or #filter > 128) then
+        return '';
+    end
+    if (filter:match("^[%w%s,_'%-]+$") == nil) then
+        return '';
+    end
+
+    local tokens = {};
+    for token in filter:gmatch('[^,]+') do
+        token = trim_string(token);
+        if (token ~= '') then
+            table.insert(tokens, token);
+        end
+    end
+    return table.concat(tokens, ', ');
+end
+
 local function normalize_step(source, index)
     if (type(source) == 'string') then
         source = { text = source };
@@ -832,6 +895,8 @@ local function normalize_step(source, index)
         marker_label = trim_string(source.marker_label or source.markerLabel),
         travel_guide_key = trim_string(source.travel_guide_key or source.travelGuideKey),
         travel_guide_label = trim_string(source.travel_guide_label or source.travelGuideLabel),
+        filter_scan = state.normalize_filter_scan(
+            source.filter_scan or source.filterScan or source.filterscan),
         destinations = state.normalize_destinations(source.destinations or source.markers),
         key_item = trim_string(source.key_item or source.keyItem),
         key_item_id = key_item_id,
@@ -2341,6 +2406,11 @@ local function guide_storage_text(guides)
                 table.insert(lines, string.format(
                     '                    travel_guide_label = %s,',
                     lua_quoted(step.travel_guide_label)));
+            end
+            if (step.filter_scan ~= '') then
+                table.insert(lines, string.format(
+                    '                    filter_scan = %s,',
+                    lua_quoted(step.filter_scan)));
             end
             if (type(step.destinations) == 'table' and #step.destinations > 0) then
                 table.insert(lines, '                    destinations = {');
@@ -5043,6 +5113,24 @@ state.render_travel_guide_link = function (step, run)
         'Optional first-visit route. Use > above if you already know the way.');
 end
 
+state.render_filter_scan_button = function (step, run)
+    if (step.filter_scan == '') then
+        return;
+    end
+
+    imgui.PushStyleColor(IMGUI.col_button, { 0.13, 0.38, 0.48, 0.96 });
+    imgui.PushStyleColor(IMGUI.col_button_hovered, { 0.18, 0.53, 0.66, 1.00 });
+    imgui.PushStyleColor(IMGUI.col_button_active, { 0.24, 0.63, 0.76, 1.00 });
+    imgui.PushStyleColor(IMGUI.col_text, COLORS.header);
+    if (imgui.Button(
+        'Filter Widescan: ' .. step.filter_scan
+            .. '##ashitaguide_filterscan_' .. run.key .. '_' .. tostring(run.step_index),
+        { -1, 0 })) then
+        AshitaCore:GetChatManager():QueueCommand(-1, '/filterscan ' .. step.filter_scan);
+    end
+    imgui.PopStyleColor(4);
+end
+
 local function render_active_guide(run)
     if (run == nil) then
         imgui.TextColored(COLORS.muted, 'No active guide selected.');
@@ -5070,6 +5158,7 @@ local function render_active_guide(run)
         text_colored_wrapped(COLORS.accent, 'DONE - click > to continue.');
     end
     text_wrapped(step.text);
+    state.render_filter_scan_button(step, run);
     local navigation = navigation_context(step);
     render_destination_strip(step, navigation);
     render_step_fields(step);

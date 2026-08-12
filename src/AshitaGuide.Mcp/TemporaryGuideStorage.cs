@@ -97,6 +97,7 @@ public static partial class TemporaryGuideStorage
                         MarkerLabel = "H8",
                         TravelGuideKey = "travel_to_lower_jeuno",
                         TravelGuideLabel = "Walk to Lower Jeuno",
+                        FilterScan = "Valk, 16A",
                         Destinations = new[]
                         {
                             new TemporaryGuideDestinationInput
@@ -150,6 +151,7 @@ public static partial class TemporaryGuideStorage
                 || !firstContents.Contains("marker_label = \"H8\"", StringComparison.Ordinal)
                 || !firstContents.Contains("travel_guide_key = \"travel_to_lower_jeuno\"", StringComparison.Ordinal)
                 || !firstContents.Contains("travel_guide_label = \"Walk to Lower Jeuno\"", StringComparison.Ordinal)
+                || !firstContents.Contains("filter_scan = \"Valk, 16A\"", StringComparison.Ordinal)
                 || !firstContents.Contains("label = \"Alternate\"", StringComparison.Ordinal)
                 || !firstContents.Contains("target_x = -40.25", StringComparison.Ordinal)
                 || !firstContents.Contains("key_item = \"Exoray mold crumb\"", StringComparison.Ordinal)
@@ -169,6 +171,27 @@ public static partial class TemporaryGuideStorage
                     Steps = new[] { new TemporaryGuideStepInput { Text = "Invalid.", TargetX = 1 } },
                 });
                 throw new InvalidOperationException("Invalid coordinate validation self-test failed.");
+            }
+            catch (ArgumentException)
+            {
+            }
+
+            try
+            {
+                Publish(new TemporaryGuideInput
+                {
+                    Key = "invalid_filterscan",
+                    Name = "Invalid Filterscan",
+                    Steps = new[]
+                    {
+                        new TemporaryGuideStepInput
+                        {
+                            Text = "Invalid.",
+                            FilterScan = "Valk; /attack",
+                        },
+                    },
+                });
+                throw new InvalidOperationException("Invalid Filterscan validation self-test failed.");
             }
             catch (ArgumentException)
             {
@@ -266,6 +289,15 @@ public static partial class TemporaryGuideStorage
             throw new ArgumentException(
                 $"guide.steps[{index}].travelGuideKey must use lowercase letters, numbers, underscores, or hyphens.");
         }
+        var filterScan = CleanOptionalText(
+            input.FilterScan,
+            128,
+            $"guide.steps[{index}].filterScan");
+        if (filterScan.Length > 0 && !FilterScanPattern().IsMatch(filterScan))
+        {
+            throw new ArgumentException(
+                $"guide.steps[{index}].filterScan contains unsupported characters.");
+        }
 
         return new StoredStep(
             CleanOptionalText(input.Title, 128, $"guide.steps[{index}].title"),
@@ -282,6 +314,7 @@ public static partial class TemporaryGuideStorage
             CleanOptionalText(input.MarkerLabel, 24, $"guide.steps[{index}].markerLabel"),
             travelGuideKey,
             CleanOptionalText(input.TravelGuideLabel, 96, $"guide.steps[{index}].travelGuideLabel"),
+            filterScan,
             destinations,
             CleanOptionalText(input.KeyItem, 128, $"guide.steps[{index}].keyItem"),
             input.KeyItemId,
@@ -379,6 +412,7 @@ public static partial class TemporaryGuideStorage
             value.GetString("marker_label") ?? string.Empty,
             value.GetString("travel_guide_key") ?? string.Empty,
             value.GetString("travel_guide_label") ?? string.Empty,
+            value.GetString("filter_scan") ?? string.Empty,
             value.GetTable("destinations")?.ArrayValues
                 .Select(item => ParseStoredDestination(item.RequireTable()))
                 .ToArray() ?? Array.Empty<StoredDestination>(),
@@ -478,6 +512,10 @@ public static partial class TemporaryGuideStorage
                 {
                     output.AppendLine($"                    travel_guide_key = {LuaQuote(step.TravelGuideKey)},");
                     output.AppendLine($"                    travel_guide_label = {LuaQuote(step.TravelGuideLabel)},");
+                }
+                if (step.FilterScan.Length > 0)
+                {
+                    output.AppendLine($"                    filter_scan = {LuaQuote(step.FilterScan)},");
                 }
                 if (step.Destinations.Count > 0)
                 {
@@ -657,6 +695,9 @@ public static partial class TemporaryGuideStorage
     [GeneratedRegex("^[A-Za-z ]+$", RegexOptions.CultureInvariant)]
     private static partial Regex JobPattern();
 
+    [GeneratedRegex("^[A-Za-z0-9 ,_'-]+$", RegexOptions.CultureInvariant)]
+    private static partial Regex FilterScanPattern();
+
     private sealed record StoredGuide(
         string Key,
         string Name,
@@ -680,6 +721,7 @@ public static partial class TemporaryGuideStorage
         string MarkerLabel,
         string TravelGuideKey,
         string TravelGuideLabel,
+        string FilterScan,
         IReadOnlyList<StoredDestination> Destinations,
         string KeyItem,
         int? KeyItemId,

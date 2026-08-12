@@ -29,7 +29,7 @@ public static class TemporaryGuideTools
                 result.ReplacedExistingGuide,
                 result.TotalGuideCount,
                 lifecycle = "Closing this AI guide's tab deletes it from temporary storage. It can be made permanent in Guide Config.",
-                safety = "Display only. No game command, input, target change, packet, or gameplay action was sent.",
+                safety = "No game command, input, target change, packet, or gameplay action was sent. A configured Filter Widescan button remains inert until clicked in game and only runs the local Filterscan addon command.",
             }, JsonOptions);
         }
         catch (ArgumentException ex)

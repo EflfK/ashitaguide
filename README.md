@@ -1,12 +1,14 @@
 # ashitaguide
 
 Experimental Ashita v4 guide helper for manual, configuration-driven quest
-walkthroughs.
+walkthroughs and hunting routes.
 
-The addon is display-only. It does not move the player, target NPCs, choose
-dialog options, send slash commands, inject packets, click menus, or automate
-quest progress. It renders local ImGui guide panels and advances steps when you
-use the manual controls or satisfy an explicitly configured display condition.
+The addon does not move the player, target NPCs, choose dialog options, inject
+packets, click menus, or automate quest progress. It renders local ImGui guide
+panels and advances steps when you use the manual controls or satisfy an
+explicitly configured display condition. A guide step may also expose one
+attended **Filter Widescan** button; clicking it sends only the configured local
+`/filterscan` addon command and never targets or claims a monster.
 
 ## Current Features
 
@@ -30,6 +32,7 @@ use the manual controls or satisfy an explicitly configured display condition.
 - optional destination markers over square-derived Ashita Minimap themes
 - world-space arrow above the current step NPC when rendered
 - optional NPC-target auto-advance for find steps
+- optional attended Filterscan button for explicitly configured monster steps
 - optional job-and-level auto-advance for leveling steps
 - built-in Pages of Valor tracker
 - dedicated Pages of Valor window that appears from chat evidence
@@ -204,6 +207,7 @@ return {
                             map_id = 15,
                         },
                     },
+                    filter_scan = 'Valk, 16A',
                     advance_on_target = false,
                 },
             },
@@ -214,8 +218,9 @@ return {
 
 Keys must be stable and unique across bundled, configured, permanent, and AI
 guides. Raw file writers should replace the complete file atomically rather than
-append partial Lua. This interface only supplies display data; it does not send
-commands or automate gameplay.
+append partial Lua. This interface supplies structured guide data and does not
+automate gameplay. A step with `filter_scan` exposes an attended button that
+sends only the local `/filterscan` addon command when clicked.
 
 `AshitaGuide.Mcp` exposes `publish_temporary_guide` as the preferred typed
 interface. It validates and safely renders one structured guide, atomically
@@ -412,6 +417,12 @@ selects that NPC. Leave it false or omit it on talk/interact steps so keeping
 the NPC selected does not skip later instructions. NPC destinations remain on
 the guide navigation map and Minimap overlay; AshitaGuide intentionally does
 not draw world-space markers over NPC models.
+
+Set `filter_scan` to a comma-separated Filterscan value such as `Valk, 16A` on
+a step that hunts a specific monster. AshitaGuide validates the value and shows
+a **Filter Widescan** button. Clicking it runs `/filterscan <value>` locally;
+it does not select, target, claim, move toward, or attack any entity. Filterscan
+must be loaded separately, normally from Ashita's `scripts/default.txt`.
 
 Set `advance_on_text` to a specific confirmation phrase to advance when that
 phrase appears in a new incoming chat event. Matching ignores case,
