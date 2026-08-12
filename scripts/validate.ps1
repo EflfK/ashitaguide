@@ -205,9 +205,10 @@ if ($content -notmatch "for _, key in ipairs\(close_keys\) do\s+close_guide_tab\
 }
 
 $queueCommands = [regex]::Matches($content, 'QueueCommand')
-if ($queueCommands.Count -ne 1 -or
-    $content -notmatch "QueueCommand\(-1, '/filterscan ' \.\. step\.filter_scan\)") {
-    throw 'Only the attended local Filterscan button may queue a command.'
+if ($queueCommands.Count -ne 2 -or
+    $content -notmatch "QueueCommand\(-1, '/filterscan ' \.\. step\.filter_scan\)" -or
+    $content -notmatch "QueueCommand\(-1, '/filterscan ' \.\. hunt\.filter_scan\)") {
+    throw 'Only the attended local Filterscan buttons may queue commands.'
 }
 
 if ($content -notmatch [regex]::Escape('filter:match("^[%w%s,_''%-]+$")')) {

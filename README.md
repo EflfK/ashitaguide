@@ -400,11 +400,11 @@ gold dot over the loaded Ashita Minimap plugin. This overlay supports bundled
 and custom square-derived themes so its clipping boundary matches the displayed
 map; circular themes remain unsupported.
 AshitaGuide also publishes a versioned, display-only destination handoff for
-AshitaMiniMap. Version 3 includes both the player's current zone and the guide
+AshitaMiniMap. Version 4 includes both the player's current zone and the guide
 step's destination zone, so AshitaMiniMap can retain the destination and plan
 verified cross-zone legs before the player reaches the final zone. The handoff
-still contains only destination metadata; it never supplies routes or performs
-travel actions.
+also carries display-only per-NM visibility choices for the attached hunt
+drawer. It never supplies routes or performs travel actions.
 Set optional `map_id` to the destination's verified live Minimap map/floor id;
 the dot is suppressed whenever Minimap is displaying another map in the same
 zone. AshitaGuide reads Minimap's live map id and transform but does not modify
@@ -415,11 +415,18 @@ marker alignment.
 For a marker-only notorious-monster step, supply the verified placeholder
 coordinates through `target_x`/`target_y` and optional `destinations`, set
 `marker_style = 'damselfly'`, and set `path_enabled = false`. Set
-`nm_spawn_name` to the exact NM name in AshitaMiniMap's catalog when its general
-NM relocation range should be hidden while the guide is active. AshitaMiniMap
+`nm_spawn_name` to the exact NM name in AshitaMiniMap's catalog. AshitaMiniMap
 then draws one damselfly icon per explicit placeholder location without gold
-guide dots or a route. Do not use the NM's possible relocation points as
-placeholder locations.
+guide dots or a route, while retaining its separate NM relocation blob. Do not
+use the NM's possible relocation points as placeholder locations.
+
+In Valkurm Dunes, AshitaGuide attaches a compact **NM Hunt** drawer to
+AshitaMiniMap. It provides per-NM map visibility, creature graphics with hover
+details, fixed official CatsEyeXI links, and only the attended actions supported
+by that NM. Valkurm Emperor includes Filterscan, manual five-minute PH and
+60-minute NM timer buttons, persistent countdown rows, reset/clear controls,
+and an optional system alarm when either countdown reaches zero. The existing
+exact-14A defeat detection and the manual PH button share the same countdown.
 
 Set `advance_on_target = true` on find/select steps to advance once the player
 selects that NPC. Leave it false or omit it on talk/interact steps so keeping

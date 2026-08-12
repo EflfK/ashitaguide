@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.28.1';
+addon.version = '0.29.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -14,8 +14,12 @@ local d3d8_device = d3d8.get_device();
 
 pcall(decision.ffi.cdef, 'void* __stdcall GetCurrentProcess(void);');
 pcall(decision.ffi.cdef, 'int __stdcall ReadProcessMemory(void*, const void*, void*, unsigned long, unsigned long*);');
+pcall(decision.ffi.cdef, 'int __stdcall MessageBeep(unsigned int);');
+pcall(decision.ffi.cdef, 'void* __stdcall ShellExecuteA(void*, const char*, const char*, const char*, const char*, int);');
 
 decision.process_handle = decision.ffi.C.GetCurrentProcess();
+decision.user32 = select(2, pcall(decision.ffi.load, 'user32'));
+decision.shell32 = select(2, pcall(decision.ffi.load, 'shell32'));
 
 function decision.guarded_read_bytes(address, size)
     address = tonumber(address) or 0;
@@ -215,6 +219,11 @@ local DEFAULT_SETTINGS = {
     guide_steps = {},
     key_item_step_completions = {},
     respawn_timer_expirations = {},
+    nm_hunt_drawer_open = true,
+    nm_hunt_show_all = true,
+    nm_hunt_hidden = {},
+    nm_hunt_selected = 'Valkurm Emperor',
+    nm_hunt_alarm = true,
 };
 
 local JOB_NAMES = {
@@ -314,6 +323,14 @@ local state = {
         bridge_last_token = nil,
         bridge_last_written_at = 0,
         bridge_write_error = nil,
+    },
+    nm_hunt = {
+        alarm_armed = {},
+        alarm_notified = {},
+        ready = {},
+        hovered_name = nil,
+        minimap_settings = nil,
+        minimap_settings_checked_at = 0,
     },
     pov_run = nil,
     pov_active = false,
@@ -1309,6 +1326,13 @@ local function normalize_settings(source)
             source.key_item_step_completions or DEFAULT_SETTINGS.key_item_step_completions),
         respawn_timer_expirations = state.copy_timestamp_map(
             source.respawn_timer_expirations or DEFAULT_SETTINGS.respawn_timer_expirations),
+        nm_hunt_drawer_open = bounded_boolean(
+            source.nm_hunt_drawer_open, DEFAULT_SETTINGS.nm_hunt_drawer_open),
+        nm_hunt_show_all = bounded_boolean(
+            source.nm_hunt_show_all, DEFAULT_SETTINGS.nm_hunt_show_all),
+        nm_hunt_hidden = copy_boolean_map(source.nm_hunt_hidden or DEFAULT_SETTINGS.nm_hunt_hidden),
+        nm_hunt_selected = trim_string(source.nm_hunt_selected or DEFAULT_SETTINGS.nm_hunt_selected),
+        nm_hunt_alarm = bounded_boolean(source.nm_hunt_alarm, DEFAULT_SETTINGS.nm_hunt_alarm),
     };
 end
 
@@ -2915,6 +2939,11 @@ local function settings_text()
         string.format(
             '    respawn_timer_expirations = %s,',
             state.lua_timestamp_map(values.respawn_timer_expirations)),
+        string.format('    nm_hunt_drawer_open = %s,', lua_boolean(values.nm_hunt_drawer_open)),
+        string.format('    nm_hunt_show_all = %s,', lua_boolean(values.nm_hunt_show_all)),
+        string.format('    nm_hunt_hidden = %s,', lua_boolean_map(values.nm_hunt_hidden)),
+        string.format('    nm_hunt_selected = %q,', values.nm_hunt_selected),
+        string.format('    nm_hunt_alarm = %s,', lua_boolean(values.nm_hunt_alarm)),
         '};',
         '',
     };
@@ -4360,7 +4389,75 @@ local function current_target_index()
     return sub_active and sub or primary;
 end
 
+state.DUNES_NM_HUNTS = {
+    {
+        name = 'Metal Shears', level = '22', mob_id = 17199161,
+        icon = 'crab', spawn_type = 'Timed',
+        details = 'Timed notorious crab near the western beach.',
+        official_url = 'https://catseyexi.com/mob/17199161',
+    },
+    {
+        name = 'Hippomaritimus', level = '37-38', mob_id = 17199351,
+        icon = 'fish', spawn_type = 'Timed',
+        details = 'Timed pugil roaming the northwest shore.',
+        official_url = 'https://catseyexi.com/mob/17199351',
+    },
+    {
+        name = 'Valkurm Emperor', level = '29-30', mob_id = 17199438,
+        icon = 'damselfly', spawn_type = 'Lottery', placeholder_count = 1,
+        details = 'Lottery replacement for Damselfly 14A. The PH can repop at any normal point in its pool.',
+        official_url = 'https://catseyexi.com/mob/17199438',
+        filter_scan = 'Valk, 14A', placeholder_seconds = 300, nm_seconds = 3600,
+    },
+    {
+        name = 'Golden Bat', level = '26-27', mob_id = 17199564,
+        icon = 'bat', spawn_type = 'Lottery', placeholder_count = 3,
+        details = 'Lottery notorious bat in the eastern tunnels.',
+        official_url = 'https://catseyexi.com/mob/17199564',
+    },
+    {
+        name = 'Goblin Swindler', level = '35', mob_id = 17199601,
+        icon = 'goblin', spawn_type = 'Triggered',
+        details = 'Triggered notorious goblin.',
+        official_url = 'https://catseyexi.com/mob/17199601',
+    },
+    {
+        name = 'Houu the Shoalwader', level = '24', mob_id = 17199602,
+        icon = 'bird', spawn_type = 'Triggered',
+        details = 'Triggered Yagudo notorious monster near the beach.',
+        official_url = 'https://catseyexi.com/mob/17199602',
+    },
+    {
+        name = 'Beach Monk', level = '23', mob_id = 17199603,
+        icon = 'octopus', spawn_type = 'Triggered',
+        details = 'Triggered sea monk notorious monster.',
+        official_url = 'https://catseyexi.com/mob/17199603',
+    },
+    {
+        name = 'Heike Crab', level = '22', mob_id = 17199604,
+        icon = 'crab', spawn_type = 'Triggered',
+        details = 'Triggered notorious crab.',
+        official_url = 'https://catseyexi.com/mob/17199604',
+    },
+};
+
+state.nm_hunt_timer_token = function (hunt, kind)
+    if (tonumber(hunt.mob_id) == 17199438 and kind == 'ph') then
+        return string.format(
+            '%s|valkurm_emperor_hunt|1|330',
+            lower_string(state.current_character_name() or 'unknown'));
+    end
+    return string.format(
+        '%s|nmhunt|103|%d|%s',
+        lower_string(state.current_character_name() or 'unknown'),
+        tonumber(hunt.mob_id) or 0,
+        tostring(kind or ''));
+end
+
 state.respawn_timer_token = function (run, step_index, step)
+    if (tonumber(step.respawn_replacement_server_id) == 17199438) then
+        return state.nm_hunt_timer_token(state.DUNES_NM_HUNTS[3], 'ph');
+    end
     local character = lower_string(state.current_character_name() or 'unknown');
     return string.format(
         '%s|%s|%d|%d',
@@ -4368,6 +4465,64 @@ state.respawn_timer_token = function (run, step_index, step)
         run.key,
         step_index,
         tonumber(step.respawn_target_index) or 0);
+end
+
+state.start_nm_hunt_timer = function (hunt, kind)
+    local seconds = kind == 'ph'
+        and tonumber(hunt.placeholder_seconds)
+        or tonumber(hunt.nm_seconds);
+    if (seconds == nil or seconds <= 0) then
+        return;
+    end
+    local token = state.nm_hunt_timer_token(hunt, kind);
+    state.settings.respawn_timer_expirations[token] = os.time() + seconds;
+    state.nm_hunt.alarm_armed[token] = true;
+    state.nm_hunt.alarm_notified[token] = false;
+    state.nm_hunt.ready[token] = false;
+end
+
+state.clear_nm_hunt_timer = function (hunt, kind)
+    local token = state.nm_hunt_timer_token(hunt, kind);
+    state.settings.respawn_timer_expirations[token] = nil;
+    state.nm_hunt.alarm_armed[token] = nil;
+    state.nm_hunt.alarm_notified[token] = nil;
+    state.nm_hunt.ready[token] = nil;
+end
+
+state.update_nm_hunt_alarms = function ()
+    local now = os.time();
+    for _, hunt in ipairs(state.DUNES_NM_HUNTS) do
+        for _, kind in ipairs({ 'ph', 'nm' }) do
+            local token = state.nm_hunt_timer_token(hunt, kind);
+            local expiration = tonumber(state.settings.respawn_timer_expirations[token]);
+            if (expiration ~= nil and expiration > now) then
+                state.nm_hunt.alarm_armed[token] = true;
+                state.nm_hunt.ready[token] = false;
+            elseif (expiration ~= nil and expiration > 0) then
+                state.nm_hunt.ready[token] = true;
+                if (state.nm_hunt.alarm_armed[token] == true
+                        and state.nm_hunt.alarm_notified[token] ~= true) then
+                    state.nm_hunt.alarm_notified[token] = true;
+                    if (state.settings.nm_hunt_alarm == true) then
+                        pcall(function () decision.user32.MessageBeep(0x30); end);
+                    end
+                end
+            end
+        end
+    end
+end
+
+state.open_nm_hunt_url = function (url)
+    url = tostring(url or '');
+    if (url:match('^https://catseyexi%.com/mob/%d+$') == nil) then
+        return;
+    end
+    local ok = pcall(function ()
+        decision.shell32.ShellExecuteA(nil, 'open', url, nil, nil, 1);
+    end);
+    if (not ok) then
+        log_info('Official CatsEyeXI page: ' .. url);
+    end
 end
 
 state.start_respawn_timer = function (run, step_index, step, tracker, reason)
@@ -4706,6 +4861,24 @@ state.minimap_handoff_context = function (step)
     };
 end
 
+state.nm_hunt_handoff = function ()
+    local player = current_navigation_player();
+    if (player == nil or player.zone_id ~= 103) then
+        return nil;
+    end
+    local hidden = {};
+    for _, hunt in ipairs(state.DUNES_NM_HUNTS) do
+        if (state.settings.nm_hunt_hidden[hunt.name] == true) then
+            hidden[#hidden + 1] = hunt.name;
+        end
+    end
+    return {
+        zone_id = 103,
+        visible = state.settings.nm_hunt_show_all == true,
+        hidden = hidden,
+    };
+end
+
 state.publish_ashitaminimap_markers = function (force_clear)
     local path = state.ashitaminimap_marker_file_path();
     if (path == nil) then
@@ -4718,6 +4891,7 @@ state.publish_ashitaminimap_markers = function (force_clear)
         and state.minimap_handoff_context(step)
         or nil;
     local marker_reference = nil;
+    local nm_hunt = force_clear ~= true and state.nm_hunt_handoff() or nil;
     local reference_player = nil;
     local reference_zone_id = nil;
     if (force_clear ~= true
@@ -4767,7 +4941,13 @@ state.publish_ashitaminimap_markers = function (force_clear)
         marker_reference ~= nil and marker_reference.name or '',
         step ~= nil and tostring(step.marker_style or '') or '',
         step ~= nil and tostring(step.path_enabled ~= false) or '',
+        nm_hunt ~= nil and tostring(nm_hunt.visible) or '',
     };
+    if (nm_hunt ~= nil) then
+        for _, name in ipairs(nm_hunt.hidden) do
+            token_parts[#token_parts + 1] = name;
+        end
+    end
     for _, marker in ipairs(markers) do
         token_parts[#token_parts + 1] = string.format(
             '%.3f:%.3f:%s:%s:%s:%s',
@@ -4788,17 +4968,19 @@ state.publish_ashitaminimap_markers = function (force_clear)
 
     local lines = {
         'return {',
-        '    version = 3,',
+        '    version = 4,',
         "    source = 'ashitaguide',",
         string.format('    updated_at = %d,', now),
         string.format(
             '    player_zone_id = %s,',
             navigation ~= nil and tostring(navigation.player.zone_id)
-                or (reference_player ~= nil and tostring(reference_player.zone_id) or 'nil')),
+                or (reference_player ~= nil and tostring(reference_player.zone_id)
+                    or (nm_hunt ~= nil and tostring(nm_hunt.zone_id) or 'nil'))),
         string.format(
             '    destination_zone_id = %s,',
             navigation ~= nil and tostring(navigation.destination_zone_id)
-                or (reference_zone_id ~= nil and tostring(reference_zone_id) or 'nil')),
+                or (reference_zone_id ~= nil and tostring(reference_zone_id)
+                    or (nm_hunt ~= nil and tostring(nm_hunt.zone_id) or 'nil'))),
         string.format('    guide_key = %q,', run ~= nil and run.key or ''),
         string.format('    step_index = %d,', run ~= nil and run.step_index or 0),
         string.format('    path_enabled = %s,', tostring(step == nil or step.path_enabled ~= false)),
@@ -4819,6 +5001,17 @@ state.publish_ashitaminimap_markers = function (force_clear)
         lines[#lines + 1] = '    marker_reference = {';
         lines[#lines + 1] = string.format('        kind = %q,', marker_reference.kind);
         lines[#lines + 1] = string.format('        name = %q,', marker_reference.name);
+        lines[#lines + 1] = '    },';
+    end
+    if (nm_hunt ~= nil) then
+        lines[#lines + 1] = '    nm_hunt = {';
+        lines[#lines + 1] = string.format('        zone_id = %d,', nm_hunt.zone_id);
+        lines[#lines + 1] = string.format('        visible = %s,', tostring(nm_hunt.visible));
+        lines[#lines + 1] = '        hidden = {';
+        for _, name in ipairs(nm_hunt.hidden) do
+            lines[#lines + 1] = string.format('            [%q] = true,', name);
+        end
+        lines[#lines + 1] = '        },';
         lines[#lines + 1] = '    },';
     end
     lines[#lines + 1] = '}';
@@ -5884,6 +6077,214 @@ local function render_guide_window()
     pop_window_style();
 end
 
+state.load_ashitaminimap_window_settings = function ()
+    local now = os.clock();
+    if (state.nm_hunt.minimap_settings ~= nil
+            and now - state.nm_hunt.minimap_settings_checked_at < 0.5) then
+        return state.nm_hunt.minimap_settings;
+    end
+    state.nm_hunt.minimap_settings_checked_at = now;
+    local install_path = ashita_install_path();
+    local path = install_path ~= nil
+        and path_join(path_join(install_path, 'addons'), 'ashitaminimap')
+        or nil;
+    local chunk = path ~= nil and loadfile(path_join(path, 'ashitaminimap_config.lua')) or nil;
+    local ok, value = false, nil;
+    if (chunk ~= nil) then
+        ok, value = pcall(chunk);
+    end
+    if (not ok or type(value) ~= 'table') then
+        state.nm_hunt.minimap_settings = nil;
+        return nil;
+    end
+    state.nm_hunt.minimap_settings = {
+        visible = value.visible ~= false,
+        x = bounded_number(value.x, 18, 0, 10000),
+        y = bounded_number(value.y, 128, 0, 10000),
+        size = bounded_number(value.size, 330, 120, 700),
+    };
+    return state.nm_hunt.minimap_settings;
+end
+
+state.draw_nm_hunt_icon = function (draw_list, kind, x, y)
+    local outline = imgui.GetColorU32({ 0.01, 0.03, 0.04, 0.95 });
+    local body = imgui.GetColorU32({ 0.95, 0.66, 0.20, 1.00 });
+    local wing = imgui.GetColorU32({ 0.18, 0.84, 0.92, 0.95 });
+    if (kind == 'damselfly') then
+        state.draw_damselfly_marker(draw_list, x, y);
+    elseif (kind == 'crab') then
+        draw_list:AddCircleFilled({ x, y + 1 }, 5.0, outline, 16);
+        draw_list:AddCircleFilled({ x, y + 1 }, 3.8, body, 16);
+        draw_list:AddLine({ x - 4, y + 3 }, { x - 8, y + 6 }, body, 1.5);
+        draw_list:AddLine({ x + 4, y + 3 }, { x + 8, y + 6 }, body, 1.5);
+        draw_list:AddLine({ x - 4, y }, { x - 8, y - 4 }, body, 1.5);
+        draw_list:AddLine({ x + 4, y }, { x + 8, y - 4 }, body, 1.5);
+    elseif (kind == 'fish') then
+        draw_list:AddCircleFilled({ x - 1, y }, 5.0, wing, 16);
+        draw_list:AddTriangleFilled({ x + 3, y }, { x + 8, y - 5 }, { x + 8, y + 5 }, body);
+        draw_list:AddCircleFilled({ x - 3, y - 1 }, 1.0, outline, 8);
+    elseif (kind == 'bat') then
+        draw_list:AddTriangleFilled({ x, y + 4 }, { x - 9, y - 5 }, { x - 3, y - 1 }, wing);
+        draw_list:AddTriangleFilled({ x, y + 4 }, { x + 9, y - 5 }, { x + 3, y - 1 }, wing);
+        draw_list:AddCircleFilled({ x, y }, 2.8, body, 12);
+    elseif (kind == 'bird') then
+        draw_list:AddTriangleFilled({ x, y }, { x - 9, y - 4 }, { x - 3, y + 4 }, wing);
+        draw_list:AddTriangleFilled({ x, y }, { x + 9, y - 4 }, { x + 3, y + 4 }, wing);
+        draw_list:AddCircleFilled({ x, y }, 2.8, body, 12);
+    elseif (kind == 'octopus') then
+        draw_list:AddCircleFilled({ x, y - 2 }, 5.0, body, 16);
+        for offset = -4, 4, 2 do
+            draw_list:AddLine({ x + offset, y + 1 }, { x + offset - 1, y + 7 }, wing, 1.4);
+        end
+    else
+        draw_list:AddCircleFilled({ x, y }, 6.0, body, 16);
+        draw_list:AddTriangleFilled({ x - 4, y - 4 }, { x - 8, y - 8 }, { x - 1, y - 6 }, wing);
+        draw_list:AddTriangleFilled({ x + 4, y - 4 }, { x + 8, y - 8 }, { x + 1, y - 6 }, wing);
+    end
+end
+
+state.nm_hunt_by_name = function (name)
+    for _, hunt in ipairs(state.DUNES_NM_HUNTS) do
+        if (hunt.name == name) then return hunt; end
+    end
+    return state.DUNES_NM_HUNTS[3];
+end
+
+state.render_nm_hunt_timer_line = function (hunt, kind, label)
+    local token = state.nm_hunt_timer_token(hunt, kind);
+    local expiration = tonumber(state.settings.respawn_timer_expirations[token]);
+    local remaining = expiration ~= nil and math.max(0, math.ceil(expiration - os.time())) or nil;
+    local status = '--:--';
+    local color = COLORS.muted;
+    if (remaining ~= nil and remaining > 0) then
+        status = string.format('%02d:%02d', math.floor(remaining / 60), remaining % 60);
+        color = COLORS.warning;
+    elseif (expiration ~= nil) then
+        status = 'READY';
+        color = COLORS.accent;
+    end
+    imgui.TextColored(color, string.format('%s %s', label, status));
+    if (expiration ~= nil) then
+        imgui.SameLine();
+        if (imgui.SmallButton('Reset##nm_timer_reset_' .. tostring(hunt.mob_id) .. kind)) then
+            state.start_nm_hunt_timer(hunt, kind);
+        end
+        imgui.SameLine();
+        if (imgui.SmallButton('X##nm_timer_clear_' .. tostring(hunt.mob_id) .. kind)) then
+            state.clear_nm_hunt_timer(hunt, kind);
+        end
+    end
+end
+
+state.render_nm_hunt_window = function ()
+    local player = current_navigation_player();
+    local minimap = state.load_ashitaminimap_window_settings();
+    if (player == nil or player.zone_id ~= 103 or minimap == nil or minimap.visible ~= true) then
+        return;
+    end
+    local open = state.settings.nm_hunt_drawer_open == true;
+    local width = open and 304 or 38;
+    local window_x = minimap.x + minimap.size - width;
+    local window_y = minimap.y + 44;
+    imgui.SetNextWindowPos({ window_x, window_y }, 0);
+    imgui.SetNextWindowSize({ width, 0 }, 0);
+    push_display_window_style(state.guide_opacity);
+    imgui.PushStyleVar(IMGUI.style_frame_padding, { 4, 2 });
+    local flags = bit.bor(
+        IMGUI.window_no_title_bar,
+        IMGUI.window_no_collapse,
+        IMGUI.window_no_resize,
+        IMGUI.window_no_move,
+        IMGUI.window_always_auto_resize,
+        IMGUI.window_no_saved_settings);
+    local visible = imgui.Begin('NM Hunt###AshitaGuideNmHunt', true, flags);
+    if (visible) then
+        if (imgui.SmallButton(open and '<##nm_hunt_close' or '>##nm_hunt_open')) then
+            state.settings.nm_hunt_drawer_open = not open;
+        end
+        if (open) then
+            imgui.SameLine();
+            imgui.TextColored(COLORS.header, 'NM HUNT');
+            imgui.Separator();
+            imgui.TextColored(COLORS.muted, 'VALKURM DUNES');
+            imgui.SameLine();
+            local alarm = T{ state.settings.nm_hunt_alarm == true };
+            if (imgui.Checkbox('Alarm##nm_hunt_alarm', alarm)) then
+                state.settings.nm_hunt_alarm = alarm[1] == true;
+            end
+            imgui.SameLine();
+            local show_all = T{ state.settings.nm_hunt_show_all == true };
+            if (imgui.Checkbox('All##nm_hunt_all', show_all)) then
+                state.settings.nm_hunt_show_all = show_all[1] == true;
+            end
+
+            state.nm_hunt.hovered_name = nil;
+            for _, hunt in ipairs(state.DUNES_NM_HUNTS) do
+                local shown = state.settings.nm_hunt_hidden[hunt.name] ~= true;
+                local shown_ref = T{ shown };
+                if (imgui.Checkbox('##nm_hunt_show_' .. tostring(hunt.mob_id), shown_ref)) then
+                    state.settings.nm_hunt_hidden[hunt.name] = shown_ref[1] == true and nil or true;
+                end
+                imgui.SameLine();
+                local icon_x, icon_y = imgui.GetCursorScreenPos();
+                imgui.Dummy({ 20, 19 });
+                state.draw_nm_hunt_icon(
+                    imgui.GetWindowDrawList(), hunt.icon, icon_x + 10, icon_y + 10);
+                imgui.SameLine();
+                local selected = state.settings.nm_hunt_selected == hunt.name;
+                if (imgui.Selectable(
+                        string.format('%s  Lv.%s##nm_hunt_%d', hunt.name, hunt.level, hunt.mob_id),
+                        selected)) then
+                    state.settings.nm_hunt_selected = hunt.name;
+                end
+                if (imgui.IsItemHovered()) then
+                    state.nm_hunt.hovered_name = hunt.name;
+                end
+            end
+
+            local hunt = state.nm_hunt_by_name(
+                state.nm_hunt.hovered_name or state.settings.nm_hunt_selected);
+            imgui.Separator();
+            local icon_x, icon_y = imgui.GetCursorScreenPos();
+            imgui.Dummy({ 22, 21 });
+            state.draw_nm_hunt_icon(
+                imgui.GetWindowDrawList(), hunt.icon, icon_x + 11, icon_y + 11);
+            imgui.SameLine();
+            imgui.TextColored(COLORS.header, hunt.name);
+            imgui.SameLine();
+            if (imgui.SmallButton('Wiki##nm_hunt_wiki_' .. tostring(hunt.mob_id))) then
+                state.open_nm_hunt_url(hunt.official_url);
+            end
+            imgui.TextColored(
+                COLORS.muted,
+                string.format('%s | Lv.%s | PH %d',
+                    hunt.spawn_type,
+                    hunt.level,
+                    tonumber(hunt.placeholder_count) or 0));
+            text_colored_wrapped(COLORS.muted, hunt.details);
+            if (hunt.filter_scan ~= nil) then
+                if (imgui.SmallButton('Scan 14A##nm_hunt_scan_' .. tostring(hunt.mob_id))) then
+                    AshitaCore:GetChatManager():QueueCommand(-1, '/filterscan ' .. hunt.filter_scan);
+                end
+                imgui.SameLine();
+                if (imgui.SmallButton('PH +5m##nm_hunt_ph_' .. tostring(hunt.mob_id))) then
+                    state.start_nm_hunt_timer(hunt, 'ph');
+                end
+                imgui.SameLine();
+                if (imgui.SmallButton('NM +60m##nm_hunt_nm_' .. tostring(hunt.mob_id))) then
+                    state.start_nm_hunt_timer(hunt, 'nm');
+                end
+                imgui.Separator();
+                state.render_nm_hunt_timer_line(hunt, 'ph', 'PH');
+                state.render_nm_hunt_timer_line(hunt, 'nm', 'NM');
+            end
+        end
+    end
+    imgui.End();
+    imgui.PopStyleVar();
+    pop_window_style();
+end
+
 local function render_valor_window()
     if (state.valor_enabled[1] ~= true
         or state.pov_active ~= true
@@ -6330,11 +6731,13 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     poll_ai_guides_file();
     poll_auction_sale_guide_file();
     state.update_respawn_timers();
+    state.update_nm_hunt_alarms();
     update_npc_step_auto_advance();
     update_level_step_auto_advance();
     update_key_item_step_completion();
     state.publish_ashitaminimap_markers(false);
     render_minimap_destination_marker();
+    state.render_nm_hunt_window();
     render_guide_window();
     render_valor_window();
     render_casket_window();
