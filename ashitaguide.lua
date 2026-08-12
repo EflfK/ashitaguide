@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.29.0';
+addon.version = '0.29.1';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -119,7 +119,9 @@ local IMGUI = {
     col_header_active = imgui_const('ImGuiCol_HeaderActive'),
     style_window_padding = imgui_const('ImGuiStyleVar_WindowPadding'),
     style_window_border_size = imgui_const('ImGuiStyleVar_WindowBorderSize'),
+    style_window_rounding = imgui_const('ImGuiStyleVar_WindowRounding'),
     style_frame_padding = imgui_const('ImGuiStyleVar_FramePadding'),
+    style_frame_rounding = imgui_const('ImGuiStyleVar_FrameRounding'),
     cond_first_use = imgui_const('ImGuiCond_FirstUseEver'),
     cond_appearing = rawget(_G, 'ImGuiCond_Appearing') or imgui_const('ImGuiCond_FirstUseEver'),
     window_no_collapse = imgui_const('ImGuiWindowFlags_NoCollapse'),
@@ -6187,22 +6189,26 @@ state.render_nm_hunt_window = function ()
     local window_x = minimap.x + minimap.size - width;
     local window_y = minimap.y + 44;
     imgui.SetNextWindowPos({ window_x, window_y }, 0);
-    imgui.SetNextWindowSize({ width, 0 }, 0);
+    imgui.SetNextWindowSize({ width, open and 0 or 32 }, 0);
     push_display_window_style(state.guide_opacity);
     imgui.PushStyleVar(IMGUI.style_frame_padding, { 4, 2 });
+    imgui.PushStyleVar(IMGUI.style_window_rounding, 7.0);
+    imgui.PushStyleVar(IMGUI.style_frame_rounding, 3.0);
     local flags = bit.bor(
         IMGUI.window_no_title_bar,
         IMGUI.window_no_collapse,
         IMGUI.window_no_resize,
         IMGUI.window_no_move,
-        IMGUI.window_always_auto_resize,
         IMGUI.window_no_saved_settings);
+    if (open) then
+        flags = bit.bor(flags, IMGUI.window_always_auto_resize);
+    end
     local visible = imgui.Begin('NM Hunt###AshitaGuideNmHunt', true, flags);
     if (visible) then
         if (open) then
             imgui.TextColored(COLORS.header, 'NM HUNT');
             imgui.SameLine();
-            imgui.SetCursorPosX(width - 32);
+            imgui.SetCursorPosX(width - 27);
             if (imgui.SmallButton('>##nm_hunt_close')) then
                 state.settings.nm_hunt_drawer_open = false;
             end
@@ -6279,12 +6285,15 @@ state.render_nm_hunt_window = function ()
                 state.render_nm_hunt_timer_line(hunt, 'ph', 'PH');
                 state.render_nm_hunt_timer_line(hunt, 'nm', 'NM');
             end
-        elseif (imgui.SmallButton('<##nm_hunt_open')) then
-            state.settings.nm_hunt_drawer_open = true;
+        else
+            imgui.SetCursorPosX(11);
+            if (imgui.SmallButton('<##nm_hunt_open')) then
+                state.settings.nm_hunt_drawer_open = true;
+            end
         end
     end
     imgui.End();
-    imgui.PopStyleVar();
+    imgui.PopStyleVar(3);
     pop_window_style();
 end
 
