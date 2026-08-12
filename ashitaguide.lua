@@ -6230,7 +6230,11 @@ state.render_nm_hunt_window = function ()
                 local shown = state.settings.nm_hunt_hidden[hunt.name] ~= true;
                 local shown_ref = T{ shown };
                 if (imgui.Checkbox('##nm_hunt_show_' .. tostring(hunt.mob_id), shown_ref)) then
-                    state.settings.nm_hunt_hidden[hunt.name] = shown_ref[1] == true and nil or true;
+                    if (shown_ref[1] == true) then
+                        state.settings.nm_hunt_hidden[hunt.name] = nil;
+                    else
+                        state.settings.nm_hunt_hidden[hunt.name] = true;
+                    end
                 end
                 imgui.SameLine();
                 local icon_x, icon_y = imgui.GetCursorScreenPos();
