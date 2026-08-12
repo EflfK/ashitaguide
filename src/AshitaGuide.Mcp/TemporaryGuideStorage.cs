@@ -98,6 +98,9 @@ public static partial class TemporaryGuideStorage
                         TravelGuideKey = "travel_to_lower_jeuno",
                         TravelGuideLabel = "Walk to Lower Jeuno",
                         FilterScan = "Valk, 14A",
+                        NmSpawnName = "Valkurm Emperor",
+                        NmMarkerStyle = "damselfly",
+                        PathEnabled = false,
                         Destinations = new[]
                         {
                             new TemporaryGuideDestinationInput
@@ -152,6 +155,9 @@ public static partial class TemporaryGuideStorage
                 || !firstContents.Contains("travel_guide_key = \"travel_to_lower_jeuno\"", StringComparison.Ordinal)
                 || !firstContents.Contains("travel_guide_label = \"Walk to Lower Jeuno\"", StringComparison.Ordinal)
                 || !firstContents.Contains("filter_scan = \"Valk, 14A\"", StringComparison.Ordinal)
+                || !firstContents.Contains("nm_spawn_name = \"Valkurm Emperor\"", StringComparison.Ordinal)
+                || !firstContents.Contains("nm_marker_style = \"damselfly\"", StringComparison.Ordinal)
+                || !firstContents.Contains("path_enabled = false", StringComparison.Ordinal)
                 || !firstContents.Contains("label = \"Alternate\"", StringComparison.Ordinal)
                 || !firstContents.Contains("target_x = -40.25", StringComparison.Ordinal)
                 || !firstContents.Contains("key_item = \"Exoray mold crumb\"", StringComparison.Ordinal)
@@ -298,6 +304,24 @@ public static partial class TemporaryGuideStorage
             throw new ArgumentException(
                 $"guide.steps[{index}].filterScan contains unsupported characters.");
         }
+        var nmSpawnName = CleanOptionalText(
+            input.NmSpawnName,
+            96,
+            $"guide.steps[{index}].nmSpawnName");
+        var nmMarkerStyle = CleanOptionalText(
+            input.NmMarkerStyle,
+            24,
+            $"guide.steps[{index}].nmMarkerStyle").ToLowerInvariant();
+        if (nmMarkerStyle.Length > 0 && nmMarkerStyle != "damselfly")
+        {
+            throw new ArgumentException(
+                $"guide.steps[{index}].nmMarkerStyle must be damselfly.");
+        }
+        if (nmSpawnName.Length > 0 && nmMarkerStyle.Length == 0)
+        {
+            throw new ArgumentException(
+                $"guide.steps[{index}].nmMarkerStyle is required when nmSpawnName is supplied.");
+        }
 
         return new StoredStep(
             CleanOptionalText(input.Title, 128, $"guide.steps[{index}].title"),
@@ -315,6 +339,9 @@ public static partial class TemporaryGuideStorage
             travelGuideKey,
             CleanOptionalText(input.TravelGuideLabel, 96, $"guide.steps[{index}].travelGuideLabel"),
             filterScan,
+            nmSpawnName,
+            nmMarkerStyle,
+            input.PathEnabled ?? true,
             destinations,
             CleanOptionalText(input.KeyItem, 128, $"guide.steps[{index}].keyItem"),
             input.KeyItemId,
@@ -413,6 +440,9 @@ public static partial class TemporaryGuideStorage
             value.GetString("travel_guide_key") ?? string.Empty,
             value.GetString("travel_guide_label") ?? string.Empty,
             value.GetString("filter_scan") ?? string.Empty,
+            value.GetString("nm_spawn_name") ?? string.Empty,
+            value.GetString("nm_marker_style") ?? string.Empty,
+            value.GetBool("path_enabled") ?? true,
             value.GetTable("destinations")?.ArrayValues
                 .Select(item => ParseStoredDestination(item.RequireTable()))
                 .ToArray() ?? Array.Empty<StoredDestination>(),
@@ -516,6 +546,15 @@ public static partial class TemporaryGuideStorage
                 if (step.FilterScan.Length > 0)
                 {
                     output.AppendLine($"                    filter_scan = {LuaQuote(step.FilterScan)},");
+                }
+                if (step.NmSpawnName.Length > 0)
+                {
+                    output.AppendLine($"                    nm_spawn_name = {LuaQuote(step.NmSpawnName)},");
+                    output.AppendLine($"                    nm_marker_style = {LuaQuote(step.NmMarkerStyle)},");
+                }
+                if (!step.PathEnabled)
+                {
+                    output.AppendLine("                    path_enabled = false,");
                 }
                 if (step.Destinations.Count > 0)
                 {
@@ -722,6 +761,9 @@ public static partial class TemporaryGuideStorage
         string TravelGuideKey,
         string TravelGuideLabel,
         string FilterScan,
+        string NmSpawnName,
+        string NmMarkerStyle,
+        bool PathEnabled,
         IReadOnlyList<StoredDestination> Destinations,
         string KeyItem,
         int? KeyItemId,

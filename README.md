@@ -400,7 +400,7 @@ gold dot over the loaded Ashita Minimap plugin. This overlay supports bundled
 and custom square-derived themes so its clipping boundary matches the displayed
 map; circular themes remain unsupported.
 AshitaGuide also publishes a versioned, display-only destination handoff for
-AshitaMiniMap. Version 2 includes both the player's current zone and the guide
+AshitaMiniMap. Version 3 includes both the player's current zone and the guide
 step's destination zone, so AshitaMiniMap can retain the destination and plan
 verified cross-zone legs before the player reaches the final zone. The handoff
 still contains only destination metadata; it never supplies routes or performs
@@ -411,6 +411,14 @@ zone. AshitaGuide reads Minimap's live map id and transform but does not modify
 Minimap, send commands, or require a custom DLL.
 Use `/agguide mapdebug` to print a bounded coordinate snapshot when diagnosing
 marker alignment.
+
+For a marker-only notorious-monster step, set `nm_spawn_name` to the exact NM
+name in AshitaMiniMap's verified spawn catalog, set `nm_marker_style` to
+`damselfly`, and set `path_enabled = false`. AshitaMiniMap then draws small
+damselfly icons at every cataloged spawn possibility without gold guide dots or
+a route. The coordinates remain owned by AshitaMiniMap and are not copied into
+the guide. These icons represent possible NM positions, not additional
+placeholders.
 
 Set `advance_on_target = true` on find/select steps to advance once the player
 selects that NPC. Leave it false or omit it on talk/interact steps so keeping

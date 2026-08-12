@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.27.0';
+addon.version = '0.28.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -700,12 +700,11 @@ local function builtin_guides()
                     title = 'Hunt the single placeholder',
                     text = 'Click Filter Widescan and kill only Damselfly target index 14A. When Valkurm Emperor replaces it, claim and defeat the NM. Keep this guide open and repeat after the placeholder returns.',
                     zone = 'Valkurm Dunes',
-                    location = 'D-8',
-                    note = 'The marker is the observed placeholder anchor. The mob can wander, so use the 14A Widescan entry as the source of truth; do not kill the other Damselflies.',
-                    target_x = -228.957,
-                    target_y = -101.226,
-                    target_z = 2.776,
-                    map_id = 0,
+                    location = 'D-8 to F-8',
+                    note = 'Damselfly icons mark the 50 server-defined possible Emperor spawn positions. They are not 50 placeholders: only Damselfly target index 14A is the placeholder.',
+                    nm_spawn_name = 'Valkurm Emperor',
+                    nm_marker_style = 'damselfly',
+                    path_enabled = false,
                     filter_scan = 'Valk, 14A',
                     respawn_target_index = 0x14A,
                     respawn_target_server_id = 17199434,
@@ -916,6 +915,18 @@ local function normalize_step(source, index)
             respawn_seconds = nil;
         end
     end
+    local nm_spawn_name = trim_string(source.nm_spawn_name or source.nmSpawnName);
+    if (#nm_spawn_name > 96) then
+        nm_spawn_name = '';
+    end
+    local nm_marker_style = trim_string(source.nm_marker_style or source.nmMarkerStyle):lower();
+    if (nm_marker_style ~= 'damselfly') then
+        nm_marker_style = '';
+    end
+    local path_enabled = source.path_enabled;
+    if (path_enabled == nil) then
+        path_enabled = source.pathEnabled;
+    end
 
     return {
         title = title,
@@ -935,6 +946,9 @@ local function normalize_step(source, index)
         travel_guide_label = trim_string(source.travel_guide_label or source.travelGuideLabel),
         filter_scan = state.normalize_filter_scan(
             source.filter_scan or source.filterScan or source.filterscan),
+        nm_spawn_name = nm_spawn_name,
+        nm_marker_style = nm_marker_style,
+        path_enabled = bounded_boolean(path_enabled, true),
         respawn_target_index = respawn_target_index,
         respawn_target_server_id = respawn_target_server_id,
         respawn_target_name = trim_string(source.respawn_target_name or source.respawnTargetName),
@@ -2459,6 +2473,17 @@ local function guide_storage_text(guides)
                 table.insert(lines, string.format(
                     '                    filter_scan = %s,',
                     lua_quoted(step.filter_scan)));
+            end
+            if (step.nm_spawn_name ~= '') then
+                table.insert(lines, string.format(
+                    '                    nm_spawn_name = %s,',
+                    lua_quoted(step.nm_spawn_name)));
+                table.insert(lines, string.format(
+                    '                    nm_marker_style = %s,',
+                    lua_quoted(step.nm_marker_style)));
+            end
+            if (step.path_enabled == false) then
+                table.insert(lines, '                    path_enabled = false,');
             end
             if (step.respawn_target_index ~= nil and step.respawn_seconds ~= nil) then
                 table.insert(lines, string.format(
@@ -4686,6 +4711,25 @@ state.publish_ashitaminimap_markers = function (force_clear)
     local navigation = state.minimap_marker_enabled[1] == true
         and state.minimap_handoff_context(step)
         or nil;
+    local marker_reference = nil;
+    local reference_player = nil;
+    local reference_zone_id = nil;
+    if (force_clear ~= true
+            and state.minimap_marker_enabled[1] == true
+            and type(step) == 'table'
+            and step.nm_spawn_name ~= '') then
+        reference_player = current_navigation_player();
+        reference_zone_id = step.zone ~= ''
+            and state.resolve_zone_id(step.zone)
+            or (reference_player ~= nil and reference_player.zone_id or nil);
+        if (reference_player ~= nil and reference_zone_id ~= nil) then
+            marker_reference = {
+                kind = 'nm_spawn_range',
+                name = step.nm_spawn_name,
+                style = step.nm_marker_style,
+            };
+        end
+    end
     local markers = {};
     if (navigation ~= nil) then
         markers[#markers + 1] = {
@@ -4713,6 +4757,9 @@ state.publish_ashitaminimap_markers = function (force_clear)
         navigation ~= nil and tostring(navigation.destination_zone_id) or '',
         run ~= nil and tostring(run.key) or '',
         run ~= nil and tostring(run.step_index) or '',
+        marker_reference ~= nil and marker_reference.name or '',
+        marker_reference ~= nil and marker_reference.style or '',
+        step ~= nil and tostring(step.path_enabled ~= false) or '',
     };
     for _, marker in ipairs(markers) do
         token_parts[#token_parts + 1] = string.format(
@@ -4733,19 +4780,20 @@ state.publish_ashitaminimap_markers = function (force_clear)
 
     local lines = {
         'return {',
-        '    version = 2,',
+        '    version = 3,',
         "    source = 'ashitaguide',",
         string.format('    updated_at = %d,', now),
         string.format(
             '    player_zone_id = %s,',
-            navigation ~= nil and tostring(navigation.player.zone_id) or 'nil'),
+            navigation ~= nil and tostring(navigation.player.zone_id)
+                or (reference_player ~= nil and tostring(reference_player.zone_id) or 'nil')),
         string.format(
             '    destination_zone_id = %s,',
-            navigation ~= nil
-                and tostring(navigation.destination_zone_id)
-                or 'nil'),
+            navigation ~= nil and tostring(navigation.destination_zone_id)
+                or (reference_zone_id ~= nil and tostring(reference_zone_id) or 'nil')),
         string.format('    guide_key = %q,', run ~= nil and run.key or ''),
         string.format('    step_index = %d,', run ~= nil and run.step_index or 0),
+        string.format('    path_enabled = %s,', tostring(step == nil or step.path_enabled ~= false)),
         '    markers = {',
     };
     for _, marker in ipairs(markers) do
@@ -4758,6 +4806,13 @@ state.publish_ashitaminimap_markers = function (force_clear)
             tostring(marker.approximate));
     end
     lines[#lines + 1] = '    },';
+    if (marker_reference ~= nil) then
+        lines[#lines + 1] = '    marker_reference = {';
+        lines[#lines + 1] = string.format('        kind = %q,', marker_reference.kind);
+        lines[#lines + 1] = string.format('        name = %q,', marker_reference.name);
+        lines[#lines + 1] = string.format('        style = %q,', marker_reference.style);
+        lines[#lines + 1] = '    },';
+    end
     lines[#lines + 1] = '}';
     lines[#lines + 1] = '';
 
