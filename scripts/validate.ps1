@@ -236,6 +236,16 @@ if ($content -notmatch "tab_row_width \+ 3 \+ tab_group_width <= GUIDE_TEXT_WRAP
     throw 'Guide tabs must wrap within the existing guide window width.'
 }
 
+if ($content -notmatch 'local function text_colored_wrapped\(color, text, wrap_position\)' -or
+    $content -notmatch 'text_colored_wrapped\(COLORS\.muted, hunt\.details, width - 12\)') {
+    throw 'The compact NM Hunt drawer must use its own text-wrap boundary.'
+}
+
+if ($content -notmatch 'local height = open and math\.max\(120, minimap\.size - 44\) or 32' -or
+    $content -notmatch 'Open or reopen Widescan after filtering') {
+    throw 'The NM Hunt drawer must remain scrollable and explain empty exact-ID Filterscan results.'
+}
+
 if ($content -notmatch "(?s)previous == nil and guide\.type ~= 'pages_of_valor'.+state\.settings\.guide_steps\[guide\.key\]") {
     throw 'Normal guides do not restore their persisted step when reopened.'
 }

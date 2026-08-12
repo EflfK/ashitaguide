@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.30.0';
+addon.version = '0.30.1';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -621,12 +621,13 @@ local function text_wrapped(text)
     end
 end
 
-local function text_colored_wrapped(color, text)
+local function text_colored_wrapped(color, text, wrap_position)
     if (type(imgui.PushTextWrapPos) == 'function' and type(imgui.PopTextWrapPos) == 'function') then
         local cursor_x = type(imgui.GetCursorPosX) == 'function'
             and (tonumber(imgui.GetCursorPosX()) or 0)
             or 0;
-        imgui.PushTextWrapPos(math.max(cursor_x + 1, GUIDE_TEXT_WRAP_POS_X));
+        local wrap_x = tonumber(wrap_position) or GUIDE_TEXT_WRAP_POS_X;
+        imgui.PushTextWrapPos(math.max(cursor_x + 1, wrap_x));
         imgui.TextColored(color, tostring(text or ''));
         imgui.PopTextWrapPos();
         return;
@@ -6249,10 +6250,11 @@ state.render_nm_hunt_window = function ()
     end
     local open = state.settings.nm_hunt_drawer_open == true;
     local width = open and 304 or 38;
+    local height = open and math.max(120, minimap.size - 44) or 32;
     local window_x = minimap.x + minimap.size - width;
     local window_y = minimap.y + 44;
     imgui.SetNextWindowPos({ window_x, window_y }, 0);
-    imgui.SetNextWindowSize({ width, open and 0 or 32 }, 0);
+    imgui.SetNextWindowSize({ width, height }, 0);
     push_display_window_style(state.guide_opacity);
     imgui.PushStyleVar(IMGUI.style_frame_padding, { 4, 2 });
     imgui.PushStyleVar(IMGUI.style_window_rounding, 7.0);
@@ -6263,9 +6265,6 @@ state.render_nm_hunt_window = function ()
         IMGUI.window_no_resize,
         IMGUI.window_no_move,
         IMGUI.window_no_saved_settings);
-    if (open) then
-        flags = bit.bor(flags, IMGUI.window_always_auto_resize);
-    end
     local visible = imgui.Begin('NM Hunt###AshitaGuideNmHunt', true, flags);
     if (visible) then
         if (open) then
@@ -6335,15 +6334,19 @@ state.render_nm_hunt_window = function ()
                     hunt.spawn_type,
                     hunt.level,
                     tonumber(hunt.placeholder_count) or 0));
-            text_colored_wrapped(COLORS.muted, hunt.details);
+            text_colored_wrapped(COLORS.muted, hunt.details, width - 12);
             if (hunt.filter_scan ~= nil) then
                 local scan_label = player.zone_id == 107 and 'Scan Lizzy PHs' or 'Scan 14A';
                 if (imgui.SmallButton(scan_label .. '##nm_hunt_scan_' .. tostring(hunt.mob_id))) then
                     AshitaCore:GetChatManager():QueueCommand(-1, '/filterscan ' .. hunt.filter_scan);
                 end
+                text_colored_wrapped(
+                    COLORS.muted,
+                    'Open or reopen Widescan after filtering. An empty list means the exact target is down or out of range.',
+                    width - 12);
                 if (#(hunt.timers or {}) > 0) then
-                    for _, timer in ipairs(hunt.timers) do
-                        imgui.SameLine();
+                    for index, timer in ipairs(hunt.timers) do
+                        if (index > 1) then imgui.SameLine(); end
                         if (imgui.SmallButton(timer.button .. '##nm_hunt_' .. timer.kind)) then
                             state.start_nm_hunt_timer(hunt, timer.kind);
                         end

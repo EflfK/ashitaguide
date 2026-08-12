@@ -433,7 +433,10 @@ Rock Lizard placeholders (`17B` lowland and `18F` northwest upland) receive
 separate lizard map markers and independent 5:30 manual countdowns. The
 Filterscan action includes Lizzy and both PH indices. CatsEyeXI's current
 server script has no meaningful post-kill Lizzy lockout, so the drawer does
-not claim a separate NM cooldown.
+not claim a separate NM cooldown. The drawer wraps to its compact width and
+scrolls vertically when its contents exceed the space beside AshitaMiniMap.
+After applying a filter, open or reopen Widescan; an empty exact-ID result means
+the matching placeholder or NM is currently down or outside Widescan range.
 
 Set `advance_on_target = true` on find/select steps to advance once the player
 selects that NPC. Leave it false or omit it on talk/interact steps so keeping
