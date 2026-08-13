@@ -336,6 +336,16 @@ Assert-NmHuntContains 'Ose' @(
     "index = 0x09F, server_id = 17649823, name = 'Torama'",
     "index = 0x0A0, server_id = 17649824, name = 'Torama'"
 )
+$oseBlock = Get-NmHuntBlock 'Ose'
+foreach ($timerKind in @('ph095', 'ph096', 'ph097', 'ph098', 'ph09b', 'ph09c', 'ph09f', 'ph0a0')) {
+    $pattern = "kind = '$timerKind'.*seconds = 960"
+    if ($oseBlock -notmatch $pattern) {
+        throw "The Ose NM Hunt entry is missing its verified 16-minute timer matching: $pattern"
+    }
+}
+if ($oseBlock -match 'seconds = 300') {
+    throw 'Ose placeholder timers must use the verified 16-minute CatsEyeXI mob-group respawn, not five minutes.'
+}
 
 Assert-NmHuntContains 'Sewer Syrup' @(
     'mob_id = 17461307', 'zone_id = 167',

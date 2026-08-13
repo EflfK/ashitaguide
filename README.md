@@ -441,7 +441,9 @@ each uses the server's 5:15 placeholder respawn. Ose, Sewer Syrup,
 Jaggedy-Eared Jack, and Amemet likewise expose their verified exact
 placeholders, with separate timer rows when a hunt has more than one. Manual
 buttons remain available when a death occurs off screen or is otherwise not
-observed.
+observed. Ose's eight exact Torama actors use the CatsEyeXI mob group's
+16-minute respawn; a successful 5% lottery roll replaces that Torama's next
+respawn with Ose.
 
 Argus, Bloodtear Baldurf, Carmine Dobsonfly, Capricious Cassie, Serket, and
 King Arthro are informational timed, shared-spawn, HQ-lottery, or trigger-chain

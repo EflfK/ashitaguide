@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.30.6';
+addon.version = '0.30.7';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -4730,18 +4730,18 @@ state.LABYRINTH_ONZOZO_NM_HUNTS = {
         name = 'Ose', level = '74-76', mob_id = 17649822,
         zone_id = 213, zone_name = 'Labyrinth of Onzozo', icon = 'coeurl',
         spawn_type = 'Lottery/random start', placeholder_count = 8,
-        details = 'Lottery replacement for eight exact Torama actors.',
+        details = '5% lottery replacement for eight exact Torama actors; each normally respawns in 16 minutes.',
         official_url = 'https://catseyexi.com/mob/17649822',
         filter_scan = 'Ose, 095, 096, 097, 098, 09B, 09C, 09F, 0A0', scan_label = 'Scan Ose PHs',
         timers = {
-            { kind = 'ph095', label = 'PH 095', button = '095 +5m', seconds = 300 },
-            { kind = 'ph096', label = 'PH 096', button = '096 +5m', seconds = 300 },
-            { kind = 'ph097', label = 'PH 097', button = '097 +5m', seconds = 300 },
-            { kind = 'ph098', label = 'PH 098', button = '098 +5m', seconds = 300 },
-            { kind = 'ph09b', label = 'PH 09B', button = '09B +5m', seconds = 300 },
-            { kind = 'ph09c', label = 'PH 09C', button = '09C +5m', seconds = 300 },
-            { kind = 'ph09f', label = 'PH 09F', button = '09F +5m', seconds = 300 },
-            { kind = 'ph0a0', label = 'PH 0A0', button = '0A0 +5m', seconds = 300 },
+            { kind = 'ph095', label = 'PH 095', button = '095 +16m', seconds = 960 },
+            { kind = 'ph096', label = 'PH 096', button = '096 +16m', seconds = 960 },
+            { kind = 'ph097', label = 'PH 097', button = '097 +16m', seconds = 960 },
+            { kind = 'ph098', label = 'PH 098', button = '098 +16m', seconds = 960 },
+            { kind = 'ph09b', label = 'PH 09B', button = '09B +16m', seconds = 960 },
+            { kind = 'ph09c', label = 'PH 09C', button = '09C +16m', seconds = 960 },
+            { kind = 'ph09f', label = 'PH 09F', button = '09F +16m', seconds = 960 },
+            { kind = 'ph0a0', label = 'PH 0A0', button = '0A0 +16m', seconds = 960 },
         },
         nm_targets = {
             { index = 0x09E, server_id = 17649822, name = 'Ose' },
