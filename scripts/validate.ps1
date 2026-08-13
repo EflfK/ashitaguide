@@ -484,9 +484,14 @@ if ($content -notmatch 'local function text_colored_wrapped\(color, text, wrap_p
 
 if ($content -notmatch "capture_window_geometry\(\s*'nm_hunt_window_x'" -or
     $content -notmatch "SetNextWindowSizeConstraints\(\{ 320, 240 \}, \{ 700, 900 \}\)" -or
-    $content -notmatch 'Show all on minimap##nm_hunt_all' -or
+    $content -match 'Show all on minimap##nm_hunt_all' -or
+    $content -notmatch 'MAP   TRACK' -or
+    $content -notmatch 'nm_hunt_map_' -or
+    $content -notmatch 'nm_hunt_track_' -or
+    $content -notmatch 'nm_hunt_toggle_list' -or
+    $content -notmatch 'state\.render_nm_hunt_details\(hunt, width\)' -or
     $content -notmatch 'Exact PH deaths start timers automatically while observed') {
-    throw 'The NM Hunt window must remain movable, resizable, and retain its minimap visibility control.'
+    throw 'The NM Hunt window must remain movable and resizable, with collapsible per-NM map and tracking controls.'
 }
 
 if ($content -notmatch "(?s)previous == nil and guide\.type ~= 'pages_of_valor'.+state\.settings\.guide_steps\[guide\.key\]") {

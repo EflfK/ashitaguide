@@ -422,9 +422,13 @@ use the NM's possible relocation points as placeholder locations.
 
 In supported zones, AshitaGuide opens a separate **NM Hunt** window. The window
 can be moved and resized independently of AshitaMiniMap, and its geometry is
-remembered between sessions. It provides per-NM map visibility, creature
-graphics with hover details, fixed official CatsEyeXI links, and only the
-attended actions supported by that NM. The recommended catalog covers Valkurm
+remembered between sessions. Each monster has separate **MAP** and **TRACK**
+checkboxes: **MAP** controls its AshitaMiniMap markers, while **TRACK** adds or
+removes its full hunt details below the list. Multiple monsters can be mapped
+and tracked at once, and the monster list can be collapsed while those tracked
+details remain visible. It also provides creature graphics with hover details,
+fixed official CatsEyeXI links, and only the attended actions supported by that
+NM. The recommended catalog covers Valkurm
 Emperor, Leaping Lizzy, Ose, Sewer Syrup, Argus, Bloodtear Baldurf, Carmine
 Dobsonfly, Jaggedy-Eared Jack, Capricious Cassie, Serket, Amemet, and King
 Arthro.

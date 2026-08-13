@@ -244,9 +244,9 @@ local DEFAULT_SETTINGS = {
     nm_hunt_window_y = 100,
     nm_hunt_window_width = 400,
     nm_hunt_window_height = 460,
-    nm_hunt_show_all = true,
+    nm_hunt_list_open = true,
     nm_hunt_hidden = {},
-    nm_hunt_selected = 'Valkurm Emperor',
+    nm_hunt_tracked = { ['Valkurm Emperor'] = true },
     nm_hunt_alarm = true,
 };
 
@@ -1286,6 +1286,15 @@ end
 local function normalize_settings(source)
     source = type(source) == 'table' and source or {};
     local legacy_opacity = bounded_number(source.opacity, DEFAULT_SETTINGS.guide_opacity, 0, 100);
+    local nm_hunt_tracked = copy_boolean_map(source.nm_hunt_tracked);
+    if (source.nm_hunt_tracked == nil) then
+        local legacy_selected = trim_string(source.nm_hunt_selected);
+        if (legacy_selected ~= '') then
+            nm_hunt_tracked[legacy_selected] = true;
+        else
+            nm_hunt_tracked = copy_boolean_map(DEFAULT_SETTINGS.nm_hunt_tracked);
+        end
+    end
     return {
         visible = bounded_boolean(source.visible, DEFAULT_SETTINGS.visible),
         window_x = bounded_number(source.window_x, DEFAULT_SETTINGS.window_x, 0, 10000),
@@ -1363,10 +1372,10 @@ local function normalize_settings(source)
             source.nm_hunt_window_width, DEFAULT_SETTINGS.nm_hunt_window_width, 320, 700),
         nm_hunt_window_height = bounded_number(
             source.nm_hunt_window_height, DEFAULT_SETTINGS.nm_hunt_window_height, 240, 900),
-        nm_hunt_show_all = bounded_boolean(
-            source.nm_hunt_show_all, DEFAULT_SETTINGS.nm_hunt_show_all),
+        nm_hunt_list_open = bounded_boolean(
+            source.nm_hunt_list_open, DEFAULT_SETTINGS.nm_hunt_list_open),
         nm_hunt_hidden = copy_boolean_map(source.nm_hunt_hidden or DEFAULT_SETTINGS.nm_hunt_hidden),
-        nm_hunt_selected = trim_string(source.nm_hunt_selected or DEFAULT_SETTINGS.nm_hunt_selected),
+        nm_hunt_tracked = nm_hunt_tracked,
         nm_hunt_alarm = bounded_boolean(source.nm_hunt_alarm, DEFAULT_SETTINGS.nm_hunt_alarm),
     };
 end
@@ -2979,9 +2988,9 @@ local function settings_text()
         string.format('    nm_hunt_window_y = %d,', bounded_number(values.nm_hunt_window_y, DEFAULT_SETTINGS.nm_hunt_window_y, 0, 10000)),
         string.format('    nm_hunt_window_width = %d,', bounded_number(values.nm_hunt_window_width, DEFAULT_SETTINGS.nm_hunt_window_width, 320, 700)),
         string.format('    nm_hunt_window_height = %d,', bounded_number(values.nm_hunt_window_height, DEFAULT_SETTINGS.nm_hunt_window_height, 240, 900)),
-        string.format('    nm_hunt_show_all = %s,', lua_boolean(values.nm_hunt_show_all)),
+        string.format('    nm_hunt_list_open = %s,', lua_boolean(values.nm_hunt_list_open)),
         string.format('    nm_hunt_hidden = %s,', lua_boolean_map(values.nm_hunt_hidden)),
-        string.format('    nm_hunt_selected = %q,', values.nm_hunt_selected),
+        string.format('    nm_hunt_tracked = %s,', lua_boolean_map(values.nm_hunt_tracked)),
         string.format('    nm_hunt_alarm = %s,', lua_boolean(values.nm_hunt_alarm)),
         '};',
         '',
@@ -5453,25 +5462,21 @@ state.nm_hunt_handoff = function ()
         return nil;
     end
     local hidden = {};
+    local markers = {};
     for _, hunt in ipairs(catalog) do
         if (state.settings.nm_hunt_hidden[hunt.name] == true) then
             hidden[#hidden + 1] = hunt.name;
+        else
+            for _, marker in ipairs(hunt.markers or {}) do
+                markers[#markers + 1] = marker;
+            end
         end
     end
-    local selected = nil;
-    for _, hunt in ipairs(catalog) do
-        if (hunt.name == state.settings.nm_hunt_selected) then selected = hunt; end
-    end
-    selected = selected or catalog[1];
     return {
         zone_id = player.zone_id,
-        visible = state.settings.nm_hunt_show_all == true,
+        visible = true,
         hidden = hidden,
-        markers = selected ~= nil
-            and state.settings.nm_hunt_show_all == true
-            and state.settings.nm_hunt_hidden[selected.name] ~= true
-            and selected.markers
-            or {},
+        markers = markers,
     };
 end
 
@@ -6760,13 +6765,6 @@ state.draw_nm_hunt_icon = function (draw_list, kind, x, y)
     end
 end
 
-state.nm_hunt_by_name = function (catalog, name)
-    for _, hunt in ipairs(catalog or {}) do
-        if (hunt.name == name) then return hunt; end
-    end
-    return type(catalog) == 'table' and catalog[1] or nil;
-end
-
 state.render_nm_hunt_button = function (label, size, variant, small)
     local button = COLORS.hunt_frame;
     local hovered = COLORS.hunt_select_hover;
@@ -6871,6 +6869,92 @@ state.render_global_nm_respawn_timers = function (timers)
     imgui.Separator();
 end
 
+state.render_nm_hunt_details = function (hunt, width)
+    local icon_x, icon_y = imgui.GetCursorScreenPos();
+    imgui.Dummy({ 22, 21 });
+    state.draw_nm_hunt_icon(
+        imgui.GetWindowDrawList(), hunt.icon, icon_x + 11, icon_y + 11);
+    imgui.SameLine();
+    imgui.TextColored(COLORS.hunt_brass, hunt.name);
+    imgui.SameLine();
+    if (state.render_nm_hunt_button(
+            'Wiki##nm_hunt_wiki_' .. tostring(hunt.mob_id),
+            nil,
+            'quiet',
+            true)) then
+        state.open_nm_hunt_url(hunt.official_url);
+    end
+    imgui.TextColored(
+        COLORS.hunt_teal,
+        string.format('%s  |  LV %s  |  %d PH',
+            string.upper(hunt.spawn_type),
+            hunt.level,
+            tonumber(hunt.placeholder_count) or 0));
+    text_colored_wrapped(COLORS.muted, hunt.details, width - 12);
+    if (hunt.filter_scan == nil) then
+        return;
+    end
+
+    imgui.TextColored(COLORS.hunt_brass, 'TRACKING');
+    local scan_label = hunt.scan_label or 'Filter Widescan';
+    if (state.render_nm_hunt_button(
+            scan_label .. '##nm_hunt_scan_' .. tostring(hunt.mob_id),
+            { 118, 0 },
+            'primary')) then
+        AshitaCore:GetChatManager():QueueCommand(-1, '/filterscan ' .. hunt.filter_scan);
+    end
+    if (type(hunt.placeholders) == 'table' and #hunt.placeholders > 0) then
+        imgui.SameLine();
+        if (state.render_nm_hunt_button(
+                'Rename PHs##nm_hunt_rename_' .. tostring(hunt.mob_id),
+                { 118, 0 },
+                'secondary')) then
+            local renamed, rename_message = state.apply_nm_hunt_renames(hunt);
+            if (renamed) then
+                log_info(rename_message);
+            else
+                log_warn(rename_message);
+            end
+        end
+    end
+    text_colored_wrapped(
+        COLORS.muted,
+        'Scan filters Widescan; Rename PHs labels the exact local nameplates through Renamer. Exact PH deaths start timers automatically while observed.',
+        width - 12);
+    imgui.TextColored(COLORS.hunt_brass, 'RESPAWN TIMERS');
+    if (#(hunt.timers or {}) > 0) then
+        for index, timer in ipairs(hunt.timers) do
+            if (index > 1) then imgui.SameLine(); end
+            if (state.render_nm_hunt_button(
+                    timer.button .. '##nm_hunt_' .. timer.kind,
+                    { 118, 0 },
+                    'secondary')) then
+                state.start_nm_hunt_timer(hunt, timer.kind);
+            end
+        end
+        imgui.Separator();
+        for _, timer in ipairs(hunt.timers) do
+            state.render_nm_hunt_timer_line(hunt, timer.kind, timer.label);
+        end
+    else
+        if (state.render_nm_hunt_button(
+                'PH +5m##nm_hunt_ph_' .. tostring(hunt.mob_id),
+                { 118, 0 },
+                'secondary')) then
+            state.start_nm_hunt_timer(hunt, 'ph');
+        end
+        imgui.SameLine();
+        if (state.render_nm_hunt_button(
+                'NM +60m##nm_hunt_nm_' .. tostring(hunt.mob_id),
+                { 118, 0 },
+                'secondary')) then
+            state.start_nm_hunt_timer(hunt, 'nm');
+        end
+        imgui.Separator();
+        state.render_nm_hunt_timer_line(hunt, 'ph', 'PH');
+    end
+end
+
 state.render_nm_hunt_window = function ()
     local player = current_navigation_player();
     local catalog = player ~= nil and state.NM_HUNTS_BY_ZONE[player.zone_id] or nil;
@@ -6930,13 +7014,6 @@ state.render_nm_hunt_window = function ()
         if (imgui.Checkbox('Alarm##nm_hunt_alarm', alarm)) then
             state.settings.nm_hunt_alarm = alarm[1] == true;
         end
-        if (catalog ~= nil) then
-            imgui.SameLine();
-            local show_all = T{ state.settings.nm_hunt_show_all == true };
-            if (imgui.Checkbox('Show all on minimap##nm_hunt_all', show_all)) then
-                state.settings.nm_hunt_show_all = show_all[1] == true;
-            end
-        end
 
         imgui.Separator();
 
@@ -6944,116 +7021,56 @@ state.render_nm_hunt_window = function ()
 
         if (catalog ~= nil) then
             state.nm_hunt.hovered_name = nil;
-            for _, hunt in ipairs(catalog) do
-                local shown = state.settings.nm_hunt_hidden[hunt.name] ~= true;
-                local shown_ref = T{ shown };
-                if (imgui.Checkbox('##nm_hunt_show_' .. tostring(hunt.mob_id), shown_ref)) then
-                    if (shown_ref[1] == true) then
-                        state.settings.nm_hunt_hidden[hunt.name] = nil;
-                    else
-                        state.settings.nm_hunt_hidden[hunt.name] = true;
+            local list_label = state.settings.nm_hunt_list_open == true
+                and '- Monsters##nm_hunt_toggle_list'
+                or '+ Monsters##nm_hunt_toggle_list';
+            if (state.render_nm_hunt_button(list_label, nil, 'quiet', true)) then
+                state.settings.nm_hunt_list_open = state.settings.nm_hunt_list_open ~= true;
+            end
+            if (state.settings.nm_hunt_list_open == true) then
+                imgui.TextColored(COLORS.muted, 'MAP   TRACK');
+                for _, hunt in ipairs(catalog) do
+                    local map_ref = T{ state.settings.nm_hunt_hidden[hunt.name] ~= true };
+                    if (imgui.Checkbox('##nm_hunt_map_' .. tostring(hunt.mob_id), map_ref)) then
+                        if (map_ref[1] == true) then
+                            state.settings.nm_hunt_hidden[hunt.name] = nil;
+                        else
+                            state.settings.nm_hunt_hidden[hunt.name] = true;
+                        end
                     end
-                end
-                imgui.SameLine();
-                local icon_x, icon_y = imgui.GetCursorScreenPos();
-                imgui.Dummy({ 20, 19 });
-                state.draw_nm_hunt_icon(
-                    imgui.GetWindowDrawList(), hunt.icon, icon_x + 10, icon_y + 10);
-                imgui.SameLine();
-                local selected = state.settings.nm_hunt_selected == hunt.name;
-                if (imgui.Selectable(
-                        string.format('%-24s Lv.%s##nm_hunt_%d', hunt.name, hunt.level, hunt.mob_id),
-                        selected)) then
-                    state.settings.nm_hunt_selected = hunt.name;
-                end
-                if (imgui.IsItemHovered()) then
-                    state.nm_hunt.hovered_name = hunt.name;
+                    imgui.SameLine();
+                    local track_ref = T{ state.settings.nm_hunt_tracked[hunt.name] == true };
+                    if (imgui.Checkbox('##nm_hunt_track_' .. tostring(hunt.mob_id), track_ref)) then
+                        state.settings.nm_hunt_tracked[hunt.name] = track_ref[1] == true
+                            and true
+                            or nil;
+                    end
+                    imgui.SameLine();
+                    local icon_x, icon_y = imgui.GetCursorScreenPos();
+                    imgui.Dummy({ 20, 19 });
+                    state.draw_nm_hunt_icon(
+                        imgui.GetWindowDrawList(), hunt.icon, icon_x + 10, icon_y + 10);
+                    imgui.SameLine();
+                    imgui.Text(string.format('%-24s Lv.%s', hunt.name, hunt.level));
+                    if (imgui.IsItemHovered()) then
+                        state.nm_hunt.hovered_name = hunt.name;
+                    end
                 end
             end
 
-            local hunt = state.nm_hunt_by_name(
-                catalog, state.settings.nm_hunt_selected);
             imgui.Separator();
-            local icon_x, icon_y = imgui.GetCursorScreenPos();
-            imgui.Dummy({ 22, 21 });
-            state.draw_nm_hunt_icon(
-                imgui.GetWindowDrawList(), hunt.icon, icon_x + 11, icon_y + 11);
-            imgui.SameLine();
-            imgui.TextColored(COLORS.hunt_brass, hunt.name);
-            imgui.SameLine();
-            if (state.render_nm_hunt_button(
-                    'Wiki##nm_hunt_wiki_' .. tostring(hunt.mob_id),
-                    nil,
-                    'quiet',
-                    true)) then
-                state.open_nm_hunt_url(hunt.official_url);
+            local tracked_count = 0;
+            for _, hunt in ipairs(catalog) do
+                if (state.settings.nm_hunt_tracked[hunt.name] == true) then
+                    if (tracked_count > 0) then
+                        imgui.Separator();
+                    end
+                    state.render_nm_hunt_details(hunt, width);
+                    tracked_count = tracked_count + 1;
+                end
             end
-            imgui.TextColored(
-                COLORS.hunt_teal,
-                string.format('%s  |  LV %s  |  %d PH',
-                    string.upper(hunt.spawn_type),
-                    hunt.level,
-                    tonumber(hunt.placeholder_count) or 0));
-            text_colored_wrapped(COLORS.muted, hunt.details, width - 12);
-            if (hunt.filter_scan ~= nil) then
-                imgui.TextColored(COLORS.hunt_brass, 'TRACKING');
-                local scan_label = hunt.scan_label or 'Filter Widescan';
-                if (state.render_nm_hunt_button(
-                        scan_label .. '##nm_hunt_scan_' .. tostring(hunt.mob_id),
-                        { 118, 0 },
-                        'primary')) then
-                    AshitaCore:GetChatManager():QueueCommand(-1, '/filterscan ' .. hunt.filter_scan);
-                end
-                if (type(hunt.placeholders) == 'table' and #hunt.placeholders > 0) then
-                    imgui.SameLine();
-                    if (state.render_nm_hunt_button(
-                            'Rename PHs##nm_hunt_rename_' .. tostring(hunt.mob_id),
-                            { 118, 0 },
-                            'secondary')) then
-                        local renamed, rename_message = state.apply_nm_hunt_renames(hunt);
-                        if (renamed) then
-                            log_info(rename_message);
-                        else
-                            log_warn(rename_message);
-                        end
-                    end
-                end
-                text_colored_wrapped(
-                    COLORS.muted,
-                    'Scan filters Widescan; Rename PHs labels the exact local nameplates through Renamer. Exact PH deaths start timers automatically while observed.',
-                    width - 12);
-                imgui.TextColored(COLORS.hunt_brass, 'RESPAWN TIMERS');
-                if (#(hunt.timers or {}) > 0) then
-                    for index, timer in ipairs(hunt.timers) do
-                        if (index > 1) then imgui.SameLine(); end
-                        if (state.render_nm_hunt_button(
-                                timer.button .. '##nm_hunt_' .. timer.kind,
-                                { 118, 0 },
-                                'secondary')) then
-                            state.start_nm_hunt_timer(hunt, timer.kind);
-                        end
-                    end
-                    imgui.Separator();
-                    for _, timer in ipairs(hunt.timers) do
-                        state.render_nm_hunt_timer_line(hunt, timer.kind, timer.label);
-                    end
-                else
-                    if (state.render_nm_hunt_button(
-                            'PH +5m##nm_hunt_ph_' .. tostring(hunt.mob_id),
-                            { 118, 0 },
-                            'secondary')) then
-                        state.start_nm_hunt_timer(hunt, 'ph');
-                    end
-                    imgui.SameLine();
-                    if (state.render_nm_hunt_button(
-                            'NM +60m##nm_hunt_nm_' .. tostring(hunt.mob_id),
-                            { 118, 0 },
-                            'secondary')) then
-                        state.start_nm_hunt_timer(hunt, 'nm');
-                    end
-                    imgui.Separator();
-                    state.render_nm_hunt_timer_line(hunt, 'ph', 'PH');
-                end
+            if (tracked_count == 0) then
+                imgui.TextColored(COLORS.muted, 'Select TRACK beside one or more monsters.');
             end
         end
     end
