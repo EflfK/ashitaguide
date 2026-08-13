@@ -426,7 +426,8 @@ remembered between sessions. It provides per-NM map visibility, creature graphic
 details, fixed official CatsEyeXI links, and only the attended actions supported
 by that NM. Valkurm Emperor includes Filterscan, manual five-minute PH and
 60-minute NM timer buttons, persistent countdown rows, reset/clear controls,
-and an optional system alarm when either countdown reaches zero. The existing
+and an optional Windows notification alarm when either countdown reaches zero.
+The alarm avoids the Exclamation sound used by consent/admin prompts. The existing
 exact-14A defeat detection and the manual PH button share the same countdown.
 
 South Gustaberg uses the same window for Leaping Lizzy alone. Its two exact

@@ -136,6 +136,9 @@ $required = @(
     "state.update_respawn_timers",
     "state.process_respawn_text",
     "state.render_respawn_timer",
+    "state.play_nm_hunt_alarm",
+    "PlaySoundA",
+    "SystemNotification",
     "Expected respawn in %02d:%02d",
     "Progress",
     "ReadProcessMemory",
@@ -158,6 +161,10 @@ $required = @(
     "function decision.pin_legacy_chat_closed",
     "A1????????C64059018B0D????????C6415901C20800"
 )
+
+if ($content.Contains('MessageBeep(0x30)')) {
+    throw 'NM hunt alarms must not use the Windows Exclamation sound associated with consent/admin prompts.'
+}
 
 foreach ($needle in $required) {
     if ($content -notlike "*$needle*") {

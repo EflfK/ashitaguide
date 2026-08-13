@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.30.1';
+addon.version = '0.30.2';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -15,10 +15,12 @@ local d3d8_device = d3d8.get_device();
 pcall(decision.ffi.cdef, 'void* __stdcall GetCurrentProcess(void);');
 pcall(decision.ffi.cdef, 'int __stdcall ReadProcessMemory(void*, const void*, void*, unsigned long, unsigned long*);');
 pcall(decision.ffi.cdef, 'int __stdcall MessageBeep(unsigned int);');
+pcall(decision.ffi.cdef, 'int __stdcall PlaySoundA(const char*, void*, unsigned int);');
 pcall(decision.ffi.cdef, 'void* __stdcall ShellExecuteA(void*, const char*, const char*, const char*, const char*, int);');
 
 decision.process_handle = decision.ffi.C.GetCurrentProcess();
 decision.user32 = select(2, pcall(decision.ffi.load, 'user32'));
+decision.winmm = select(2, pcall(decision.ffi.load, 'winmm'));
 decision.shell32 = select(2, pcall(decision.ffi.load, 'shell32'));
 
 function decision.guarded_read_bytes(address, size)
@@ -4534,6 +4536,17 @@ state.clear_nm_hunt_timer = function (hunt, kind)
     state.nm_hunt.ready[token] = nil;
 end
 
+state.play_nm_hunt_alarm = function ()
+    -- Use the Windows notification event asynchronously. The previous
+    -- MB_ICONEXCLAMATION sound is also used for consent/admin prompts.
+    local ok, played = pcall(function ()
+        return decision.winmm.PlaySoundA('SystemNotification', nil, 0x00010003);
+    end);
+    if (ok ~= true or tonumber(played) == 0) then
+        pcall(function () decision.user32.MessageBeep(0x40); end);
+    end
+end
+
 state.update_nm_hunt_alarms = function ()
     local now = os.time();
     for _, catalog in pairs(state.NM_HUNTS_BY_ZONE) do
@@ -4552,7 +4565,7 @@ state.update_nm_hunt_alarms = function ()
                         and state.nm_hunt.alarm_notified[token] ~= true) then
                     state.nm_hunt.alarm_notified[token] = true;
                     if (state.settings.nm_hunt_alarm == true) then
-                        pcall(function () decision.user32.MessageBeep(0x30); end);
+                        state.play_nm_hunt_alarm();
                     end
                 end
             end
