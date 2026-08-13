@@ -6429,6 +6429,33 @@ state.nm_hunt_by_name = function (catalog, name)
     return type(catalog) == 'table' and catalog[1] or nil;
 end
 
+state.render_nm_hunt_button = function (label, size, variant, small)
+    local button = COLORS.hunt_frame;
+    local hovered = COLORS.hunt_select_hover;
+    local active = COLORS.hunt_select;
+    local text = COLORS.hunt_brass;
+    if (variant == 'primary') then
+        button = { 0.10, 0.31, 0.35, 0.98 };
+        hovered = { 0.13, 0.41, 0.46, 1.00 };
+        active = { 0.16, 0.49, 0.53, 1.00 };
+        text = { 0.94, 1.00, 1.00, 1.00 };
+    elseif (variant == 'quiet') then
+        text = COLORS.hunt_teal;
+    end
+    imgui.PushStyleColor(IMGUI.col_button, button);
+    imgui.PushStyleColor(IMGUI.col_button_hovered, hovered);
+    imgui.PushStyleColor(IMGUI.col_button_active, active);
+    imgui.PushStyleColor(IMGUI.col_text, text);
+    local pressed = false;
+    if (small == true) then
+        pressed = imgui.SmallButton(label);
+    else
+        pressed = imgui.Button(label, size or { 0, 0 });
+    end
+    imgui.PopStyleColor(4);
+    return pressed;
+end
+
 state.render_nm_hunt_timer_line = function (hunt, kind, label)
     local token = state.nm_hunt_timer_token(hunt, kind);
     local expiration = tonumber(state.settings.respawn_timer_expirations[token]);
@@ -6447,11 +6474,19 @@ state.render_nm_hunt_timer_line = function (hunt, kind, label)
     imgui.TextColored(color, string.format('%s %s%s', label, status, source_label));
     if (expiration ~= nil) then
         imgui.SameLine();
-        if (imgui.SmallButton('Reset##nm_timer_reset_' .. tostring(hunt.mob_id) .. kind)) then
+        if (state.render_nm_hunt_button(
+                'Reset##nm_timer_reset_' .. tostring(hunt.mob_id) .. kind,
+                nil,
+                'quiet',
+                true)) then
             state.start_nm_hunt_timer(hunt, kind);
         end
         imgui.SameLine();
-        if (imgui.SmallButton('X##nm_timer_clear_' .. tostring(hunt.mob_id) .. kind)) then
+        if (state.render_nm_hunt_button(
+                'X##nm_timer_clear_' .. tostring(hunt.mob_id) .. kind,
+                nil,
+                'quiet',
+                true)) then
             state.clear_nm_hunt_timer(hunt, kind);
         end
     end
@@ -6487,6 +6522,9 @@ state.render_nm_hunt_window = function ()
     imgui.PushStyleColor(IMGUI.col_frame_bg_active, COLORS.hunt_select);
     imgui.PushStyleColor(IMGUI.col_check_mark, COLORS.hunt_teal);
     imgui.PushStyleColor(IMGUI.col_separator, { 0.25, 0.30, 0.31, 0.72 });
+    imgui.PushStyleColor(IMGUI.col_button, COLORS.hunt_frame);
+    imgui.PushStyleColor(IMGUI.col_button_hovered, COLORS.hunt_select_hover);
+    imgui.PushStyleColor(IMGUI.col_button_active, COLORS.hunt_select);
     local flags = IMGUI.window_no_saved_settings;
     local visible = imgui.Begin('NM Hunt###AshitaGuideNmHunt', true, flags);
     capture_window_geometry(
@@ -6554,7 +6592,11 @@ state.render_nm_hunt_window = function ()
             imgui.SameLine();
             imgui.TextColored(COLORS.hunt_brass, hunt.name);
             imgui.SameLine();
-            if (imgui.SmallButton('Wiki##nm_hunt_wiki_' .. tostring(hunt.mob_id))) then
+            if (state.render_nm_hunt_button(
+                    'Wiki##nm_hunt_wiki_' .. tostring(hunt.mob_id),
+                    nil,
+                    'quiet',
+                    true)) then
                 state.open_nm_hunt_url(hunt.official_url);
             end
             imgui.TextColored(
@@ -6567,7 +6609,10 @@ state.render_nm_hunt_window = function ()
             if (hunt.filter_scan ~= nil) then
                 imgui.TextColored(COLORS.hunt_brass, 'TRACKING');
                 local scan_label = hunt.scan_label or 'Filter Widescan';
-                if (imgui.Button(scan_label .. '##nm_hunt_scan_' .. tostring(hunt.mob_id), { 118, 0 })) then
+                if (state.render_nm_hunt_button(
+                        scan_label .. '##nm_hunt_scan_' .. tostring(hunt.mob_id),
+                        { 118, 0 },
+                        'primary')) then
                     AshitaCore:GetChatManager():QueueCommand(-1, '/filterscan ' .. hunt.filter_scan);
                 end
                 text_colored_wrapped(
@@ -6578,7 +6623,10 @@ state.render_nm_hunt_window = function ()
                 if (#(hunt.timers or {}) > 0) then
                     for index, timer in ipairs(hunt.timers) do
                         if (index > 1) then imgui.SameLine(); end
-                        if (imgui.Button(timer.button .. '##nm_hunt_' .. timer.kind, { 118, 0 })) then
+                        if (state.render_nm_hunt_button(
+                                timer.button .. '##nm_hunt_' .. timer.kind,
+                                { 118, 0 },
+                                'secondary')) then
                             state.start_nm_hunt_timer(hunt, timer.kind);
                         end
                     end
@@ -6587,11 +6635,17 @@ state.render_nm_hunt_window = function ()
                         state.render_nm_hunt_timer_line(hunt, timer.kind, timer.label);
                     end
                 else
-                    if (imgui.Button('PH +5m##nm_hunt_ph_' .. tostring(hunt.mob_id), { 118, 0 })) then
+                    if (state.render_nm_hunt_button(
+                            'PH +5m##nm_hunt_ph_' .. tostring(hunt.mob_id),
+                            { 118, 0 },
+                            'secondary')) then
                         state.start_nm_hunt_timer(hunt, 'ph');
                     end
                     imgui.SameLine();
-                    if (imgui.Button('NM +60m##nm_hunt_nm_' .. tostring(hunt.mob_id), { 118, 0 })) then
+                    if (state.render_nm_hunt_button(
+                            'NM +60m##nm_hunt_nm_' .. tostring(hunt.mob_id),
+                            { 118, 0 },
+                            'secondary')) then
                         state.start_nm_hunt_timer(hunt, 'nm');
                     end
                     imgui.Separator();
@@ -6601,7 +6655,7 @@ state.render_nm_hunt_window = function ()
             end
     end
     imgui.End();
-    imgui.PopStyleColor(11);
+    imgui.PopStyleColor(14);
     imgui.PopStyleVar(3);
     pop_window_style();
 end
