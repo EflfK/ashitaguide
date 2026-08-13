@@ -4809,10 +4809,6 @@ state.start_nm_hunt_placeholder_timer = function (hunt, placeholder, tracker, re
     tracker.last_start_reason = reason;
     tracker.observed_alive = false;
     tracker.last_hp = 0;
-    log_info(string.format(
-        '%s %03X defeated; NM hunt timer started automatically.',
-        tostring(placeholder.name or 'Placeholder'),
-        tonumber(placeholder.index) or 0));
     return true;
 end
 
