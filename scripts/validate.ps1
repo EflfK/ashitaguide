@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $addon = Join-Path $root 'ashitaguide.lua'
 $config = Join-Path $root 'ashitaguide_config.lua'
+$alarm = Join-Path $root 'sounds\claim-window-alert.wav'
 
 if (-not (Test-Path -LiteralPath $addon)) {
     throw "Missing addon file: $addon"
@@ -10,6 +11,17 @@ if (-not (Test-Path -LiteralPath $addon)) {
 
 if (-not (Test-Path -LiteralPath $config)) {
     throw "Missing config file: $config"
+}
+
+if (-not (Test-Path -LiteralPath $alarm)) {
+    throw "Missing custom NM timer alarm: $alarm"
+}
+
+$alarmBytes = [System.IO.File]::ReadAllBytes($alarm)
+if (($alarmBytes.Length -lt 44) -or
+        ([System.Text.Encoding]::ASCII.GetString($alarmBytes, 0, 4) -ne 'RIFF') -or
+        ([System.Text.Encoding]::ASCII.GetString($alarmBytes, 8, 4) -ne 'WAVE')) {
+    throw 'Custom NM timer alarm must be a valid RIFF/WAVE file.'
 }
 
 $content = Get-Content -LiteralPath $addon -Raw
@@ -138,6 +150,8 @@ $required = @(
     "state.render_respawn_timer",
     "state.play_nm_hunt_alarm",
     "PlaySoundA",
+    "claim-window-alert.wav",
+    "0x00020003",
     "SystemNotification",
     "Expected respawn in %02d:%02d",
     "Progress",

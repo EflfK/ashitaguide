@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.30.2';
+addon.version = '0.30.3';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -4553,13 +4553,20 @@ state.clear_nm_hunt_timer = function (hunt, kind)
 end
 
 state.play_nm_hunt_alarm = function ()
-    -- Use the Windows notification event asynchronously. The previous
-    -- MB_ICONEXCLAMATION sound is also used for consent/admin prompts.
+    local sound_path = path_join(addon.path or '', 'sounds\\claim-window-alert.wav');
     local ok, played = pcall(function ()
-        return decision.winmm.PlaySoundA('SystemNotification', nil, 0x00010003);
+        -- SND_FILENAME | SND_ASYNC | SND_NODEFAULT
+        return decision.winmm.PlaySoundA(sound_path, nil, 0x00020003);
     end);
     if (ok ~= true or tonumber(played) == 0) then
-        pcall(function () decision.user32.MessageBeep(0x40); end);
+        ok, played = pcall(function ()
+            -- Fall back to a neutral system notification without using the
+            -- Exclamation sound associated with consent/admin prompts.
+            return decision.winmm.PlaySoundA('SystemNotification', nil, 0x00010003);
+        end);
+        if (ok ~= true or tonumber(played) == 0) then
+            pcall(function () decision.user32.MessageBeep(0x40); end);
+        end
     end
 end
 
