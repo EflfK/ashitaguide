@@ -6917,10 +6917,6 @@ state.render_nm_hunt_details = function (hunt, width)
             end
         end
     end
-    text_colored_wrapped(
-        COLORS.muted,
-        'Scan filters Widescan; Rename PHs labels the exact local nameplates through Renamer. Exact PH deaths start timers automatically while observed.',
-        width - 12);
     imgui.TextColored(COLORS.hunt_brass, 'RESPAWN TIMERS');
     if (#(hunt.timers or {}) > 0) then
         for index, timer in ipairs(hunt.timers) do

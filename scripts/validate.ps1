@@ -490,7 +490,7 @@ if ($content -notmatch "capture_window_geometry\(\s*'nm_hunt_window_x'" -or
     $content -notmatch 'nm_hunt_track_' -or
     $content -notmatch 'nm_hunt_toggle_list' -or
     $content -notmatch 'state\.render_nm_hunt_details\(hunt, width\)' -or
-    $content -notmatch 'Exact PH deaths start timers automatically while observed') {
+    $content -match 'Scan filters Widescan; Rename PHs labels') {
     throw 'The NM Hunt window must remain movable and resizable, with collapsible per-NM map and tracking controls.'
 }
 
