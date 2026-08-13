@@ -26,6 +26,33 @@ if (($alarmBytes.Length -lt 44) -or
 
 $content = Get-Content -LiteralPath $addon -Raw
 
+function Get-NmHuntBlock([string] $name) {
+    $escapedName = [regex]::Escape($name)
+    $match = [regex]::Match(
+        $content,
+        "(?ms)^    \{\r?\n        name = '$escapedName'.*?^    \},")
+    if (-not $match.Success) {
+        throw "Missing NM Hunt catalog entry: $name"
+    }
+    return $match.Value
+}
+
+function Assert-NmHuntContains([string] $name, [string[]] $patterns) {
+    $block = Get-NmHuntBlock $name
+    foreach ($pattern in $patterns) {
+        if ($block -notmatch $pattern) {
+            throw "The $name NM Hunt entry is missing required data matching: $pattern"
+        }
+    }
+}
+
+function Assert-NmHuntHasNoFixedNmTimer([string] $name) {
+    $block = Get-NmHuntBlock $name
+    if ($block -match '\bnm_seconds\s*=') {
+        throw "The $name NM Hunt entry must not present a fixed NM timer for a random window or group spawn."
+    }
+}
+
 $required = @(
     "addon.name    = 'ashitaguide'",
     "ashita.events.register('d3d_present'",
@@ -270,6 +297,155 @@ if ($content -notmatch "index = 0x14A, server_id = 17199434, name = 'Damselfly'"
     $content -notmatch "timer_kind = 'ph17b'" -or
     $content -notmatch "timer_kind = 'ph18f'") {
     throw 'Current lottery NM hunts must declare their exact placeholders for generic automatic timers.'
+}
+
+Assert-NmHuntContains 'Valkurm Emperor' @(
+    "mob_id = 17199438",
+    "zone_id = 103",
+    "index = 0x14E, server_id = 17199438, name = 'Valkurm Emperor'",
+    "index = 0x14A, server_id = 17199434, name = 'Damselfly'",
+    "placeholder_seconds = 300",
+    "nm_seconds = 3600"
+)
+
+$lizzyBlock = Get-NmHuntBlock 'Leaping Lizzy'
+foreach ($pattern in @(
+        "mob_id = 17215868",
+        "zone_id = 107",
+        "index = 0x17B, server_id = 17215867, name = 'Rock Lizard'",
+        "index = 0x18F, server_id = 17215887, name = 'Rock Lizard'",
+        "kind = 'ph17b'.+seconds = 315",
+        "kind = 'ph18f'.+seconds = 315")) {
+    if ($lizzyBlock -notmatch $pattern) {
+        throw "The Leaping Lizzy NM Hunt entry is missing corrected 5:15 data matching: $pattern"
+    }
+}
+if ($lizzyBlock -match 'seconds = 330') {
+    throw 'Leaping Lizzy placeholder timers must use the verified 5:15 reference, not 5:30.'
+}
+
+Assert-NmHuntContains 'Ose' @(
+    'mob_id = 17649822', 'zone_id = 213',
+    "index = 0x09E, server_id = 17649822, name = 'Ose'",
+    "index = 0x095, server_id = 17649813, name = 'Torama'",
+    "index = 0x096, server_id = 17649814, name = 'Torama'",
+    "index = 0x097, server_id = 17649815, name = 'Torama'",
+    "index = 0x098, server_id = 17649816, name = 'Torama'",
+    "index = 0x09B, server_id = 17649819, name = 'Torama'",
+    "index = 0x09C, server_id = 17649820, name = 'Torama'",
+    "index = 0x09F, server_id = 17649823, name = 'Torama'",
+    "index = 0x0A0, server_id = 17649824, name = 'Torama'"
+)
+
+Assert-NmHuntContains 'Sewer Syrup' @(
+    'mob_id = 17461307', 'zone_id = 167',
+    "index = 0x03B, server_id = 17461307, name = 'Sewer Syrup'",
+    "index = 0x039, server_id = 17461305, name = 'Mousse'",
+    "index = 0x03A, server_id = 17461306, name = 'Mousse'"
+)
+
+Assert-NmHuntContains 'Argus' @(
+    'mob_id = 17588674', 'zone_id = 198',
+    "index = 0x1C2, server_id = 17588674, name = 'Argus'",
+    "index = 0x1CD, server_id = 17588685, name = 'Leech King'"
+)
+Assert-NmHuntHasNoFixedNmTimer 'Argus'
+
+Assert-NmHuntContains 'Bloodtear Baldurf' @(
+    'mob_id = 17195318', 'zone_id = 102',
+    "index = 0x136, server_id = 17195318, name = 'Bloodtear Baldurf'",
+    "index = 0x135, server_id = 17195317, name = 'Lumbering Lambert'",
+    "index = 0x087, server_id = 17195143, name = 'Battering Ram'",
+    "index = 0x134, server_id = 17195316, name = 'Battering Ram'"
+)
+Assert-NmHuntHasNoFixedNmTimer 'Bloodtear Baldurf'
+
+$carmineBlock = Get-NmHuntBlock 'Carmine Dobsonfly'
+foreach ($pattern in @(
+        'mob_id = 16900230', 'zone_id = 30',
+        "index = 0x086, server_id = 16900230, name = 'Carmine Dobsonfly'",
+        "index = 0x087, server_id = 16900231, name = 'Carmine Dobsonfly'",
+        "index = 0x088, server_id = 16900232, name = 'Carmine Dobsonfly'",
+        "index = 0x089, server_id = 16900233, name = 'Carmine Dobsonfly'",
+        "index = 0x08A, server_id = 16900234, name = 'Carmine Dobsonfly'",
+        "index = 0x08B, server_id = 16900235, name = 'Carmine Dobsonfly'",
+        "index = 0x08C, server_id = 16900236, name = 'Carmine Dobsonfly'",
+        "index = 0x08D, server_id = 16900237, name = 'Carmine Dobsonfly'",
+        "index = 0x08E, server_id = 16900238, name = 'Carmine Dobsonfly'",
+        "index = 0x08F, server_id = 16900239, name = 'Carmine Dobsonfly'")) {
+    if ($carmineBlock -notmatch $pattern) {
+        throw "The Carmine Dobsonfly NM Hunt entry is missing verified group data matching: $pattern"
+    }
+}
+if ($carmineBlock -notmatch "spawn_type = '[^']*[Tt]imed[^']*'" -or
+        $carmineBlock -match '\bplaceholders\s*=' -or
+        $carmineBlock -match '\bnm_seconds\s*=') {
+    throw 'Carmine Dobsonfly must be a ten-member group/random-window hunt without placeholder or fixed NM timers.'
+}
+
+Assert-NmHuntContains 'Jaggedy-Eared Jack' @(
+    'mob_id = 17187111', 'zone_id = 100',
+    "index = 0x127, server_id = 17187111, name = 'Jaggedy-Eared Jack'",
+    "index = 0x126, server_id = 17187110, name = 'Forest Hare'"
+)
+Assert-NmHuntHasNoFixedNmTimer 'Jaggedy-Eared Jack'
+
+Assert-NmHuntContains 'Capricious Cassie' @(
+    'mob_id = 17613129', 'zone_id = 204',
+    "index = 0x049, server_id = 17613129, name = 'Capricious Cassie'"
+)
+Assert-NmHuntHasNoFixedNmTimer 'Capricious Cassie'
+
+Assert-NmHuntContains 'Serket' @(
+    'mob_id = 17596720', 'zone_id = 200',
+    "index = 0x030, server_id = 17596720, name = 'Serket'"
+)
+Assert-NmHuntHasNoFixedNmTimer 'Serket'
+
+Assert-NmHuntContains 'Amemet' @(
+    'mob_id = 17490016', 'zone_id = 174',
+    "index = 0x060, server_id = 17490016, name = 'Amemet'",
+    "index = 0x00C, server_id = 17489932, name = 'Sand Lizard'",
+    "index = 0x00D, server_id = 17489933, name = 'Sand Lizard'",
+    "index = 0x00E, server_id = 17489934, name = 'Sand Lizard'",
+    "index = 0x04A, server_id = 17489994, name = 'Sand Lizard'",
+    "index = 0x050, server_id = 17490000, name = 'Sand Lizard'",
+    "index = 0x051, server_id = 17490001, name = 'Sand Lizard'",
+    "index = 0x052, server_id = 17490002, name = 'Sand Lizard'",
+    "index = 0x053, server_id = 17490003, name = 'Sand Lizard'",
+    "index = 0x054, server_id = 17490004, name = 'Sand Lizard'",
+    "index = 0x055, server_id = 17490005, name = 'Sand Lizard'",
+    "index = 0x058, server_id = 17490008, name = 'Sand Lizard'",
+    "index = 0x059, server_id = 17490009, name = 'Sand Lizard'",
+    "index = 0x05A, server_id = 17490010, name = 'Sand Lizard'"
+)
+
+$arthroBlock = Get-NmHuntBlock 'King Arthro'
+foreach ($pattern in @(
+        'mob_id = 17203216', 'zone_id = 104',
+        "index = 0x010, server_id = 17203216, name = 'King Arthro'",
+        "index = 0x006, server_id = 17203206, name = 'Knight Crab'",
+        "index = 0x007, server_id = 17203207, name = 'Knight Crab'",
+        "index = 0x008, server_id = 17203208, name = 'Knight Crab'",
+        "index = 0x009, server_id = 17203209, name = 'Knight Crab'",
+        "index = 0x00A, server_id = 17203210, name = 'Knight Crab'",
+        "index = 0x00B, server_id = 17203211, name = 'Knight Crab'",
+        "index = 0x00C, server_id = 17203212, name = 'Knight Crab'",
+        "index = 0x00D, server_id = 17203213, name = 'Knight Crab'",
+        "index = 0x00E, server_id = 17203214, name = 'Knight Crab'",
+        "index = 0x00F, server_id = 17203215, name = 'Knight Crab'")) {
+    if ($arthroBlock -notmatch $pattern) {
+        throw "The King Arthro NM Hunt entry is missing verified group data matching: $pattern"
+    }
+}
+if ($arthroBlock -match '\b(?:nm_seconds|placeholder_seconds|timers)\s*=') {
+    throw 'King Arthro must not expose ordinary placeholder timers or a fixed group/NM timer.'
+}
+
+foreach ($zoneId in @(30, 100, 102, 103, 104, 107, 167, 174, 198, 200, 204, 213)) {
+    if ($content -notmatch "(?s)state\.NM_HUNTS_BY_ZONE = \{.+\[$zoneId\] = state\.[A-Z0-9_]+_NM_HUNTS") {
+        throw "The NM Hunt catalog must register zone $zoneId in NM_HUNTS_BY_ZONE."
+    }
 }
 
 if ($content -notmatch "(?s)state\.update_nm_hunt_placeholder_timers = function.+placeholder\.index.+placeholder\.server_id.+placeholder\.name.+tracker\.last_hp > 0" -or

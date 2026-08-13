@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.30.5';
+addon.version = '0.30.6';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -4524,8 +4524,8 @@ state.SOUTH_GUSTABERG_NM_HUNTS = {
         official_url = 'https://catseyexi.com/mob/17215868',
         filter_scan = 'Lizzy, 17B, 18F', scan_label = 'Scan Lizzy PHs',
         timers = {
-            { kind = 'ph17b', label = 'PH 17B', button = '17B +5:30', seconds = 330 },
-            { kind = 'ph18f', label = 'PH 18F', button = '18F +5:30', seconds = 330 },
+            { kind = 'ph17b', label = 'PH 17B', button = '17B +5:15', seconds = 315 },
+            { kind = 'ph18f', label = 'PH 18F', button = '18F +5:15', seconds = 315 },
         },
         placeholders = {
             {
@@ -4544,9 +4544,248 @@ state.SOUTH_GUSTABERG_NM_HUNTS = {
     },
 };
 
+state.WEST_RONFAURE_NM_HUNTS = {
+    {
+        name = 'Jaggedy-Eared Jack', level = '9-10', mob_id = 17187111,
+        zone_id = 100, zone_name = 'West Ronfaure', icon = 'rabbit',
+        spawn_type = 'Lottery', placeholder_count = 1,
+        details = 'Lottery replacement for the exact Forest Hare at target index 126.',
+        official_url = 'https://catseyexi.com/mob/17187111',
+        filter_scan = 'Jaggedy, 126', scan_label = 'Scan Jack PH',
+        placeholder_seconds = 300,
+        nm_targets = {
+            { index = 0x127, server_id = 17187111, name = 'Jaggedy-Eared Jack' },
+        },
+        placeholders = {
+            { index = 0x126, server_id = 17187110, name = 'Forest Hare', timer_kind = 'ph' },
+        },
+    },
+};
+
+state.LA_THEINE_NM_HUNTS = {
+    {
+        name = 'Bloodtear Baldurf', level = '55-56', mob_id = 17195318,
+        zone_id = 102, zone_name = 'La Theine Plateau', icon = 'ram',
+        spawn_type = 'HQ lottery chain', placeholder_count = 2,
+        details = 'Battering Rams can produce Lumbering Lambert; Lambert can then produce Bloodtear. This is a hierarchy, not a fixed countdown.',
+        official_url = 'https://catseyexi.com/mob/17195318',
+        filter_scan = 'Bloodtear, Lambert, 087, 134', scan_label = 'Scan ram chain',
+        nm_targets = {
+            { index = 0x136, server_id = 17195318, name = 'Bloodtear Baldurf' },
+            { index = 0x135, server_id = 17195317, name = 'Lumbering Lambert' },
+        },
+        placeholders = {
+            { index = 0x087, server_id = 17195143, name = 'Battering Ram' },
+            { index = 0x134, server_id = 17195316, name = 'Battering Ram' },
+        },
+    },
+};
+
+state.JUGNER_FOREST_NM_HUNTS = {
+    {
+        name = 'King Arthro', level = '55', mob_id = 17203216,
+        zone_id = 104, zone_name = 'Jugner Forest', icon = 'crab',
+        spawn_type = 'Triggered/random window', placeholder_count = 10,
+        details = 'Defeat all ten exact Knight Crabs to trigger King Arthro. The group return uses a random window, so no fixed timer is shown.',
+        official_url = 'https://catseyexi.com/mob/17203216',
+        filter_scan = 'Arthro, 006, 007, 008, 009, 00A, 00B, 00C, 00D, 00E, 00F', scan_label = 'Scan Arthro group',
+        nm_targets = {
+            { index = 0x010, server_id = 17203216, name = 'King Arthro' },
+        },
+        group_members = {
+            { index = 0x006, server_id = 17203206, name = 'Knight Crab' },
+            { index = 0x007, server_id = 17203207, name = 'Knight Crab' },
+            { index = 0x008, server_id = 17203208, name = 'Knight Crab' },
+            { index = 0x009, server_id = 17203209, name = 'Knight Crab' },
+            { index = 0x00A, server_id = 17203210, name = 'Knight Crab' },
+            { index = 0x00B, server_id = 17203211, name = 'Knight Crab' },
+            { index = 0x00C, server_id = 17203212, name = 'Knight Crab' },
+            { index = 0x00D, server_id = 17203213, name = 'Knight Crab' },
+            { index = 0x00E, server_id = 17203214, name = 'Knight Crab' },
+            { index = 0x00F, server_id = 17203215, name = 'Knight Crab' },
+        },
+    },
+};
+
+state.BOSTAUNIEUX_NM_HUNTS = {
+    {
+        name = 'Sewer Syrup', level = '64-65', mob_id = 17461307,
+        zone_id = 167, zone_name = 'Bostaunieux Oubliette', icon = 'slime',
+        spawn_type = 'Lottery/random start', placeholder_count = 2,
+        details = 'Lottery replacement for two exact Mousse actors in the lower sewer.',
+        official_url = 'https://catseyexi.com/mob/17461307',
+        filter_scan = 'Sewer, 039, 03A', scan_label = 'Scan Syrup PHs',
+        timers = {
+            { kind = 'ph039', label = 'PH 039', button = '039 +5m', seconds = 300 },
+            { kind = 'ph03a', label = 'PH 03A', button = '03A +5m', seconds = 300 },
+        },
+        nm_targets = {
+            { index = 0x03B, server_id = 17461307, name = 'Sewer Syrup' },
+        },
+        placeholders = {
+            { index = 0x039, server_id = 17461305, name = 'Mousse', timer_kind = 'ph039' },
+            { index = 0x03A, server_id = 17461306, name = 'Mousse', timer_kind = 'ph03a' },
+        },
+    },
+};
+
+state.KUFTAL_TUNNEL_NM_HUNTS = {
+    {
+        name = 'Amemet', level = '66', mob_id = 17490016,
+        zone_id = 174, zone_name = 'Kuftal Tunnel', icon = 'lizard',
+        spawn_type = 'Lottery/random start', placeholder_count = 13,
+        details = 'Lottery replacement for thirteen exact Sand Lizard actors on map page 2.',
+        official_url = 'https://catseyexi.com/mob/17490016',
+        filter_scan = 'Amemet, 00C, 00D, 00E, 04A, 050, 051, 052, 053, 054, 055, 058, 059, 05A', scan_label = 'Scan Amemet PHs',
+        timers = {
+            { kind = 'ph00c', label = 'PH 00C', button = '00C +5m', seconds = 300 },
+            { kind = 'ph00d', label = 'PH 00D', button = '00D +5m', seconds = 300 },
+            { kind = 'ph00e', label = 'PH 00E', button = '00E +5m', seconds = 300 },
+            { kind = 'ph04a', label = 'PH 04A', button = '04A +5m', seconds = 300 },
+            { kind = 'ph050', label = 'PH 050', button = '050 +5m', seconds = 300 },
+            { kind = 'ph051', label = 'PH 051', button = '051 +5m', seconds = 300 },
+            { kind = 'ph052', label = 'PH 052', button = '052 +5m', seconds = 300 },
+            { kind = 'ph053', label = 'PH 053', button = '053 +5m', seconds = 300 },
+            { kind = 'ph054', label = 'PH 054', button = '054 +5m', seconds = 300 },
+            { kind = 'ph055', label = 'PH 055', button = '055 +5m', seconds = 300 },
+            { kind = 'ph058', label = 'PH 058', button = '058 +5m', seconds = 300 },
+            { kind = 'ph059', label = 'PH 059', button = '059 +5m', seconds = 300 },
+            { kind = 'ph05a', label = 'PH 05A', button = '05A +5m', seconds = 300 },
+        },
+        nm_targets = {
+            { index = 0x060, server_id = 17490016, name = 'Amemet' },
+        },
+        placeholders = {
+            { index = 0x00C, server_id = 17489932, name = 'Sand Lizard', timer_kind = 'ph00c' },
+            { index = 0x00D, server_id = 17489933, name = 'Sand Lizard', timer_kind = 'ph00d' },
+            { index = 0x00E, server_id = 17489934, name = 'Sand Lizard', timer_kind = 'ph00e' },
+            { index = 0x04A, server_id = 17489994, name = 'Sand Lizard', timer_kind = 'ph04a' },
+            { index = 0x050, server_id = 17490000, name = 'Sand Lizard', timer_kind = 'ph050' },
+            { index = 0x051, server_id = 17490001, name = 'Sand Lizard', timer_kind = 'ph051' },
+            { index = 0x052, server_id = 17490002, name = 'Sand Lizard', timer_kind = 'ph052' },
+            { index = 0x053, server_id = 17490003, name = 'Sand Lizard', timer_kind = 'ph053' },
+            { index = 0x054, server_id = 17490004, name = 'Sand Lizard', timer_kind = 'ph054' },
+            { index = 0x055, server_id = 17490005, name = 'Sand Lizard', timer_kind = 'ph055' },
+            { index = 0x058, server_id = 17490008, name = 'Sand Lizard', timer_kind = 'ph058' },
+            { index = 0x059, server_id = 17490009, name = 'Sand Lizard', timer_kind = 'ph059' },
+            { index = 0x05A, server_id = 17490010, name = 'Sand Lizard', timer_kind = 'ph05a' },
+        },
+    },
+};
+
+state.MAZE_SHAKHRAMI_NM_HUNTS = {
+    {
+        name = 'Argus', level = '36-37', mob_id = 17588674,
+        zone_id = 198, zone_name = 'Maze of Shakhrami', icon = 'hecteyes',
+        spawn_type = 'Shared timed/random window', placeholder_count = 0,
+        details = 'Argus and Leech King share a random 1-2 hour cycle. No fixed countdown is claimed.',
+        official_url = 'https://catseyexi.com/mob/17588674',
+        filter_scan = 'Argus, Leech', scan_label = 'Scan shared spawn',
+        nm_targets = {
+            { index = 0x1C2, server_id = 17588674, name = 'Argus' },
+            { index = 0x1CD, server_id = 17588685, name = 'Leech King' },
+        },
+    },
+};
+
+state.GARLAIGE_CITADEL_NM_HUNTS = {
+    {
+        name = 'Serket', level = '70', mob_id = 17596720,
+        zone_id = 200, zone_name = 'Garlaige Citadel', icon = 'scorpion',
+        spawn_type = 'Timed/random window', placeholder_count = 0,
+        details = 'Timed random-start NM with a 21-24 hour server window; no single fixed countdown is shown.',
+        official_url = 'https://catseyexi.com/mob/17596720',
+        filter_scan = 'Serket', scan_label = 'Scan Serket',
+        nm_targets = {
+            { index = 0x030, server_id = 17596720, name = 'Serket' },
+        },
+    },
+};
+
+state.FEIYIN_NM_HUNTS = {
+    {
+        name = 'Capricious Cassie', level = '70', mob_id = 17613129,
+        zone_id = 204, zone_name = "Fei'Yin", icon = 'morbol',
+        spawn_type = 'Timed/random window', placeholder_count = 0,
+        details = 'Timed random-start NM with a 21-24 hour server window; no single fixed countdown is shown.',
+        official_url = 'https://catseyexi.com/mob/17613129',
+        filter_scan = 'Cassie', scan_label = 'Scan Cassie',
+        nm_targets = {
+            { index = 0x049, server_id = 17613129, name = 'Capricious Cassie' },
+        },
+    },
+};
+
+state.LABYRINTH_ONZOZO_NM_HUNTS = {
+    {
+        name = 'Ose', level = '74-76', mob_id = 17649822,
+        zone_id = 213, zone_name = 'Labyrinth of Onzozo', icon = 'coeurl',
+        spawn_type = 'Lottery/random start', placeholder_count = 8,
+        details = 'Lottery replacement for eight exact Torama actors.',
+        official_url = 'https://catseyexi.com/mob/17649822',
+        filter_scan = 'Ose, 095, 096, 097, 098, 09B, 09C, 09F, 0A0', scan_label = 'Scan Ose PHs',
+        timers = {
+            { kind = 'ph095', label = 'PH 095', button = '095 +5m', seconds = 300 },
+            { kind = 'ph096', label = 'PH 096', button = '096 +5m', seconds = 300 },
+            { kind = 'ph097', label = 'PH 097', button = '097 +5m', seconds = 300 },
+            { kind = 'ph098', label = 'PH 098', button = '098 +5m', seconds = 300 },
+            { kind = 'ph09b', label = 'PH 09B', button = '09B +5m', seconds = 300 },
+            { kind = 'ph09c', label = 'PH 09C', button = '09C +5m', seconds = 300 },
+            { kind = 'ph09f', label = 'PH 09F', button = '09F +5m', seconds = 300 },
+            { kind = 'ph0a0', label = 'PH 0A0', button = '0A0 +5m', seconds = 300 },
+        },
+        nm_targets = {
+            { index = 0x09E, server_id = 17649822, name = 'Ose' },
+        },
+        placeholders = {
+            { index = 0x095, server_id = 17649813, name = 'Torama', timer_kind = 'ph095' },
+            { index = 0x096, server_id = 17649814, name = 'Torama', timer_kind = 'ph096' },
+            { index = 0x097, server_id = 17649815, name = 'Torama', timer_kind = 'ph097' },
+            { index = 0x098, server_id = 17649816, name = 'Torama', timer_kind = 'ph098' },
+            { index = 0x09B, server_id = 17649819, name = 'Torama', timer_kind = 'ph09b' },
+            { index = 0x09C, server_id = 17649820, name = 'Torama', timer_kind = 'ph09c' },
+            { index = 0x09F, server_id = 17649823, name = 'Torama', timer_kind = 'ph09f' },
+            { index = 0x0A0, server_id = 17649824, name = 'Torama', timer_kind = 'ph0a0' },
+        },
+    },
+};
+
+state.RIVERNE_A01_NM_HUNTS = {
+    {
+        name = 'Carmine Dobsonfly', level = '44-46', mob_id = 16900230,
+        zone_id = 30, zone_name = 'Riverne - Site #A01', icon = 'damselfly',
+        spawn_type = 'Timed/random window', placeholder_count = 0,
+        details = 'Ten-member timed group with a shared 21-24 hour return after the full group is defeated. No fixed timer is shown.',
+        official_url = 'https://catseyexi.com/mob/16900230',
+        filter_scan = 'Carmine', scan_label = 'Scan Carmine group',
+        nm_targets = {
+            { index = 0x086, server_id = 16900230, name = 'Carmine Dobsonfly' },
+            { index = 0x087, server_id = 16900231, name = 'Carmine Dobsonfly' },
+            { index = 0x088, server_id = 16900232, name = 'Carmine Dobsonfly' },
+            { index = 0x089, server_id = 16900233, name = 'Carmine Dobsonfly' },
+            { index = 0x08A, server_id = 16900234, name = 'Carmine Dobsonfly' },
+            { index = 0x08B, server_id = 16900235, name = 'Carmine Dobsonfly' },
+            { index = 0x08C, server_id = 16900236, name = 'Carmine Dobsonfly' },
+            { index = 0x08D, server_id = 16900237, name = 'Carmine Dobsonfly' },
+            { index = 0x08E, server_id = 16900238, name = 'Carmine Dobsonfly' },
+            { index = 0x08F, server_id = 16900239, name = 'Carmine Dobsonfly' },
+        },
+    },
+};
+
 state.NM_HUNTS_BY_ZONE = {
+    [30] = state.RIVERNE_A01_NM_HUNTS,
+    [100] = state.WEST_RONFAURE_NM_HUNTS,
+    [102] = state.LA_THEINE_NM_HUNTS,
     [103] = state.DUNES_NM_HUNTS,
+    [104] = state.JUGNER_FOREST_NM_HUNTS,
     [107] = state.SOUTH_GUSTABERG_NM_HUNTS,
+    [167] = state.BOSTAUNIEUX_NM_HUNTS,
+    [174] = state.KUFTAL_TUNNEL_NM_HUNTS,
+    [198] = state.MAZE_SHAKHRAMI_NM_HUNTS,
+    [200] = state.GARLAIGE_CITADEL_NM_HUNTS,
+    [204] = state.FEIYIN_NM_HUNTS,
+    [213] = state.LABYRINTH_ONZOZO_NM_HUNTS,
 };
 
 state.nm_hunt_placeholder_display_name = function (index, original_name)

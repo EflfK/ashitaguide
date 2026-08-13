@@ -420,17 +420,40 @@ then draws one damselfly icon per explicit placeholder location without gold
 guide dots or a route, while retaining its separate NM relocation blob. Do not
 use the NM's possible relocation points as placeholder locations.
 
-In Valkurm Dunes, AshitaGuide opens a separate **NM Hunt** window. The window
+In supported zones, AshitaGuide opens a separate **NM Hunt** window. The window
 can be moved and resized independently of AshitaMiniMap, and its geometry is
-remembered between sessions. It provides per-NM map visibility, creature graphics with hover
-details, fixed official CatsEyeXI links, and only the attended actions supported
-by that NM. Valkurm Emperor includes Filterscan, manual five-minute PH and
-60-minute NM timer buttons, persistent countdown rows, reset/clear controls,
-and an optional custom Claim Window Alert when either countdown reaches zero.
-Exact observed Valkurm Emperor deaths start its 60-minute NM timer
-automatically. Active NM respawn windows are listed in a global NM-only section
-that remains visible after zoning; placeholder timers remain in their local
-hunt details and are not included in the global list.
+remembered between sessions. It provides per-NM map visibility, creature
+graphics with hover details, fixed official CatsEyeXI links, and only the
+attended actions supported by that NM. The recommended catalog covers Valkurm
+Emperor, Leaping Lizzy, Ose, Sewer Syrup, Argus, Bloodtear Baldurf, Carmine
+Dobsonfly, Jaggedy-Eared Jack, Capricious Cassie, Serket, Amemet, and King
+Arthro.
+
+Exact lottery tracking is enabled only when the CatsEyeXI actor identity and
+normal placeholder respawn are known. Valkurm Emperor tracks its exact
+Damselfly with a five-minute PH timer and its exact death with a 60-minute NM
+timer. Leaping Lizzy tracks the two exact Rock Lizard actors independently;
+each uses the server's 5:15 placeholder respawn. Ose, Sewer Syrup,
+Jaggedy-Eared Jack, and Amemet likewise expose their verified exact
+placeholders, with separate timer rows when a hunt has more than one. Manual
+buttons remain available when a death occurs off screen or is otherwise not
+observed.
+
+Argus, Bloodtear Baldurf, Carmine Dobsonfly, Capricious Cassie, Serket, and
+King Arthro are informational timed, shared-spawn, HQ-lottery, or trigger-chain
+entries rather than ordinary fixed-PH countdowns. In particular, Argus shares
+its timed spawn with Leech King; Bloodtear Baldurf depends on the Lumbering
+Lambert chain; King Arthro depends on ten Knight Crabs; and Carmine Dobsonfly
+is a timed group. The pinned CatsEyeXI scripts give Capricious Cassie and
+Serket 21-24-hour random respawns, while King Arthro's crab return is
+randomized. The window describes those ranges without presenting a single
+countdown as an exact pop time.
+
+Persistent countdown rows include reset/clear controls and an optional custom
+Claim Window Alert when a tracked countdown reaches zero. Active exact NM
+respawn timers are listed in a global NM-only section that remains visible
+after zoning; placeholder timers remain in their local hunt details and are
+not included in the global list.
 For lottery hunts with exact placeholder IDs, **Rename PHs** sits beside the
 scan button. It writes a small per-hunt list under Renamer's local configuration
 folder and merges it into the active list, preserving unrelated renames. The
@@ -444,17 +467,11 @@ notification while avoiding the Exclamation sound used by consent/admin
 prompts. The existing exact-14A defeat detection and the manual PH button share
 the same countdown. Golden Bat's three exact Sand Bat placeholders (`1C9`,
 `1CA`, and `1CB`) each have an independent five-minute automatic countdown
-with the same manual fallback.
-
-South Gustaberg uses the same window for Leaping Lizzy alone. Its two exact
-Rock Lizard placeholders (`17B` lowland and `18F` northwest upland) receive
-separate lizard map markers and independent 5:30 countdowns. The addon starts
-the matching countdown automatically when it observes that exact placeholder
-die; the manual buttons remain available for missed or off-screen kills. The
-Filterscan action includes Lizzy and both PH indices. CatsEyeXI's current
-server script has no meaningful post-kill Lizzy lockout, so the window does
-not claim a separate NM cooldown. The window wraps to its current width and
-scrolls vertically when its contents exceed its current height.
+with the same manual fallback. Leaping Lizzy's exact `17B` lowland and `18F`
+northwest-upland Rock Lizards receive separate map markers and independent
+5:15 countdowns. CatsEyeXI has no meaningful post-kill Lizzy lockout, so the
+window does not claim a separate NM cooldown. The window wraps to its current
+width and scrolls vertically when its contents exceed its current height.
 After applying a filter, open or reopen Widescan; an empty exact-ID result means
 the matching placeholder or NM is currently down or outside Widescan range.
 
