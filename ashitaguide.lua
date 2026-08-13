@@ -352,6 +352,8 @@ local state = {
         alarm_armed = {},
         alarm_notified = {},
         ready = {},
+        placeholder_trackers = {},
+        timer_start_reasons = {},
         hovered_name = nil,
         minimap_settings = nil,
         minimap_settings_checked_at = 0,
@@ -4441,16 +4443,45 @@ state.DUNES_NM_HUNTS = {
     },
     {
         name = 'Valkurm Emperor', level = '29-30', mob_id = 17199438,
+        zone_id = 103, zone_name = 'Valkurm Dunes',
         icon = 'damselfly', spawn_type = 'Lottery', placeholder_count = 1,
         details = 'Lottery replacement for Damselfly 14A. The PH can repop at any normal point in its pool.',
         official_url = 'https://catseyexi.com/mob/17199438',
-        filter_scan = 'Valk, 14A', placeholder_seconds = 300, nm_seconds = 3600,
+        filter_scan = 'Valk, 14A', scan_label = 'Scan 14A',
+        placeholder_seconds = 300, nm_seconds = 3600,
+        placeholders = {
+            {
+                index = 0x14A, server_id = 17199434, name = 'Damselfly',
+                timer_kind = 'ph',
+            },
+        },
     },
     {
         name = 'Golden Bat', level = '26-27', mob_id = 17199564,
+        zone_id = 103, zone_name = 'Valkurm Dunes',
         icon = 'bat', spawn_type = 'Lottery', placeholder_count = 3,
-        details = 'Lottery notorious bat in the eastern tunnels.',
+        details = 'Three exact Sand Bat PHs: 1C9 west and 1CA/1CB eastern tunnel pair.',
         official_url = 'https://catseyexi.com/mob/17199564',
+        filter_scan = 'Golden, 1C9, 1CA, 1CB', scan_label = 'Scan Golden PHs',
+        timers = {
+            { kind = 'ph1c9', label = 'PH 1C9', button = '1C9 +5m', seconds = 300 },
+            { kind = 'ph1ca', label = 'PH 1CA', button = '1CA +5m', seconds = 300 },
+            { kind = 'ph1cb', label = 'PH 1CB', button = '1CB +5m', seconds = 300 },
+        },
+        placeholders = {
+            {
+                index = 0x1C9, server_id = 17199561, name = 'Sand Bat',
+                timer_kind = 'ph1c9',
+            },
+            {
+                index = 0x1CA, server_id = 17199562, name = 'Sand Bat',
+                timer_kind = 'ph1ca',
+            },
+            {
+                index = 0x1CB, server_id = 17199563, name = 'Sand Bat',
+                timer_kind = 'ph1cb',
+            },
+        },
     },
     {
         name = 'Goblin Swindler', level = '35', mob_id = 17199601,
@@ -4485,10 +4516,20 @@ state.SOUTH_GUSTABERG_NM_HUNTS = {
         spawn_type = 'Lottery/random start', placeholder_count = 2,
         details = 'Two independent Rock Lizard PHs: 17B lowland and 18F northwest upland. Lizzy has no meaningful post-kill lockout.',
         official_url = 'https://catseyexi.com/mob/17215868',
-        filter_scan = 'Lizzy, 17B, 18F',
+        filter_scan = 'Lizzy, 17B, 18F', scan_label = 'Scan Lizzy PHs',
         timers = {
             { kind = 'ph17b', label = 'PH 17B', button = '17B +5:30', seconds = 330 },
             { kind = 'ph18f', label = 'PH 18F', button = '18F +5:30', seconds = 330 },
+        },
+        placeholders = {
+            {
+                index = 0x17B, server_id = 17215867, name = 'Rock Lizard',
+                timer_kind = 'ph17b',
+            },
+            {
+                index = 0x18F, server_id = 17215887, name = 'Rock Lizard',
+                timer_kind = 'ph18f',
+            },
         },
         markers = {
             { x = -275.441, y = -347.294, z = 20.451, style = 'lizard' },
@@ -4529,19 +4570,21 @@ state.respawn_timer_token = function (run, step_index, step)
         tonumber(step.respawn_target_index) or 0);
 end
 
-state.start_nm_hunt_timer = function (hunt, kind)
+state.start_nm_hunt_timer = function (hunt, kind, reason)
     local seconds = kind == 'ph' and tonumber(hunt.placeholder_seconds) or tonumber(hunt.nm_seconds);
     for _, timer in ipairs(hunt.timers or {}) do
         if (timer.kind == kind) then seconds = tonumber(timer.seconds); end
     end
     if (seconds == nil or seconds <= 0) then
-        return;
+        return false;
     end
     local token = state.nm_hunt_timer_token(hunt, kind);
     state.settings.respawn_timer_expirations[token] = os.time() + seconds;
+    state.nm_hunt.timer_start_reasons[token] = reason or 'manual';
     state.nm_hunt.alarm_armed[token] = true;
     state.nm_hunt.alarm_notified[token] = false;
     state.nm_hunt.ready[token] = false;
+    return true;
 end
 
 state.clear_nm_hunt_timer = function (hunt, kind)
@@ -4550,6 +4593,7 @@ state.clear_nm_hunt_timer = function (hunt, kind)
     state.nm_hunt.alarm_armed[token] = nil;
     state.nm_hunt.alarm_notified[token] = nil;
     state.nm_hunt.ready[token] = nil;
+    state.nm_hunt.timer_start_reasons[token] = nil;
 end
 
 state.play_nm_hunt_alarm = function ()
@@ -4654,6 +4698,123 @@ state.respawn_entity_snapshot = function (entity, index, expected_server_id, exp
     };
 end
 
+state.nm_hunt_placeholder_tracker = function (hunt, placeholder)
+    local token = string.format(
+        '%d|%d|%s',
+        tonumber(hunt.zone_id) or 0,
+        tonumber(placeholder.index) or 0,
+        tostring(placeholder.timer_kind or 'ph'));
+    local tracker = state.nm_hunt.placeholder_trackers[token];
+    if (tracker == nil) then
+        tracker = {};
+        state.nm_hunt.placeholder_trackers[token] = tracker;
+    end
+    return tracker;
+end
+
+state.start_nm_hunt_placeholder_timer = function (hunt, placeholder, tracker, reason)
+    local now = os.time();
+    if (tracker.last_death_at ~= nil and now - tracker.last_death_at <= 2) then
+        return false;
+    end
+    if (not state.start_nm_hunt_timer(
+            hunt, placeholder.timer_kind or 'ph', 'automatic')) then
+        return false;
+    end
+    tracker.last_death_at = now;
+    tracker.last_start_reason = reason;
+    tracker.observed_alive = false;
+    tracker.last_hp = 0;
+    log_info(string.format(
+        '%s %03X defeated; NM hunt timer started automatically.',
+        tostring(placeholder.name or 'Placeholder'),
+        tonumber(placeholder.index) or 0));
+    return true;
+end
+
+state.update_nm_hunt_placeholder_timers = function ()
+    local clock = os.clock();
+    if (clock - (state.nm_hunt.placeholder_last_poll or 0) < 0.10) then
+        return;
+    end
+    state.nm_hunt.placeholder_last_poll = clock;
+
+    local player = current_navigation_player();
+    local catalog = player ~= nil and state.NM_HUNTS_BY_ZONE[player.zone_id] or nil;
+    if (catalog == nil) then
+        return;
+    end
+    local memory = safe_read(function () return AshitaCore:GetMemoryManager(); end, nil);
+    local entity = memory ~= nil and safe_read(function () return memory:GetEntity(); end, nil) or nil;
+    local target_index = current_target_index();
+
+    for _, hunt in ipairs(catalog) do
+        hunt.zone_id = hunt.zone_id or player.zone_id;
+        for _, placeholder in ipairs(hunt.placeholders or {}) do
+            local tracker = state.nm_hunt_placeholder_tracker(hunt, placeholder);
+            local snapshot = state.respawn_entity_snapshot(
+                entity,
+                placeholder.index,
+                placeholder.server_id,
+                tostring(placeholder.name or ''));
+            if (snapshot ~= nil) then
+                if (target_index == placeholder.index) then
+                    tracker.targeted_at = clock;
+                end
+                if (snapshot.hp ~= nil and snapshot.hp <= 0
+                    and tracker.observed_alive == true
+                    and tracker.last_hp ~= nil and tracker.last_hp > 0) then
+                    state.start_nm_hunt_placeholder_timer(
+                        hunt, placeholder, tracker, 'hp');
+                elseif (snapshot.hp ~= nil and snapshot.hp > 0) then
+                    tracker.observed_alive = true;
+                end
+                tracker.last_hp = snapshot.hp;
+            end
+        end
+    end
+end
+
+state.process_nm_hunt_placeholder_text = function (defeated_name)
+    local player = current_navigation_player();
+    local catalog = player ~= nil and state.NM_HUNTS_BY_ZONE[player.zone_id] or nil;
+    if (catalog == nil) then
+        return false;
+    end
+
+    local clock = os.clock();
+    local target_index = current_target_index();
+    local best = nil;
+    for _, hunt in ipairs(catalog) do
+        hunt.zone_id = hunt.zone_id or player.zone_id;
+        for _, placeholder in ipairs(hunt.placeholders or {}) do
+            local tracker = state.nm_hunt_placeholder_tracker(hunt, placeholder);
+            if tostring(placeholder.name or ''):lower() == defeated_name:lower()
+                and tracker.observed_alive == true
+                and tracker.targeted_at ~= nil
+                and clock - tracker.targeted_at <= 15 then
+                local is_current = target_index == placeholder.index;
+                if (best == nil
+                    or (is_current and not best.is_current)
+                    or (is_current == best.is_current
+                        and tracker.targeted_at > best.tracker.targeted_at)) then
+                    best = {
+                        hunt = hunt,
+                        placeholder = placeholder,
+                        tracker = tracker,
+                        is_current = is_current,
+                    };
+                end
+            end
+        end
+    end
+    if (best == nil) then
+        return false;
+    end
+    return state.start_nm_hunt_placeholder_timer(
+        best.hunt, best.placeholder, best.tracker, 'defeat text');
+end
+
 state.update_respawn_timers = function ()
     local clock = os.clock();
     if (clock - (state.respawn_last_poll or 0) < 0.10) then
@@ -4717,6 +4878,7 @@ state.process_respawn_text = function (text)
     if (defeated_name == nil) then
         return false;
     end
+    local handled = state.process_nm_hunt_placeholder_text(defeated_name);
     local clock = os.clock();
     for _, key in ipairs(state.active_order) do
         local run = state.active[key];
@@ -4735,7 +4897,7 @@ state.process_respawn_text = function (text)
             return true;
         end
     end
-    return false;
+    return handled;
 end
 
 local function update_npc_step_auto_advance()
@@ -6270,6 +6432,7 @@ end
 state.render_nm_hunt_timer_line = function (hunt, kind, label)
     local token = state.nm_hunt_timer_token(hunt, kind);
     local expiration = tonumber(state.settings.respawn_timer_expirations[token]);
+    local start_reason = state.nm_hunt.timer_start_reasons[token];
     local remaining = expiration ~= nil and math.max(0, math.ceil(expiration - os.time())) or nil;
     local status = '--:--';
     local color = COLORS.muted;
@@ -6280,7 +6443,8 @@ state.render_nm_hunt_timer_line = function (hunt, kind, label)
         status = 'READY';
         color = COLORS.accent;
     end
-    imgui.TextColored(color, string.format('%s %s', label, status));
+    local source_label = start_reason == 'automatic' and ' AUTO' or '';
+    imgui.TextColored(color, string.format('%s %s%s', label, status, source_label));
     if (expiration ~= nil) then
         imgui.SameLine();
         if (imgui.SmallButton('Reset##nm_timer_reset_' .. tostring(hunt.mob_id) .. kind)) then
@@ -6402,13 +6566,13 @@ state.render_nm_hunt_window = function ()
             text_colored_wrapped(COLORS.muted, hunt.details, width - 12);
             if (hunt.filter_scan ~= nil) then
                 imgui.TextColored(COLORS.hunt_brass, 'TRACKING');
-                local scan_label = player.zone_id == 107 and 'Scan Lizzy PHs' or 'Scan 14A';
+                local scan_label = hunt.scan_label or 'Filter Widescan';
                 if (imgui.Button(scan_label .. '##nm_hunt_scan_' .. tostring(hunt.mob_id), { 118, 0 })) then
                     AshitaCore:GetChatManager():QueueCommand(-1, '/filterscan ' .. hunt.filter_scan);
                 end
                 text_colored_wrapped(
                     COLORS.muted,
-                    'Open or reopen Widescan after filtering. An empty list means the exact target is down or out of range.',
+                    'Exact PH deaths start timers automatically while observed. Manual buttons remain available for missed or off-screen kills.',
                     width - 12);
                 imgui.TextColored(COLORS.hunt_brass, 'RESPAWN TIMERS');
                 if (#(hunt.timers or {}) > 0) then
@@ -6888,6 +7052,7 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     poll_ai_guides_file();
     poll_auction_sale_guide_file();
     state.update_respawn_timers();
+    state.update_nm_hunt_placeholder_timers();
     state.update_nm_hunt_alarms();
     update_npc_step_auto_advance();
     update_level_step_auto_advance();

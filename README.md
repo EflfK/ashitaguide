@@ -430,17 +430,41 @@ and an optional custom Claim Window Alert when either countdown reaches zero.
 If the bundled WAV cannot play, the addon falls back to a neutral Windows
 notification while avoiding the Exclamation sound used by consent/admin
 prompts. The existing exact-14A defeat detection and the manual PH button share
-the same countdown.
+the same countdown. Golden Bat's three exact Sand Bat placeholders (`1C9`,
+`1CA`, and `1CB`) each have an independent five-minute automatic countdown
+with the same manual fallback.
 
 South Gustaberg uses the same window for Leaping Lizzy alone. Its two exact
 Rock Lizard placeholders (`17B` lowland and `18F` northwest upland) receive
-separate lizard map markers and independent 5:30 manual countdowns. The
+separate lizard map markers and independent 5:30 countdowns. The addon starts
+the matching countdown automatically when it observes that exact placeholder
+die; the manual buttons remain available for missed or off-screen kills. The
 Filterscan action includes Lizzy and both PH indices. CatsEyeXI's current
 server script has no meaningful post-kill Lizzy lockout, so the window does
 not claim a separate NM cooldown. The window wraps to its current width and
 scrolls vertically when its contents exceed its current height.
 After applying a filter, open or reopen Widescan; an empty exact-ID result means
 the matching placeholder or NM is currently down or outside Widescan range.
+
+Automatic NM-hunt placeholder tracking is data-driven. Any current or future
+lottery NM can opt in by declaring exact placeholders on its hunt entry:
+
+```lua
+placeholders = {
+    {
+        index = 0x14A,
+        server_id = 17199434,
+        name = 'Damselfly',
+        timer_kind = 'ph',
+    },
+},
+```
+
+`timer_kind` selects the hunt's standard PH timer or a matching entry in its
+`timers` list. Detection requires either an observed alive-to-zero HP transition
+at the exact index or matching defeat text within 15 seconds of targeting that
+exact observed placeholder. It never infers an off-screen death from absence,
+so manual timer controls remain the recovery path.
 
 Set `advance_on_target = true` on find/select steps to advance once the player
 selects that NPC. Leave it false or omit it on talk/interact steps so keeping

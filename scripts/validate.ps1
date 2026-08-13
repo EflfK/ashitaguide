@@ -148,6 +148,9 @@ $required = @(
     "state.update_respawn_timers",
     "state.process_respawn_text",
     "state.render_respawn_timer",
+    "state.update_nm_hunt_placeholder_timers",
+    "state.process_nm_hunt_placeholder_text",
+    "state.start_nm_hunt_placeholder_timer",
     "state.play_nm_hunt_alarm",
     "PlaySoundA",
     "claim-window-alert.wav",
@@ -242,6 +245,22 @@ if ($content -notmatch "GetHPPercent\(index\)" -or
     throw 'Respawn timers must require an exact observed HP transition or a recent exact target before defeat text can start them.'
 }
 
+if ($content -notmatch "index = 0x14A, server_id = 17199434, name = 'Damselfly'" -or
+    $content -notmatch "index = 0x1C9, server_id = 17199561, name = 'Sand Bat'" -or
+    $content -notmatch "index = 0x1CA, server_id = 17199562, name = 'Sand Bat'" -or
+    $content -notmatch "index = 0x1CB, server_id = 17199563, name = 'Sand Bat'" -or
+    $content -notmatch "index = 0x17B, server_id = 17215867, name = 'Rock Lizard'" -or
+    $content -notmatch "index = 0x18F, server_id = 17215887, name = 'Rock Lizard'" -or
+    $content -notmatch "timer_kind = 'ph17b'" -or
+    $content -notmatch "timer_kind = 'ph18f'") {
+    throw 'Current lottery NM hunts must declare their exact placeholders for generic automatic timers.'
+}
+
+if ($content -notmatch "(?s)state\.update_nm_hunt_placeholder_timers = function.+placeholder\.index.+placeholder\.server_id.+placeholder\.name.+tracker\.last_hp > 0" -or
+    $content -notmatch "(?s)state\.process_nm_hunt_placeholder_text = function.+clock - tracker\.targeted_at <= 15.+best\.placeholder") {
+    throw 'NM hunt placeholder timers must use generic exact-index HP and recent-target defeat-text detection.'
+}
+
 if ($content -notmatch "respawn_target_server_id = 17199434" -or
     $content -notmatch "respawn_target_index = 0x14A" -or
     $content -notmatch "respawn_seconds = 300") {
@@ -265,7 +284,7 @@ if ($content -notmatch 'local function text_colored_wrapped\(color, text, wrap_p
 if ($content -notmatch "capture_window_geometry\(\s*'nm_hunt_window_x'" -or
     $content -notmatch "SetNextWindowSizeConstraints\(\{ 320, 240 \}, \{ 700, 900 \}\)" -or
     $content -notmatch 'Show all on minimap##nm_hunt_all' -or
-    $content -notmatch 'Open or reopen Widescan after filtering') {
+    $content -notmatch 'Exact PH deaths start timers automatically while observed') {
     throw 'The NM Hunt window must remain movable, resizable, and retain its minimap visibility control.'
 }
 
