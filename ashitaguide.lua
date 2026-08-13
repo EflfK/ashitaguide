@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.30.4';
+addon.version = '0.30.5';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -4543,6 +4543,26 @@ state.NM_HUNTS_BY_ZONE = {
     [107] = state.SOUTH_GUSTABERG_NM_HUNTS,
 };
 
+state.nm_hunt_placeholder_display_name = function (index, original_name)
+    index = tonumber(index);
+    original_name = clean_message(original_name);
+    if (index == nil or original_name == '') then
+        return '';
+    end
+    return string.format('PH %03X - %s', index, original_name):sub(1, 27);
+end
+
+state.placeholder_name_matches = function (actual_name, original_name, index)
+    local actual = lower_string(actual_name);
+    local original = lower_string(original_name);
+    if (actual == '' or original == '') then
+        return false;
+    end
+    return actual == original
+        or actual == lower_string(
+            state.nm_hunt_placeholder_display_name(index, original_name));
+end
+
 state.apply_nm_hunt_renames = function (hunt)
     local install_path = ashita_install_path();
     local zone_id = tonumber(hunt ~= nil and hunt.zone_id);
@@ -4576,7 +4596,7 @@ state.apply_nm_hunt_renames = function (hunt)
         local index = tonumber(placeholder.index);
         local original_name = clean_message(placeholder.name);
         if (server_id ~= nil and index ~= nil and original_name ~= '') then
-            local renamed = string.format('PH %03X - %s', index, original_name):sub(1, 27);
+            local renamed = state.nm_hunt_placeholder_display_name(index, original_name);
             lines[#lines + 1] = string.format(
                 '        T{ %d, %q },',
                 math.floor(server_id),
@@ -4748,7 +4768,11 @@ state.respawn_entity_snapshot = function (entity, index, expected_server_id, exp
     if (expected_server_id ~= nil and server_id ~= expected_server_id) then
         return nil;
     end
-    if (expected_name ~= '' and name:lower() ~= expected_name:lower()) then
+    -- Renamer changes the local entity name. An exact server ID remains the
+    -- authoritative identity; fall back to name matching only without one.
+    if (expected_server_id == nil
+            and expected_name ~= ''
+            and name:lower() ~= expected_name:lower()) then
         return nil;
     end
     return {
@@ -4849,7 +4873,8 @@ state.process_nm_hunt_placeholder_text = function (defeated_name)
         hunt.zone_id = hunt.zone_id or player.zone_id;
         for _, placeholder in ipairs(hunt.placeholders or {}) do
             local tracker = state.nm_hunt_placeholder_tracker(hunt, placeholder);
-            if tostring(placeholder.name or ''):lower() == defeated_name:lower()
+            if state.placeholder_name_matches(
+                    defeated_name, placeholder.name, placeholder.index)
                 and tracker.observed_alive == true
                 and tracker.targeted_at ~= nil
                 and clock - tracker.targeted_at <= 15 then
@@ -4949,7 +4974,8 @@ state.process_respawn_text = function (text)
         if (step ~= nil and tracker ~= nil
             and step.respawn_target_index ~= nil
             and step.respawn_target_name ~= ''
-            and defeated_name:lower() == step.respawn_target_name:lower()
+            and state.placeholder_name_matches(
+                defeated_name, step.respawn_target_name, step.respawn_target_index)
             and tracker.observed_alive == true
             and tracker.targeted_at ~= nil
             and clock - tracker.targeted_at <= 15) then

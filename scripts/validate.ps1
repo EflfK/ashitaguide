@@ -237,9 +237,15 @@ if ($queueCommands.Count -ne 3 -or
 }
 
 if ($content -notmatch "string\.format\('ashitaguide_nm_%d', math\.floor\(mob_id\)\)" -or
-    $content -notmatch "string\.format\('PH %03X - %s', index, original_name\):sub\(1, 27\)" -or
+    $content -notmatch "state\.nm_hunt_placeholder_display_name\(index, original_name\)" -or
     $content -notmatch "path_join\(addons_root, 'renamer'\)") {
     throw 'NM Hunt Renamer lists must use bounded names and the local Renamer config folder.'
+}
+
+if ($content -notmatch "return string\.format\('PH %03X - %s', index, original_name\):sub\(1, 27\)" -or
+    $content -notmatch 'expected_server_id == nil' -or
+    ([regex]::Matches($content, 'state\.placeholder_name_matches\(')).Count -ne 2) {
+    throw 'Placeholder timers must accept bounded Renamer labels while retaining exact server-ID identity.'
 }
 
 if ($content -notmatch [regex]::Escape('filter:match("^[%w%s,_''%-]+$")')) {

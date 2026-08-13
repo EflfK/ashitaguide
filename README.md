@@ -432,7 +432,9 @@ scan button. It writes a small per-hunt list under Renamer's local configuration
 folder and merges it into the active list, preserving unrelated renames. The
 resulting local nameplates include the exact target index, such as
 `PH 14A - Damselfly`. Renamer must be loaded; the normal startup script should
-include `/addon load renamer` before AshitaGuide.
+include `/addon load renamer` before AshitaGuide. Automatic placeholder timers
+recognize both the original and renamed local name while retaining exact
+server-ID and target-index checks.
 If the bundled WAV cannot play, the addon falls back to a neutral Windows
 notification while avoiding the Exclamation sound used by consent/admin
 prompts. The existing exact-14A defeat detection and the manual PH button share
