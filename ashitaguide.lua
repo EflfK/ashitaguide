@@ -116,6 +116,14 @@ local IMGUI = {
     col_button_hovered = imgui_const('ImGuiCol_ButtonHovered'),
     col_button_active = imgui_const('ImGuiCol_ButtonActive'),
     col_text = imgui_const('ImGuiCol_Text'),
+    col_title_bg = imgui_const('ImGuiCol_TitleBg'),
+    col_title_bg_active = imgui_const('ImGuiCol_TitleBgActive'),
+    col_title_bg_collapsed = imgui_const('ImGuiCol_TitleBgCollapsed'),
+    col_frame_bg = imgui_const('ImGuiCol_FrameBg'),
+    col_frame_bg_hovered = imgui_const('ImGuiCol_FrameBgHovered'),
+    col_frame_bg_active = imgui_const('ImGuiCol_FrameBgActive'),
+    col_check_mark = imgui_const('ImGuiCol_CheckMark'),
+    col_separator = imgui_const('ImGuiCol_Separator'),
     col_header = imgui_const('ImGuiCol_Header'),
     col_header_hovered = imgui_const('ImGuiCol_HeaderHovered'),
     col_header_active = imgui_const('ImGuiCol_HeaderActive'),
@@ -166,6 +174,14 @@ local COLORS = {
     tab_active = { 0.165, 0.165, 0.180, 0.98 },
     tab_text = { 0.78, 0.78, 0.82, 1.00 },
     tab_text_active = { 0.98, 0.98, 1.00, 1.00 },
+    hunt_title = { 0.075, 0.095, 0.115, 1.00 },
+    hunt_title_active = { 0.105, 0.135, 0.155, 1.00 },
+    hunt_select = { 0.120, 0.195, 0.220, 0.92 },
+    hunt_select_hover = { 0.125, 0.165, 0.185, 0.92 },
+    hunt_frame = { 0.070, 0.090, 0.110, 0.94 },
+    hunt_frame_hover = { 0.110, 0.145, 0.165, 0.98 },
+    hunt_teal = { 0.34, 0.78, 0.79, 1.00 },
+    hunt_brass = { 0.84, 0.70, 0.35, 1.00 },
 };
 
 local GUIDE_ANCHOR_CORNERS = {
@@ -226,8 +242,8 @@ local DEFAULT_SETTINGS = {
     nm_hunt_drawer_open = true,
     nm_hunt_window_x = 360,
     nm_hunt_window_y = 100,
-    nm_hunt_window_width = 360,
-    nm_hunt_window_height = 520,
+    nm_hunt_window_width = 400,
+    nm_hunt_window_height = 460,
     nm_hunt_show_all = true,
     nm_hunt_hidden = {},
     nm_hunt_selected = 'Valkurm Emperor',
@@ -6286,9 +6302,20 @@ state.render_nm_hunt_window = function ()
         imgui.SetNextWindowSizeConstraints({ 320, 240 }, { 700, 900 });
     end
     push_display_window_style(state.guide_opacity);
-    imgui.PushStyleVar(IMGUI.style_frame_padding, { 4, 2 });
+    imgui.PushStyleVar(IMGUI.style_frame_padding, { 5, 3 });
     imgui.PushStyleVar(IMGUI.style_window_rounding, 7.0);
-    imgui.PushStyleVar(IMGUI.style_frame_rounding, 3.0);
+    imgui.PushStyleVar(IMGUI.style_frame_rounding, 4.0);
+    imgui.PushStyleColor(IMGUI.col_title_bg, COLORS.hunt_title);
+    imgui.PushStyleColor(IMGUI.col_title_bg_active, COLORS.hunt_title_active);
+    imgui.PushStyleColor(IMGUI.col_title_bg_collapsed, COLORS.hunt_title);
+    imgui.PushStyleColor(IMGUI.col_header, COLORS.hunt_select);
+    imgui.PushStyleColor(IMGUI.col_header_hovered, COLORS.hunt_select_hover);
+    imgui.PushStyleColor(IMGUI.col_header_active, COLORS.hunt_select);
+    imgui.PushStyleColor(IMGUI.col_frame_bg, COLORS.hunt_frame);
+    imgui.PushStyleColor(IMGUI.col_frame_bg_hovered, COLORS.hunt_frame_hover);
+    imgui.PushStyleColor(IMGUI.col_frame_bg_active, COLORS.hunt_select);
+    imgui.PushStyleColor(IMGUI.col_check_mark, COLORS.hunt_teal);
+    imgui.PushStyleColor(IMGUI.col_separator, { 0.25, 0.30, 0.31, 0.72 });
     local flags = IMGUI.window_no_saved_settings;
     local visible = imgui.Begin('NM Hunt###AshitaGuideNmHunt', true, flags);
     capture_window_geometry(
@@ -6302,8 +6329,10 @@ state.render_nm_hunt_window = function ()
         900);
     if (visible) then
         local width = state.settings.nm_hunt_window_width;
-        imgui.TextColored(COLORS.muted, string.upper(player.zone));
+        imgui.TextColored(COLORS.hunt_brass, string.upper(player.zone));
         imgui.SameLine();
+        imgui.TextColored(COLORS.muted, string.format('%d TARGETS', #catalog));
+
         local alarm = T{ state.settings.nm_hunt_alarm == true };
         if (imgui.Checkbox('Alarm##nm_hunt_alarm', alarm)) then
             state.settings.nm_hunt_alarm = alarm[1] == true;
@@ -6313,6 +6342,8 @@ state.render_nm_hunt_window = function ()
         if (imgui.Checkbox('Show all on minimap##nm_hunt_all', show_all)) then
             state.settings.nm_hunt_show_all = show_all[1] == true;
         end
+
+        imgui.Separator();
 
             state.nm_hunt.hovered_name = nil;
             for _, hunt in ipairs(catalog) do
@@ -6333,7 +6364,7 @@ state.render_nm_hunt_window = function ()
                 imgui.SameLine();
                 local selected = state.settings.nm_hunt_selected == hunt.name;
                 if (imgui.Selectable(
-                        string.format('%s  Lv.%s##nm_hunt_%d', hunt.name, hunt.level, hunt.mob_id),
+                        string.format('%-24s Lv.%s##nm_hunt_%d', hunt.name, hunt.level, hunt.mob_id),
                         selected)) then
                     state.settings.nm_hunt_selected = hunt.name;
                 end
@@ -6343,38 +6374,40 @@ state.render_nm_hunt_window = function ()
             end
 
             local hunt = state.nm_hunt_by_name(
-                catalog, state.nm_hunt.hovered_name or state.settings.nm_hunt_selected);
+                catalog, state.settings.nm_hunt_selected);
             imgui.Separator();
             local icon_x, icon_y = imgui.GetCursorScreenPos();
             imgui.Dummy({ 22, 21 });
             state.draw_nm_hunt_icon(
                 imgui.GetWindowDrawList(), hunt.icon, icon_x + 11, icon_y + 11);
             imgui.SameLine();
-            imgui.TextColored(COLORS.header, hunt.name);
+            imgui.TextColored(COLORS.hunt_brass, hunt.name);
             imgui.SameLine();
             if (imgui.SmallButton('Wiki##nm_hunt_wiki_' .. tostring(hunt.mob_id))) then
                 state.open_nm_hunt_url(hunt.official_url);
             end
             imgui.TextColored(
-                COLORS.muted,
-                string.format('%s | Lv.%s | PH %d',
-                    hunt.spawn_type,
+                COLORS.hunt_teal,
+                string.format('%s  |  LV %s  |  %d PH',
+                    string.upper(hunt.spawn_type),
                     hunt.level,
                     tonumber(hunt.placeholder_count) or 0));
             text_colored_wrapped(COLORS.muted, hunt.details, width - 12);
             if (hunt.filter_scan ~= nil) then
+                imgui.TextColored(COLORS.hunt_brass, 'TRACKING');
                 local scan_label = player.zone_id == 107 and 'Scan Lizzy PHs' or 'Scan 14A';
-                if (imgui.SmallButton(scan_label .. '##nm_hunt_scan_' .. tostring(hunt.mob_id))) then
+                if (imgui.Button(scan_label .. '##nm_hunt_scan_' .. tostring(hunt.mob_id), { 118, 0 })) then
                     AshitaCore:GetChatManager():QueueCommand(-1, '/filterscan ' .. hunt.filter_scan);
                 end
                 text_colored_wrapped(
                     COLORS.muted,
                     'Open or reopen Widescan after filtering. An empty list means the exact target is down or out of range.',
                     width - 12);
+                imgui.TextColored(COLORS.hunt_brass, 'RESPAWN TIMERS');
                 if (#(hunt.timers or {}) > 0) then
                     for index, timer in ipairs(hunt.timers) do
                         if (index > 1) then imgui.SameLine(); end
-                        if (imgui.SmallButton(timer.button .. '##nm_hunt_' .. timer.kind)) then
+                        if (imgui.Button(timer.button .. '##nm_hunt_' .. timer.kind, { 118, 0 })) then
                             state.start_nm_hunt_timer(hunt, timer.kind);
                         end
                     end
@@ -6383,12 +6416,11 @@ state.render_nm_hunt_window = function ()
                         state.render_nm_hunt_timer_line(hunt, timer.kind, timer.label);
                     end
                 else
-                    imgui.SameLine();
-                    if (imgui.SmallButton('PH +5m##nm_hunt_ph_' .. tostring(hunt.mob_id))) then
+                    if (imgui.Button('PH +5m##nm_hunt_ph_' .. tostring(hunt.mob_id), { 118, 0 })) then
                         state.start_nm_hunt_timer(hunt, 'ph');
                     end
                     imgui.SameLine();
-                    if (imgui.SmallButton('NM +60m##nm_hunt_nm_' .. tostring(hunt.mob_id))) then
+                    if (imgui.Button('NM +60m##nm_hunt_nm_' .. tostring(hunt.mob_id), { 118, 0 })) then
                         state.start_nm_hunt_timer(hunt, 'nm');
                     end
                     imgui.Separator();
@@ -6398,6 +6430,7 @@ state.render_nm_hunt_window = function ()
             end
     end
     imgui.End();
+    imgui.PopStyleColor(11);
     imgui.PopStyleVar(3);
     pop_window_style();
 end
