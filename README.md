@@ -427,6 +427,10 @@ details, fixed official CatsEyeXI links, and only the attended actions supported
 by that NM. Valkurm Emperor includes Filterscan, manual five-minute PH and
 60-minute NM timer buttons, persistent countdown rows, reset/clear controls,
 and an optional custom Claim Window Alert when either countdown reaches zero.
+Exact observed Valkurm Emperor deaths start its 60-minute NM timer
+automatically. Active NM respawn windows are listed in a global NM-only section
+that remains visible after zoning; placeholder timers remain in their local
+hunt details and are not included in the global list.
 For lottery hunts with exact placeholder IDs, **Rename PHs** sits beside the
 scan button. It writes a small per-hunt list under Renamer's local configuration
 folder and merges it into the active list, preserving unrelated renames. The

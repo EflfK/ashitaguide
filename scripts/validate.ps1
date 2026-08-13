@@ -151,6 +151,9 @@ $required = @(
     "state.update_nm_hunt_placeholder_timers",
     "state.process_nm_hunt_placeholder_text",
     "state.start_nm_hunt_placeholder_timer",
+    "state.nm_hunt_tracked_entities",
+    "state.global_nm_respawn_timers",
+    "state.render_global_nm_respawn_timers",
     "state.play_nm_hunt_alarm",
     "PlaySoundA",
     "claim-window-alert.wav",
@@ -278,6 +281,15 @@ if ($content -notmatch "respawn_target_server_id = 17199434" -or
     $content -notmatch "respawn_target_index = 0x14A" -or
     $content -notmatch "respawn_seconds = 300") {
     throw 'The Valkurm Emperor guide must track the verified 14A placeholder with a five-minute timer.'
+}
+if ($content -notmatch "index = 0x14E, server_id = 17199438, name = 'Valkurm Emperor'" -or
+    $content -notmatch "(?s)state\.global_nm_respawn_timers = function.+nm_hunt_timer_token\(hunt, 'nm'\).+expiration ~= nil" -or
+    $content -notmatch "NM RESPAWN WINDOWS" -or
+    $content -notmatch "catalog == nil and #global_nm_timers == 0") {
+    throw 'Global NM respawn tracking must detect exact NM deaths and remain visible across zones.'
+}
+if ($content -notmatch "(?s)state\.render_global_nm_respawn_timers = function.+render_nm_hunt_timer_line\(hunt, 'nm', label\)") {
+    throw 'The global respawn list must render NM timers only.'
 }
 if ($content -notmatch "target_x = -228\.957" -or
     $content -notmatch "target_y = -101\.226" -or

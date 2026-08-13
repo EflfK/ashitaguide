@@ -4449,6 +4449,12 @@ state.DUNES_NM_HUNTS = {
         official_url = 'https://catseyexi.com/mob/17199438',
         filter_scan = 'Valk, 14A', scan_label = 'Scan 14A',
         placeholder_seconds = 300, nm_seconds = 3600,
+        nm_targets = {
+            {
+                index = 0x14E, server_id = 17199438, name = 'Valkurm Emperor',
+                timer_kind = 'nm',
+            },
+        },
         placeholders = {
             {
                 index = 0x14A, server_id = 17199434, name = 'Damselfly',
@@ -4796,6 +4802,17 @@ state.nm_hunt_placeholder_tracker = function (hunt, placeholder)
     return tracker;
 end
 
+state.nm_hunt_tracked_entities = function (hunt)
+    local tracked = {};
+    for _, placeholder in ipairs(hunt.placeholders or {}) do
+        tracked[#tracked + 1] = placeholder;
+    end
+    for _, nm_target in ipairs(hunt.nm_targets or {}) do
+        tracked[#tracked + 1] = nm_target;
+    end
+    return tracked;
+end
+
 state.start_nm_hunt_placeholder_timer = function (hunt, placeholder, tracker, reason)
     local now = os.time();
     if (tracker.last_death_at ~= nil and now - tracker.last_death_at <= 2) then
@@ -4830,7 +4847,7 @@ state.update_nm_hunt_placeholder_timers = function ()
 
     for _, hunt in ipairs(catalog) do
         hunt.zone_id = hunt.zone_id or player.zone_id;
-        for _, placeholder in ipairs(hunt.placeholders or {}) do
+        for _, placeholder in ipairs(state.nm_hunt_tracked_entities(hunt)) do
             local tracker = state.nm_hunt_placeholder_tracker(hunt, placeholder);
             local snapshot = state.respawn_entity_snapshot(
                 entity,
@@ -4867,7 +4884,7 @@ state.process_nm_hunt_placeholder_text = function (defeated_name)
     local best = nil;
     for _, hunt in ipairs(catalog) do
         hunt.zone_id = hunt.zone_id or player.zone_id;
-        for _, placeholder in ipairs(hunt.placeholders or {}) do
+        for _, placeholder in ipairs(state.nm_hunt_tracked_entities(hunt)) do
             local tracker = state.nm_hunt_placeholder_tracker(hunt, placeholder);
             if state.placeholder_name_matches(
                     defeated_name, placeholder.name, placeholder.index)
@@ -6574,10 +6591,52 @@ state.render_nm_hunt_timer_line = function (hunt, kind, label)
     end
 end
 
+state.global_nm_respawn_timers = function ()
+    local timers = {};
+    for _, catalog in pairs(state.NM_HUNTS_BY_ZONE) do
+        for _, hunt in ipairs(catalog) do
+            if (tonumber(hunt.nm_seconds) or 0) > 0 then
+                local token = state.nm_hunt_timer_token(hunt, 'nm');
+                local expiration = tonumber(state.settings.respawn_timer_expirations[token]);
+                if (expiration ~= nil) then
+                    timers[#timers + 1] = {
+                        hunt = hunt,
+                        expiration = expiration,
+                    };
+                end
+            end
+        end
+    end
+    table.sort(timers, function (left, right)
+        if (left.expiration == right.expiration) then
+            return tostring(left.hunt.name) < tostring(right.hunt.name);
+        end
+        return left.expiration < right.expiration;
+    end);
+    return timers;
+end
+
+state.render_global_nm_respawn_timers = function (timers)
+    if (#timers == 0) then
+        return;
+    end
+    imgui.TextColored(COLORS.hunt_brass, 'NM RESPAWN WINDOWS');
+    for _, timer in ipairs(timers) do
+        local hunt = timer.hunt;
+        local label = hunt.name;
+        if (tostring(hunt.zone_name or '') ~= '') then
+            label = string.format('%s [%s]', label, hunt.zone_name);
+        end
+        state.render_nm_hunt_timer_line(hunt, 'nm', label);
+    end
+    imgui.Separator();
+end
+
 state.render_nm_hunt_window = function ()
     local player = current_navigation_player();
     local catalog = player ~= nil and state.NM_HUNTS_BY_ZONE[player.zone_id] or nil;
-    if (catalog == nil) then
+    local global_nm_timers = state.global_nm_respawn_timers();
+    if (catalog == nil and #global_nm_timers == 0) then
         return;
     end
     imgui.SetNextWindowPos(
@@ -6620,22 +6679,31 @@ state.render_nm_hunt_window = function ()
         900);
     if (visible) then
         local width = state.settings.nm_hunt_window_width;
-        imgui.TextColored(COLORS.hunt_brass, string.upper(player.zone));
-        imgui.SameLine();
-        imgui.TextColored(COLORS.muted, string.format('%d TARGETS', #catalog));
+        if (catalog ~= nil) then
+            imgui.TextColored(COLORS.hunt_brass, string.upper(player.zone));
+            imgui.SameLine();
+            imgui.TextColored(COLORS.muted, string.format('%d TARGETS', #catalog));
+        else
+            imgui.TextColored(COLORS.hunt_brass, 'GLOBAL NM TRACKER');
+        end
 
         local alarm = T{ state.settings.nm_hunt_alarm == true };
         if (imgui.Checkbox('Alarm##nm_hunt_alarm', alarm)) then
             state.settings.nm_hunt_alarm = alarm[1] == true;
         end
-        imgui.SameLine();
-        local show_all = T{ state.settings.nm_hunt_show_all == true };
-        if (imgui.Checkbox('Show all on minimap##nm_hunt_all', show_all)) then
-            state.settings.nm_hunt_show_all = show_all[1] == true;
+        if (catalog ~= nil) then
+            imgui.SameLine();
+            local show_all = T{ state.settings.nm_hunt_show_all == true };
+            if (imgui.Checkbox('Show all on minimap##nm_hunt_all', show_all)) then
+                state.settings.nm_hunt_show_all = show_all[1] == true;
+            end
         end
 
         imgui.Separator();
 
+        state.render_global_nm_respawn_timers(global_nm_timers);
+
+        if (catalog ~= nil) then
             state.nm_hunt.hovered_name = nil;
             for _, hunt in ipairs(catalog) do
                 local shown = state.settings.nm_hunt_hidden[hunt.name] ~= true;
@@ -6746,9 +6814,9 @@ state.render_nm_hunt_window = function ()
                     end
                     imgui.Separator();
                     state.render_nm_hunt_timer_line(hunt, 'ph', 'PH');
-                    state.render_nm_hunt_timer_line(hunt, 'nm', 'NM');
                 end
             end
+        end
     end
     imgui.End();
     imgui.PopStyleColor(14);
