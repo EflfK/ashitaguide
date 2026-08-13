@@ -229,10 +229,17 @@ if ($content -notmatch "for _, key in ipairs\(close_keys\) do\s+close_guide_tab\
 }
 
 $queueCommands = [regex]::Matches($content, 'QueueCommand')
-if ($queueCommands.Count -ne 2 -or
+if ($queueCommands.Count -ne 3 -or
     $content -notmatch "QueueCommand\(-1, '/filterscan ' \.\. step\.filter_scan\)" -or
-    $content -notmatch "QueueCommand\(-1, '/filterscan ' \.\. hunt\.filter_scan\)") {
-    throw 'Only the attended local Filterscan buttons may queue commands.'
+    $content -notmatch "QueueCommand\(-1, '/filterscan ' \.\. hunt\.filter_scan\)" -or
+    $content -notmatch "QueueCommand\(-1, '/renamer merge ' \.\. list_name\)") {
+    throw 'Only the attended local Filterscan and Renamer buttons may queue commands.'
+}
+
+if ($content -notmatch "string\.format\('ashitaguide_nm_%d', math\.floor\(mob_id\)\)" -or
+    $content -notmatch "string\.format\('PH %03X - %s', index, original_name\):sub\(1, 27\)" -or
+    $content -notmatch "path_join\(addons_root, 'renamer'\)") {
+    throw 'NM Hunt Renamer lists must use bounded names and the local Renamer config folder.'
 }
 
 if ($content -notmatch [regex]::Escape('filter:match("^[%w%s,_''%-]+$")')) {

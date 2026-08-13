@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.30.3';
+addon.version = '0.30.4';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -4543,6 +4543,66 @@ state.NM_HUNTS_BY_ZONE = {
     [107] = state.SOUTH_GUSTABERG_NM_HUNTS,
 };
 
+state.apply_nm_hunt_renames = function (hunt)
+    local install_path = ashita_install_path();
+    local zone_id = tonumber(hunt ~= nil and hunt.zone_id);
+    local mob_id = tonumber(hunt ~= nil and hunt.mob_id);
+    local placeholders = hunt ~= nil and hunt.placeholders or nil;
+    if (install_path == nil or zone_id == nil or mob_id == nil
+            or type(placeholders) ~= 'table' or #placeholders == 0) then
+        return false, 'No exact placeholder rename data is available for this hunt.';
+    end
+    if (ashita == nil or ashita.fs == nil) then
+        return false, 'Ashita filesystem helpers are unavailable.';
+    end
+
+    local config_root = path_join(install_path, 'config');
+    local addons_root = path_join(config_root, 'addons');
+    local renamer_root = path_join(addons_root, 'renamer');
+    for _, directory in ipairs({ config_root, addons_root, renamer_root }) do
+        if (not ashita.fs.exists(directory)) then
+            ashita.fs.create_dir(directory);
+        end
+    end
+
+    local lines = {
+        "require('common');",
+        '',
+        'return T{',
+        string.format('    [%d] = T{', zone_id),
+    };
+    for _, placeholder in ipairs(placeholders) do
+        local server_id = tonumber(placeholder.server_id);
+        local index = tonumber(placeholder.index);
+        local original_name = clean_message(placeholder.name);
+        if (server_id ~= nil and index ~= nil and original_name ~= '') then
+            local renamed = string.format('PH %03X - %s', index, original_name):sub(1, 27);
+            lines[#lines + 1] = string.format(
+                '        T{ %d, %q },',
+                math.floor(server_id),
+                renamed);
+        end
+    end
+    if (#lines == 4) then
+        return false, 'No valid placeholder rename entries were found.';
+    end
+    lines[#lines + 1] = '    },';
+    lines[#lines + 1] = '};';
+    lines[#lines + 1] = '';
+
+    local list_name = string.format('ashitaguide_nm_%d', math.floor(mob_id));
+    local list_path = path_join(renamer_root, list_name .. '.lua');
+    local wrote, write_error = write_text_file(list_path, table.concat(lines, '\n'));
+    if (not wrote) then
+        return false, string.format(
+            'Could not write the Renamer list: %s',
+            tostring(write_error or 'unknown error'));
+    end
+
+    AshitaCore:GetChatManager():QueueCommand(-1, '/renamer merge ' .. list_name);
+    return true, string.format('Renamed %d exact placeholder(s).', #placeholders);
+end
+
 state.nm_hunt_timer_token = function (hunt, kind)
     if (tonumber(hunt.mob_id) == 17199438 and kind == 'ph') then
         return string.format(
@@ -6615,9 +6675,23 @@ state.render_nm_hunt_window = function ()
                         'primary')) then
                     AshitaCore:GetChatManager():QueueCommand(-1, '/filterscan ' .. hunt.filter_scan);
                 end
+                if (type(hunt.placeholders) == 'table' and #hunt.placeholders > 0) then
+                    imgui.SameLine();
+                    if (state.render_nm_hunt_button(
+                            'Rename PHs##nm_hunt_rename_' .. tostring(hunt.mob_id),
+                            { 118, 0 },
+                            'secondary')) then
+                        local renamed, rename_message = state.apply_nm_hunt_renames(hunt);
+                        if (renamed) then
+                            log_info(rename_message);
+                        else
+                            log_warn(rename_message);
+                        end
+                    end
+                end
                 text_colored_wrapped(
                     COLORS.muted,
-                    'Exact PH deaths start timers automatically while observed. Manual buttons remain available for missed or off-screen kills.',
+                    'Scan filters Widescan; Rename PHs labels the exact local nameplates through Renamer. Exact PH deaths start timers automatically while observed.',
                     width - 12);
                 imgui.TextColored(COLORS.hunt_brass, 'RESPAWN TIMERS');
                 if (#(hunt.timers or {}) > 0) then

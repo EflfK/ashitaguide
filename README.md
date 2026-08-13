@@ -427,6 +427,12 @@ details, fixed official CatsEyeXI links, and only the attended actions supported
 by that NM. Valkurm Emperor includes Filterscan, manual five-minute PH and
 60-minute NM timer buttons, persistent countdown rows, reset/clear controls,
 and an optional custom Claim Window Alert when either countdown reaches zero.
+For lottery hunts with exact placeholder IDs, **Rename PHs** sits beside the
+scan button. It writes a small per-hunt list under Renamer's local configuration
+folder and merges it into the active list, preserving unrelated renames. The
+resulting local nameplates include the exact target index, such as
+`PH 14A - Damselfly`. Renamer must be loaded; the normal startup script should
+include `/addon load renamer` before AshitaGuide.
 If the bundled WAV cannot play, the addon falls back to a neutral Windows
 notification while avoiding the Exclamation sound used by consent/admin
 prompts. The existing exact-14A defeat detection and the manual PH button share
