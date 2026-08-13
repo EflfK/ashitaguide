@@ -347,6 +347,46 @@ if ($oseBlock -match 'seconds = 300') {
     throw 'Ose placeholder timers must use the verified 16-minute CatsEyeXI mob-group respawn, not five minutes.'
 }
 
+Assert-NmHuntContains 'Mysticmaker Profblix' @(
+    'mob_id = 17649693', 'zone_id = 213',
+    "index = 0x01D, server_id = 17649693, name = 'Mysticmaker Profblix'",
+    '2-2.5 hour server window'
+)
+Assert-NmHuntHasNoFixedNmTimer 'Mysticmaker Profblix'
+
+Assert-NmHuntContains 'Lord of Onzozo' @(
+    'mob_id = 17649731', 'zone_id = 213',
+    "index = 0x043, server_id = 17649731, name = 'Lord of Onzozo'",
+    "index = 0x042, server_id = 17649730, name = 'Flying Manta'",
+    'placeholder_seconds = 960'
+)
+
+Assert-NmHuntContains 'Narasimha' @(
+    'mob_id = 17649784', 'zone_id = 213',
+    "index = 0x078, server_id = 17649784, name = 'Narasimha'",
+    "index = 0x077, server_id = 17649783, name = 'Labyrinth Manticore'",
+    'placeholder_seconds = 960'
+)
+
+Assert-NmHuntContains 'Hellion' @(
+    'mob_id = 17649795', 'zone_id = 213',
+    "index = 0x083, server_id = 17649795, name = 'Hellion'",
+    "index = 0x085, server_id = 17649797, name = 'Tainted Flesh'",
+    "index = 0x092, server_id = 17649810, name = 'Tainted Flesh'",
+    "kind = 'ph085'.+seconds = 960", "kind = 'ph092'.+seconds = 960"
+)
+
+Assert-NmHuntContains 'Soulstealer Skullnix' @(
+    'mob_id = 17649818', 'zone_id = 213',
+    "index = 0x09A, server_id = 17649818, name = 'Soulstealer Skullnix'",
+    "index = 0x0A7, server_id = 17649831, name = 'Goblin Bandit'",
+    "index = 0x0AA, server_id = 17649834, name = 'Goblin Mercenary'",
+    "index = 0x0AE, server_id = 17649838, name = 'Goblin Shepherd'",
+    "index = 0x0B3, server_id = 17649843, name = 'Goblin Shepherd'",
+    "kind = 'ph0a7'.+seconds = 960", "kind = 'ph0aa'.+seconds = 924",
+    "kind = 'ph0ae'.+seconds = 960", "kind = 'ph0b3'.+seconds = 960"
+)
+
 Assert-NmHuntContains 'Sewer Syrup' @(
     'mob_id = 17461307', 'zone_id = 167',
     "index = 0x03B, server_id = 17461307, name = 'Sewer Syrup'",

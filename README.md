@@ -428,10 +428,10 @@ removes its full hunt details below the list. Multiple monsters can be mapped
 and tracked at once, and the monster list can be collapsed while those tracked
 details remain visible. It also provides creature graphics with hover details,
 fixed official CatsEyeXI links, and only the attended actions supported by that
-NM. The recommended catalog covers Valkurm
-Emperor, Leaping Lizzy, Ose, Sewer Syrup, Argus, Bloodtear Baldurf, Carmine
-Dobsonfly, Jaggedy-Eared Jack, Capricious Cassie, Serket, Amemet, and King
-Arthro.
+NM. The recommended catalog covers Valkurm Emperor, Leaping Lizzy, every active
+huntable Labyrinth of Onzozo NM, Sewer Syrup, Argus, Bloodtear Baldurf,
+Carmine Dobsonfly, Jaggedy-Eared Jack, Capricious Cassie, Serket, Amemet, and
+King Arthro.
 
 Exact lottery tracking is enabled only when the CatsEyeXI actor identity and
 normal placeholder respawn are known. Valkurm Emperor tracks its exact
@@ -441,9 +441,13 @@ each uses the server's 5:15 placeholder respawn. Ose, Sewer Syrup,
 Jaggedy-Eared Jack, and Amemet likewise expose their verified exact
 placeholders, with separate timer rows when a hunt has more than one. Manual
 buttons remain available when a death occurs off screen or is otherwise not
-observed. Ose's eight exact Torama actors use the CatsEyeXI mob group's
-16-minute respawn; a successful 5% lottery roll replaces that Torama's next
-respawn with Ose.
+observed. The Labyrinth of Onzozo catalog replaces that zone's always-on circle
+list with individual MAP and TRACK controls for Mysticmaker Profblix, Lord of
+Onzozo, Narasimha, Hellion, Soulstealer Skullnix, and Ose. Its exact lottery
+actors use the pinned CatsEyeXI group respawns: 16 minutes except Soulstealer's
+Goblin Mercenary 0AA at 15:24. Ose's eight exact Torama actors use a 16-minute
+respawn; a successful 5% lottery roll replaces that Torama's next respawn with
+Ose.
 
 Argus, Bloodtear Baldurf, Carmine Dobsonfly, Capricious Cassie, Serket, and
 King Arthro are informational timed, shared-spawn, HQ-lottery, or trigger-chain

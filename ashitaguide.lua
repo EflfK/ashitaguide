@@ -4727,6 +4727,89 @@ state.FEIYIN_NM_HUNTS = {
 
 state.LABYRINTH_ONZOZO_NM_HUNTS = {
     {
+        name = 'Mysticmaker Profblix', level = '50-52', mob_id = 17649693,
+        zone_id = 213, zone_name = 'Labyrinth of Onzozo', icon = 'goblin',
+        spawn_type = 'Timed/random window', placeholder_count = 0,
+        details = 'Timed random-start NM with a 2-2.5 hour server window in five-minute increments; no single fixed countdown is shown.',
+        official_url = 'https://catseyexi.com/mob/17649693',
+        filter_scan = 'Mysticmaker', scan_label = 'Scan Mysticmaker',
+        nm_targets = {
+            { index = 0x01D, server_id = 17649693, name = 'Mysticmaker Profblix' },
+        },
+    },
+    {
+        name = 'Lord of Onzozo', level = '74-77', mob_id = 17649731,
+        zone_id = 213, zone_name = 'Labyrinth of Onzozo', icon = 'octopus',
+        spawn_type = 'Lottery/random start', placeholder_count = 1,
+        details = 'Lottery replacement for exact Flying Manta 042; the placeholder normally respawns in 16 minutes.',
+        official_url = 'https://catseyexi.com/mob/17649731',
+        filter_scan = 'Lord, 042', scan_label = 'Scan Lord PH',
+        placeholder_seconds = 960,
+        nm_targets = {
+            { index = 0x043, server_id = 17649731, name = 'Lord of Onzozo' },
+        },
+        placeholders = {
+            { index = 0x042, server_id = 17649730, name = 'Flying Manta', timer_kind = 'ph' },
+        },
+    },
+    {
+        name = 'Narasimha', level = '75-77', mob_id = 17649784,
+        zone_id = 213, zone_name = 'Labyrinth of Onzozo', icon = 'manticore',
+        spawn_type = 'Lottery/random start', placeholder_count = 1,
+        details = 'Lottery replacement for exact Labyrinth Manticore 077; the placeholder normally respawns in 16 minutes.',
+        official_url = 'https://catseyexi.com/mob/17649784',
+        filter_scan = 'Narasimha, 077', scan_label = 'Scan Narasimha PH',
+        placeholder_seconds = 960,
+        nm_targets = {
+            { index = 0x078, server_id = 17649784, name = 'Narasimha' },
+        },
+        placeholders = {
+            { index = 0x077, server_id = 17649783, name = 'Labyrinth Manticore', timer_kind = 'ph' },
+        },
+    },
+    {
+        name = 'Hellion', level = '66', mob_id = 17649795,
+        zone_id = 213, zone_name = 'Labyrinth of Onzozo', icon = 'doom',
+        spawn_type = 'Lottery/random start', placeholder_count = 2,
+        details = 'Lottery replacement for exact Tainted Flesh actors 085 and 092; each normally respawns in 16 minutes.',
+        official_url = 'https://catseyexi.com/mob/17649795',
+        filter_scan = 'Hellion, 085, 092', scan_label = 'Scan Hellion PHs',
+        timers = {
+            { kind = 'ph085', label = 'PH 085', button = '085 +16m', seconds = 960 },
+            { kind = 'ph092', label = 'PH 092', button = '092 +16m', seconds = 960 },
+        },
+        nm_targets = {
+            { index = 0x083, server_id = 17649795, name = 'Hellion' },
+        },
+        placeholders = {
+            { index = 0x085, server_id = 17649797, name = 'Tainted Flesh', timer_kind = 'ph085' },
+            { index = 0x092, server_id = 17649810, name = 'Tainted Flesh', timer_kind = 'ph092' },
+        },
+    },
+    {
+        name = 'Soulstealer Skullnix', level = '69-71', mob_id = 17649818,
+        zone_id = 213, zone_name = 'Labyrinth of Onzozo', icon = 'goblin',
+        spawn_type = 'Lottery/random start', placeholder_count = 4,
+        details = 'Lottery replacement for four exact goblins; Mercenary 0AA respawns in 15:24 and the other three in 16 minutes.',
+        official_url = 'https://catseyexi.com/mob/17649818',
+        filter_scan = 'Skullnix, 0A7, 0AA, 0AE, 0B3', scan_label = 'Scan Skullnix PHs',
+        timers = {
+            { kind = 'ph0a7', label = 'Bandit 0A7', button = '0A7 +16m', seconds = 960 },
+            { kind = 'ph0aa', label = 'Mercenary 0AA', button = '0AA +15:24', seconds = 924 },
+            { kind = 'ph0ae', label = 'Shepherd 0AE', button = '0AE +16m', seconds = 960 },
+            { kind = 'ph0b3', label = 'Shepherd 0B3', button = '0B3 +16m', seconds = 960 },
+        },
+        nm_targets = {
+            { index = 0x09A, server_id = 17649818, name = 'Soulstealer Skullnix' },
+        },
+        placeholders = {
+            { index = 0x0A7, server_id = 17649831, name = 'Goblin Bandit', timer_kind = 'ph0a7' },
+            { index = 0x0AA, server_id = 17649834, name = 'Goblin Mercenary', timer_kind = 'ph0aa' },
+            { index = 0x0AE, server_id = 17649838, name = 'Goblin Shepherd', timer_kind = 'ph0ae' },
+            { index = 0x0B3, server_id = 17649843, name = 'Goblin Shepherd', timer_kind = 'ph0b3' },
+        },
+    },
+    {
         name = 'Ose', level = '74-76', mob_id = 17649822,
         zone_id = 213, zone_name = 'Labyrinth of Onzozo', icon = 'coeurl',
         spawn_type = 'Lottery/random start', placeholder_count = 8,
