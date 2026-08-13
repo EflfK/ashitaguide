@@ -531,6 +531,11 @@ if ($content -notmatch 'local function text_colored_wrapped\(color, text, wrap_p
     $content -notmatch 'text_colored_wrapped\(COLORS\.muted, hunt\.details, width - 12\)') {
     throw 'The NM Hunt window must use its own text-wrap boundary.'
 }
+if ($content -notmatch "state\.render_nm_hunt_timer_buttons = function \(hunt, width\)" -or
+    $content -notmatch "row_width \+ button_spacing \+ button_width <= available_width" -or
+    $content -notmatch "state\.render_nm_hunt_timer_buttons\(hunt, width\)") {
+    throw 'NM Hunt respawn timer buttons must wrap within the window width.'
+}
 
 if ($content -notmatch "capture_window_geometry\(\s*'nm_hunt_window_x'" -or
     $content -notmatch "SetNextWindowSizeConstraints\(\{ 320, 240 \}, \{ 700, 900 \}\)" -or

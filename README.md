@@ -480,8 +480,9 @@ the same countdown. Golden Bat's three exact Sand Bat placeholders (`1C9`,
 with the same manual fallback. Leaping Lizzy's exact `17B` lowland and `18F`
 northwest-upland Rock Lizards receive separate map markers and independent
 5:15 countdowns. CatsEyeXI has no meaningful post-kill Lizzy lockout, so the
-window does not claim a separate NM cooldown. The window wraps to its current
-width and scrolls vertically when its contents exceed its current height.
+window does not claim a separate NM cooldown. The timer buttons wrap into
+additional rows when the window is too narrow to fit them, while text wraps to
+the current width and the window scrolls when its contents exceed its height.
 After applying a filter, open or reopen Widescan; an empty exact-ID result means
 the matching placeholder or NM is currently down or outside Widescan range.
 

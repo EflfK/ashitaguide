@@ -6952,6 +6952,27 @@ state.render_global_nm_respawn_timers = function (timers)
     imgui.Separator();
 end
 
+state.render_nm_hunt_timer_buttons = function (hunt, width)
+    local button_width = 118;
+    local button_spacing = 8;
+    local row_width = 0;
+    local available_width = math.max(button_width, (tonumber(width) or button_width) - 24);
+    for _, timer in ipairs(hunt.timers or {}) do
+        if (row_width > 0 and row_width + button_spacing + button_width <= available_width) then
+            imgui.SameLine(0, button_spacing);
+            row_width = row_width + button_spacing + button_width;
+        else
+            row_width = button_width;
+        end
+        if (state.render_nm_hunt_button(
+                timer.button .. '##nm_hunt_' .. timer.kind,
+                { button_width, 0 },
+                'secondary')) then
+            state.start_nm_hunt_timer(hunt, timer.kind);
+        end
+    end
+end
+
 state.render_nm_hunt_details = function (hunt, width)
     local icon_x, icon_y = imgui.GetCursorScreenPos();
     imgui.Dummy({ 22, 21 });
@@ -7002,15 +7023,7 @@ state.render_nm_hunt_details = function (hunt, width)
     end
     imgui.TextColored(COLORS.hunt_brass, 'RESPAWN TIMERS');
     if (#(hunt.timers or {}) > 0) then
-        for index, timer in ipairs(hunt.timers) do
-            if (index > 1) then imgui.SameLine(); end
-            if (state.render_nm_hunt_button(
-                    timer.button .. '##nm_hunt_' .. timer.kind,
-                    { 118, 0 },
-                    'secondary')) then
-                state.start_nm_hunt_timer(hunt, timer.kind);
-            end
-        end
+        state.render_nm_hunt_timer_buttons(hunt, width);
         imgui.Separator();
         for _, timer in ipairs(hunt.timers) do
             state.render_nm_hunt_timer_line(hunt, timer.kind, timer.label);
