@@ -4742,7 +4742,7 @@ state.MAZE_SHAKHRAMI_NM_HUNTS = {
         spawn_type = 'Shared timed/random window', placeholder_count = 0,
         details = 'Argus and Leech King share a random 1-2 hour cycle. No fixed countdown is claimed.',
         official_url = 'https://catseyexi.com/mob/17588674',
-        filter_scan = 'Argus', scan_label = 'Scan Argus',
+        filter_scan = 'Argus, Leech King', scan_label = 'Scan shared pair',
         nm_targets = {
             { index = 0x1C2, server_id = 17588674, name = 'Argus' },
         },
@@ -4753,7 +4753,7 @@ state.MAZE_SHAKHRAMI_NM_HUNTS = {
         spawn_type = 'Shared timed/random window', placeholder_count = 0,
         details = 'Leech King and Argus share a random 1-2 hour cycle. No fixed countdown is claimed.',
         official_url = 'https://catseyexi.com/mob/17588685',
-        filter_scan = 'Leech King', scan_label = 'Scan Leech King',
+        filter_scan = 'Leech King, Argus', scan_label = 'Scan shared pair',
         nm_targets = {
             { index = 0x1CD, server_id = 17588685, name = 'Leech King' },
         },

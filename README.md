@@ -454,7 +454,8 @@ individual MAP and TRACK controls for all ten supported encounters. Trembler
 Tabitha tracks exact Maze Makers 034 and 035 at five minutes, Gloombound Lurker
 tracks its verified 90-minute return, Lesath retains its random 1-3-hour window,
 and Argus and Leech King remain separate map choices while documenting their
-shared random cycle.
+shared random cycle. Each member's Filter Widescan button includes both names
+so one attended scan checks whichever member the shared cycle selected.
 
 Argus, Bloodtear Baldurf, Carmine Dobsonfly, Capricious Cassie, Serket, and
 King Arthro are informational timed, shared-spawn, HQ-lottery, or trigger-chain

@@ -396,7 +396,8 @@ Assert-NmHuntContains 'Sewer Syrup' @(
 
 Assert-NmHuntContains 'Argus' @(
     'mob_id = 17588674', 'zone_id = 198',
-    "index = 0x1C2, server_id = 17588674, name = 'Argus'"
+    "index = 0x1C2, server_id = 17588674, name = 'Argus'",
+    "filter_scan = 'Argus, Leech King'"
 )
 Assert-NmHuntHasNoFixedNmTimer 'Argus'
 
@@ -428,7 +429,8 @@ Assert-NmHuntHasNoFixedNmTimer 'Lesath'
 
 Assert-NmHuntContains 'Leech King' @(
     'mob_id = 17588685', 'zone_id = 198',
-    "index = 0x1CD, server_id = 17588685, name = 'Leech King'"
+    "index = 0x1CD, server_id = 17588685, name = 'Leech King'",
+    "filter_scan = 'Leech King, Argus'"
 )
 Assert-NmHuntHasNoFixedNmTimer 'Leech King'
 
