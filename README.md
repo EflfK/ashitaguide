@@ -429,9 +429,9 @@ and tracked at once, and the monster list can be collapsed while those tracked
 details remain visible. It also provides creature graphics with hover details,
 fixed official CatsEyeXI links, and only the attended actions supported by that
 NM. The recommended catalog covers Valkurm Emperor, Leaping Lizzy, every active
-huntable Labyrinth of Onzozo NM, Sewer Syrup, Argus, Bloodtear Baldurf,
-Carmine Dobsonfly, Jaggedy-Eared Jack, Capricious Cassie, Serket, Amemet, and
-King Arthro.
+huntable Labyrinth of Onzozo and Maze of Shakhrami NM, Sewer Syrup, Bloodtear
+Baldurf, Carmine Dobsonfly, Jaggedy-Eared Jack, Capricious Cassie, Serket,
+Amemet, and King Arthro.
 
 Exact lottery tracking is enabled only when the CatsEyeXI actor identity and
 normal placeholder respawn are known. Valkurm Emperor tracks its exact
@@ -448,6 +448,13 @@ actors use the pinned CatsEyeXI group respawns: 16 minutes except Soulstealer's
 Goblin Mercenary 0AA at 15:24. Ose's eight exact Torama actors use a 16-minute
 respawn; a successful 5% lottery roll replaces that Torama's next respawn with
 Ose.
+
+The Maze of Shakhrami catalog likewise replaces its always-on circle list with
+individual MAP and TRACK controls for all ten supported encounters. Trembler
+Tabitha tracks exact Maze Makers 034 and 035 at five minutes, Gloombound Lurker
+tracks its verified 90-minute return, Lesath retains its random 1-3-hour window,
+and Argus and Leech King remain separate map choices while documenting their
+shared random cycle.
 
 Argus, Bloodtear Baldurf, Carmine Dobsonfly, Capricious Cassie, Serket, and
 King Arthro are informational timed, shared-spawn, HQ-lottery, or trigger-chain

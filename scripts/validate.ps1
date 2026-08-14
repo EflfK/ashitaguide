@@ -396,10 +396,64 @@ Assert-NmHuntContains 'Sewer Syrup' @(
 
 Assert-NmHuntContains 'Argus' @(
     'mob_id = 17588674', 'zone_id = 198',
-    "index = 0x1C2, server_id = 17588674, name = 'Argus'",
-    "index = 0x1CD, server_id = 17588685, name = 'Leech King'"
+    "index = 0x1C2, server_id = 17588674, name = 'Argus'"
 )
 Assert-NmHuntHasNoFixedNmTimer 'Argus'
+
+Assert-NmHuntContains 'Ichorous Ire' @(
+    'mob_id = 17588225', 'zone_id = 198',
+    "index = 0x001, server_id = 17588225, name = 'Ichorous Ire'"
+)
+
+Assert-NmHuntContains 'Trembler Tabitha' @(
+    'mob_id = 17588278', 'zone_id = 198',
+    "index = 0x036, server_id = 17588278, name = 'Trembler Tabitha'",
+    "index = 0x034, server_id = 17588276, name = 'Maze Maker'",
+    "index = 0x035, server_id = 17588277, name = 'Maze Maker'",
+    "kind = 'ph034'.+seconds = 300", "kind = 'ph035'.+seconds = 300"
+)
+
+Assert-NmHuntContains 'Gloombound Lurker' @(
+    'mob_id = 17588469', 'zone_id = 198',
+    "index = 0x0F5, server_id = 17588469, name = 'Gloombound Lurker'",
+    'nm_seconds = 5400'
+)
+
+Assert-NmHuntContains 'Lesath' @(
+    'mob_id = 17588589', 'zone_id = 198',
+    "index = 0x16D, server_id = 17588589, name = 'Lesath'",
+    'random 1-3 hour server window'
+)
+Assert-NmHuntHasNoFixedNmTimer 'Lesath'
+
+Assert-NmHuntContains 'Leech King' @(
+    'mob_id = 17588685', 'zone_id = 198',
+    "index = 0x1CD, server_id = 17588685, name = 'Leech King'"
+)
+Assert-NmHuntHasNoFixedNmTimer 'Leech King'
+
+Assert-NmHuntContains 'Wyrmfly' @(
+    'mob_id = 17588701', 'zone_id = 198',
+    "index = 0x1DD, server_id = 17588701, name = 'Wyrmfly'",
+    "index = 0x1DE, server_id = 17588702, name = 'Wyrmfly'",
+    "index = 0x1DF, server_id = 17588703, name = 'Wyrmfly'"
+)
+
+Assert-NmHuntContains 'Dark Elemental' @(
+    'mob_id = 17588704', 'zone_id = 198',
+    "index = 0x1E0, server_id = 17588704, name = 'Dark Elemental'"
+)
+
+Assert-NmHuntContains 'Lost Soul' @(
+    'mob_id = 17588706', 'zone_id = 198',
+    "index = 0x1E2, server_id = 17588706, name = 'Lost Soul'"
+)
+
+Assert-NmHuntContains 'Aroma Crawler' @(
+    'mob_id = 17588705', 'zone_id = 198',
+    "index = 0x1E1, server_id = 17588705, name = 'Aroma Crawler'",
+    'returns in 10-30 minutes'
+)
 
 Assert-NmHuntContains 'Bloodtear Baldurf' @(
     'mob_id = 17195318', 'zone_id = 102',

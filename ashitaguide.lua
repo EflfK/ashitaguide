@@ -4684,15 +4684,124 @@ state.KUFTAL_TUNNEL_NM_HUNTS = {
 
 state.MAZE_SHAKHRAMI_NM_HUNTS = {
     {
+        name = 'Ichorous Ire', level = '35-36', mob_id = 17588225,
+        zone_id = 198, zone_name = 'Maze of Shakhrami', icon = 'slime',
+        spawn_type = 'Fixed', placeholder_count = 0,
+        details = 'Fixed notorious jelly on the upper map.',
+        official_url = 'https://catseyexi.com/mob/17588225',
+        filter_scan = 'Ichorous', scan_label = 'Scan Ichorous Ire',
+        nm_targets = {
+            { index = 0x001, server_id = 17588225, name = 'Ichorous Ire' },
+        },
+    },
+    {
+        name = 'Trembler Tabitha', level = '55', mob_id = 17588278,
+        zone_id = 198, zone_name = 'Maze of Shakhrami', icon = 'worm',
+        spawn_type = 'Lottery', placeholder_count = 2,
+        details = 'Lottery replacement for exact Maze Maker actors 034 and 035; each normally respawns in five minutes.',
+        official_url = 'https://catseyexi.com/mob/17588278',
+        filter_scan = 'Tabitha, 034, 035', scan_label = 'Scan Tabitha PHs',
+        timers = {
+            { kind = 'ph034', label = 'PH 034', button = '034 +5m', seconds = 300 },
+            { kind = 'ph035', label = 'PH 035', button = '035 +5m', seconds = 300 },
+        },
+        nm_targets = {
+            { index = 0x036, server_id = 17588278, name = 'Trembler Tabitha' },
+        },
+        placeholders = {
+            { index = 0x034, server_id = 17588276, name = 'Maze Maker', timer_kind = 'ph034' },
+            { index = 0x035, server_id = 17588277, name = 'Maze Maker', timer_kind = 'ph035' },
+        },
+    },
+    {
+        name = 'Gloombound Lurker', level = '48', mob_id = 17588469,
+        zone_id = 198, zone_name = 'Maze of Shakhrami', icon = 'bat',
+        spawn_type = 'Timed', placeholder_count = 0,
+        details = 'Timed notorious bat with a verified 90-minute server respawn.',
+        official_url = 'https://catseyexi.com/mob/17588469',
+        filter_scan = 'Gloombound', scan_label = 'Scan Gloombound',
+        nm_seconds = 5400,
+        nm_targets = {
+            { index = 0x0F5, server_id = 17588469, name = 'Gloombound Lurker', timer_kind = 'nm' },
+        },
+    },
+    {
+        name = 'Lesath', level = '44', mob_id = 17588589,
+        zone_id = 198, zone_name = 'Maze of Shakhrami', icon = 'scorpion',
+        spawn_type = 'Timed/random window', placeholder_count = 0,
+        details = 'Timed notorious scorpion with a random 1-3 hour server window; no single fixed countdown is shown.',
+        official_url = 'https://catseyexi.com/mob/17588589',
+        filter_scan = 'Lesath', scan_label = 'Scan Lesath',
+        nm_targets = {
+            { index = 0x16D, server_id = 17588589, name = 'Lesath' },
+        },
+    },
+    {
         name = 'Argus', level = '36-37', mob_id = 17588674,
         zone_id = 198, zone_name = 'Maze of Shakhrami', icon = 'hecteyes',
         spawn_type = 'Shared timed/random window', placeholder_count = 0,
         details = 'Argus and Leech King share a random 1-2 hour cycle. No fixed countdown is claimed.',
         official_url = 'https://catseyexi.com/mob/17588674',
-        filter_scan = 'Argus, Leech', scan_label = 'Scan shared spawn',
+        filter_scan = 'Argus', scan_label = 'Scan Argus',
         nm_targets = {
             { index = 0x1C2, server_id = 17588674, name = 'Argus' },
+        },
+    },
+    {
+        name = 'Leech King', level = '35-36', mob_id = 17588685,
+        zone_id = 198, zone_name = 'Maze of Shakhrami', icon = 'leech',
+        spawn_type = 'Shared timed/random window', placeholder_count = 0,
+        details = 'Leech King and Argus share a random 1-2 hour cycle. No fixed countdown is claimed.',
+        official_url = 'https://catseyexi.com/mob/17588685',
+        filter_scan = 'Leech King', scan_label = 'Scan Leech King',
+        nm_targets = {
             { index = 0x1CD, server_id = 17588685, name = 'Leech King' },
+        },
+    },
+    {
+        name = 'Wyrmfly', level = '30', mob_id = 17588701,
+        zone_id = 198, zone_name = 'Maze of Shakhrami', icon = 'damselfly',
+        spawn_type = 'Quest-triggered group', placeholder_count = 0,
+        details = 'Three-member Eco-Warrior quest group; all three despawn after three idle minutes.',
+        official_url = 'https://catseyexi.com/mob/17588701',
+        filter_scan = 'Wyrmfly', scan_label = 'Scan Wyrmflies',
+        nm_targets = {
+            { index = 0x1DD, server_id = 17588701, name = 'Wyrmfly' },
+            { index = 0x1DE, server_id = 17588702, name = 'Wyrmfly' },
+            { index = 0x1DF, server_id = 17588703, name = 'Wyrmfly' },
+        },
+    },
+    {
+        name = 'Dark Elemental', level = '75', mob_id = 17588704,
+        zone_id = 198, zone_name = 'Maze of Shakhrami', icon = 'elemental',
+        spawn_type = 'Strange Apparatus trigger', placeholder_count = 0,
+        details = 'Triggered Strange Apparatus encounter with a five-minute idle despawn.',
+        official_url = 'https://catseyexi.com/mob/17588704',
+        filter_scan = 'Dark Elemental, 1E0', scan_label = 'Scan Dark Elemental',
+        nm_targets = {
+            { index = 0x1E0, server_id = 17588704, name = 'Dark Elemental' },
+        },
+    },
+    {
+        name = 'Lost Soul', level = '50', mob_id = 17588706,
+        zone_id = 198, zone_name = 'Maze of Shakhrami', icon = 'skeleton',
+        spawn_type = 'Fixed special encounter', placeholder_count = 0,
+        details = 'Fixed special notorious skeleton record with a three-minute idle despawn.',
+        official_url = 'https://catseyexi.com/mob/17588706',
+        filter_scan = 'Lost Soul, 1E2', scan_label = 'Scan Lost Soul',
+        nm_targets = {
+            { index = 0x1E2, server_id = 17588706, name = 'Lost Soul' },
+        },
+    },
+    {
+        name = 'Aroma Crawler', level = '44-48', mob_id = 17588705,
+        zone_id = 198, zone_name = 'Maze of Shakhrami', icon = 'crawler',
+        spawn_type = 'RSE-triggered/random point', placeholder_count = 0,
+        details = 'RSE satchel encounter triggered at the active question mark; the trigger relocates and returns in 10-30 minutes.',
+        official_url = 'https://catseyexi.com/mob/17588705',
+        filter_scan = 'Aroma Crawler, 1E1', scan_label = 'Scan Aroma Crawler',
+        nm_targets = {
+            { index = 0x1E1, server_id = 17588705, name = 'Aroma Crawler' },
         },
     },
 };
