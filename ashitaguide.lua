@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.30.7';
+addon.version = '0.30.8';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -6656,6 +6656,7 @@ function decision.render()
     end
     imgui.PushStyleVar(IMGUI.style_window_padding, { 8, 6 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, 1.0);
+    imgui.PushStyleVar(IMGUI.style_window_rounding, 7.0);
     imgui.PushStyleColor(IMGUI.col_window_bg, {
         COLORS.display_bg[1],
         COLORS.display_bg[2],
@@ -6699,7 +6700,7 @@ function decision.render()
 
     imgui.End();
     imgui.PopStyleColor(2);
-    imgui.PopStyleVar(2);
+    imgui.PopStyleVar(3);
 end
 
 function state.render_active_tab_buttons()
@@ -6765,6 +6766,7 @@ local function push_display_window_style(opacity)
     imgui.PushStyleVar(IMGUI.style_window_padding, { 6, 4 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, 1.0);
     imgui.PushStyleVar(IMGUI.style_frame_padding, { 5, 2 });
+    imgui.PushStyleVar(IMGUI.style_window_rounding, 7.0);
     imgui.PushStyleColor(IMGUI.col_window_bg, {
         COLORS.display_bg[1],
         COLORS.display_bg[2],
@@ -6779,6 +6781,7 @@ local function push_config_window_style()
     imgui.PushStyleVar(IMGUI.style_window_padding, { 8, 8 });
     imgui.PushStyleVar(IMGUI.style_window_border_size, 1.0);
     imgui.PushStyleVar(IMGUI.style_frame_padding, { 4, 3 });
+    imgui.PushStyleVar(IMGUI.style_window_rounding, 7.0);
     imgui.PushStyleColor(IMGUI.col_window_bg, COLORS.panel_bg);
     imgui.PushStyleColor(IMGUI.col_child_bg, COLORS.child_bg);
     imgui.PushStyleColor(IMGUI.col_border, COLORS.border);
@@ -6786,7 +6789,7 @@ end
 
 local function pop_window_style()
     imgui.PopStyleColor(3);
-    imgui.PopStyleVar(3);
+    imgui.PopStyleVar(4);
 end
 
 local function capture_window_geometry(x_key, y_key, width_key, height_key, min_width, max_width, min_height, max_height)
