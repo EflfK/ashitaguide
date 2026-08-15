@@ -193,7 +193,6 @@ local GUIDE_ANCHOR_CORNERS = {
 
 local GUIDE_WINDOW_MAX_WIDTH = 560;
 local GUIDE_TEXT_WRAP_POS_X = GUIDE_WINDOW_MAX_WIDTH - 12;
-local VALOR_MIN_OPACITY = 70;
 
 local DEFAULT_SETTINGS = {
     visible = true,
@@ -219,6 +218,7 @@ local DEFAULT_SETTINGS = {
     valor_enabled = true,
     valor_show_zone = true,
     valor_show_totals = true,
+    valor_min_opacity = 70,
     valor_opacity = 92,
     valor_window_x = 990,
     valor_window_y = 160,
@@ -1336,7 +1336,7 @@ local function normalize_settings(source)
         valor_enabled = bounded_boolean(source.valor_enabled, DEFAULT_SETTINGS.valor_enabled),
         valor_show_zone = bounded_boolean(source.valor_show_zone, DEFAULT_SETTINGS.valor_show_zone),
         valor_show_totals = bounded_boolean(source.valor_show_totals, DEFAULT_SETTINGS.valor_show_totals),
-        valor_opacity = bounded_number(source.valor_opacity, legacy_opacity, VALOR_MIN_OPACITY, 100),
+        valor_opacity = bounded_number(source.valor_opacity, legacy_opacity, DEFAULT_SETTINGS.valor_min_opacity, 100),
         valor_window_x = bounded_number(source.valor_window_x, DEFAULT_SETTINGS.valor_window_x, 0, 10000),
         valor_window_y = bounded_number(source.valor_window_y, DEFAULT_SETTINGS.valor_window_y, 0, 10000),
         valor_window_width = bounded_number(source.valor_window_width, DEFAULT_SETTINGS.valor_window_width, 220, 600),
@@ -2959,7 +2959,7 @@ local function settings_text()
         string.format('    valor_enabled = %s,', lua_boolean(state.valor_enabled[1])),
         string.format('    valor_show_zone = %s,', lua_boolean(state.valor_show_zone[1])),
         string.format('    valor_show_totals = %s,', lua_boolean(state.valor_show_totals[1])),
-        string.format('    valor_opacity = %d,', bounded_number(state.valor_opacity[1], DEFAULT_SETTINGS.valor_opacity, VALOR_MIN_OPACITY, 100)),
+        string.format('    valor_opacity = %d,', bounded_number(state.valor_opacity[1], DEFAULT_SETTINGS.valor_opacity, DEFAULT_SETTINGS.valor_min_opacity, 100)),
         string.format('    valor_window_x = %d,', bounded_number(values.valor_window_x, DEFAULT_SETTINGS.valor_window_x, 0, 10000)),
         string.format('    valor_window_y = %d,', bounded_number(values.valor_window_y, DEFAULT_SETTINGS.valor_window_y, 0, 10000)),
         string.format('    valor_window_width = %d,', bounded_number(values.valor_window_width, DEFAULT_SETTINGS.valor_window_width, 220, 600)),
@@ -4150,7 +4150,7 @@ local function render_valor_config()
     imgui.SliderInt(
         'Background opacity##ashitaguide_valor_opacity',
         state.valor_opacity,
-        VALOR_MIN_OPACITY,
+        DEFAULT_SETTINGS.valor_min_opacity,
         100,
         '%d%%');
     imgui.PopItemWidth();
