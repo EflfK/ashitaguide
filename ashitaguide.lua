@@ -1,6 +1,6 @@
 addon.name    = 'ashitaguide';
 addon.author  = 'EflfK';
-addon.version = '0.30.8';
+addon.version = '0.31.0';
 addon.desc    = 'Manual configuration-driven quest and page guide helper for Ashita.';
 
 require('common');
@@ -201,6 +201,7 @@ local DEFAULT_SETTINGS = {
     guide_anchor_corner = 'top_left',
     guide_show_step_list = true,
     guide_tabs_bottom = false,
+    roe_challenge_visible = true,
     guide_map_size = 160,
     minimap_marker_enabled = true,
     guide_opacity = 92,
@@ -308,6 +309,7 @@ local state = {
     casket_enabled = T{ true },
     guide_show_step_list = T{ true },
     guide_tabs_bottom = T{ false },
+    roe_challenge_visible = T{ true },
     guide_map_size = T{ 160 },
     minimap_marker_enabled = T{ true },
     guide_opacity = T{ 92 },
@@ -414,6 +416,20 @@ local state = {
     native_chat_win_ptr2 = nil,
     guide_window_width = nil,
     guide_window_height = nil,
+};
+
+-- Limited-time Records of Eminence challenges use fixed four-hour UTC slots.
+-- Rows are Sunday through Saturday; columns begin at 03:00, 07:00, 11:00,
+-- 15:00, 19:00, and 23:00 UTC. Keeping the schedule in UTC makes the local
+-- display follow daylight-saving changes without maintaining a timezone table.
+state.ROE_LIMITED_TIME_CHALLENGES = {
+    { 'Vanquish Vermin',    'Vanquish Arcana',         'Gain Experience',     'Vanquish Birds',        'Vanquish Lizards',    'Vanquish Undead' },
+    { 'Spoils (Seals)',     'Crack Treasure Caskets',  'Vanquish Aquans',     'Vanquish Amorphs',      'Vanquish Vermin',     'Vanquish Arcana' },
+    { 'Gain Experience',    'Physical Damage Kills',   'Vanquish Beasts',     'Vanquish Undead',       'Spoils (Seals)',      'Crack Treasure Caskets' },
+    { 'Vanquish Aquans',    'Magic Damage Kills',      'Vanquish Plantoids',  'Vanquish Arcana',       'Gain Experience',     'Physical Damage Kills' },
+    { 'Vanquish Beasts',    'Vanquish Birds',          'Vanquish Lizards',    'Crack Treasure Caskets','Vanquish Aquans',     'Magic Damage Kills' },
+    { 'Vanquish Plantoids', 'Vanquish Amorphs',        'Vanquish Vermin',     'Physical Damage Kills', 'Vanquish Beasts',     'Vanquish Birds' },
+    { 'Vanquish Lizards',   'Vanquish Undead',         'Spoils (Seals)',      'Magic Damage Kills',    'Vanquish Plantoids',  'Vanquish Amorphs' },
 };
 
 local function trim_string(value)
@@ -1303,6 +1319,9 @@ local function normalize_settings(source)
         guide_anchor_corner = normalize_guide_anchor_corner(source.guide_anchor_corner),
         guide_show_step_list = bounded_boolean(source.guide_show_step_list, DEFAULT_SETTINGS.guide_show_step_list),
         guide_tabs_bottom = bounded_boolean(source.guide_tabs_bottom, DEFAULT_SETTINGS.guide_tabs_bottom),
+        roe_challenge_visible = bounded_boolean(
+            source.roe_challenge_visible,
+            DEFAULT_SETTINGS.roe_challenge_visible),
         guide_map_size = bounded_number(source.guide_map_size, DEFAULT_SETTINGS.guide_map_size, 120, 260),
         minimap_marker_enabled = bounded_boolean(
             source.minimap_marker_enabled,
@@ -2699,6 +2718,7 @@ local function load_config()
     state.casket_enabled[1] = state.settings.casket_enabled;
     state.guide_show_step_list[1] = state.settings.guide_show_step_list;
     state.guide_tabs_bottom[1] = state.settings.guide_tabs_bottom;
+    state.roe_challenge_visible[1] = state.settings.roe_challenge_visible;
     state.guide_map_size[1] = state.settings.guide_map_size;
     state.minimap_marker_enabled[1] = state.settings.minimap_marker_enabled;
     state.guide_opacity[1] = state.settings.guide_opacity;
@@ -2942,6 +2962,7 @@ local function settings_text()
         string.format('    guide_anchor_corner = %q,', normalize_guide_anchor_corner(values.guide_anchor_corner)),
         string.format('    guide_show_step_list = %s,', lua_boolean(state.guide_show_step_list[1])),
         string.format('    guide_tabs_bottom = %s,', lua_boolean(state.guide_tabs_bottom[1])),
+        string.format('    roe_challenge_visible = %s,', lua_boolean(state.roe_challenge_visible[1])),
         string.format('    guide_map_size = %d,', bounded_number(state.guide_map_size[1], DEFAULT_SETTINGS.guide_map_size, 120, 260)),
         string.format('    minimap_marker_enabled = %s,', lua_boolean(state.minimap_marker_enabled[1])),
         string.format('    guide_opacity = %d,', bounded_number(state.guide_opacity[1], DEFAULT_SETTINGS.guide_opacity, 0, 100)),
@@ -3946,6 +3967,7 @@ local function render_guide_selector()
     render_guide_anchor_selector();
     imgui.Checkbox('Show step list##ashitaguide_guide_show_step_list', state.guide_show_step_list);
     imgui.Checkbox('Tabs on bottom##ashitaguide_guide_tabs_bottom', state.guide_tabs_bottom);
+    imgui.Checkbox('Show RoE challenge timer##ashitaguide_roe_challenge_visible', state.roe_challenge_visible);
     imgui.Checkbox('Show destination on Minimap##ashitaguide_minimap_marker', state.minimap_marker_enabled);
     imgui.PushItemWidth(220);
     imgui.SliderInt('Map size##ashitaguide_guide_map_size', state.guide_map_size, 120, 260, '%d px');
@@ -6740,6 +6762,90 @@ function state.render_active_tab_buttons()
     end
 end
 
+state.roe_limited_time_challenge_at = function (timestamp)
+    local now = math.floor(tonumber(timestamp) or os.time());
+    local utc = os.date('!*t', now);
+    local adjusted_hour = (utc.hour - 3) % 24;
+    local schedule_day = utc.wday;
+    if (utc.hour < 3) then
+        schedule_day = schedule_day - 1;
+        if (schedule_day < 1) then schedule_day = 7; end
+    end
+
+    local slot = math.floor(adjusted_hour / 4) + 1;
+    local seconds_into_slot = ((utc.hour - 3) % 4) * 3600 + utc.min * 60 + utc.sec;
+    local remaining_seconds = 14400 - seconds_into_slot;
+    local day_schedule = state.ROE_LIMITED_TIME_CHALLENGES[schedule_day] or {};
+    return {
+        name = day_schedule[slot] or 'Unknown challenge',
+        remaining_seconds = remaining_seconds,
+        ends_at = now + remaining_seconds,
+    };
+end
+
+state.next_roe_gain_experience = function (timestamp)
+    local now = math.floor(tonumber(timestamp) or os.time());
+    local current = state.roe_limited_time_challenge_at(now);
+    if (current.name == 'Gain Experience') then
+        return {
+            active = true,
+            starts_at = now,
+            remaining_seconds = current.remaining_seconds,
+        };
+    end
+
+    local next_slot = current.ends_at;
+    for offset = 0, 41 do
+        local starts_at = next_slot + offset * 14400;
+        local candidate = state.roe_limited_time_challenge_at(starts_at);
+        if (candidate.name == 'Gain Experience') then
+            return {
+                active = false,
+                starts_at = starts_at,
+                remaining_seconds = math.max(0, starts_at - now),
+            };
+        end
+    end
+    return nil;
+end
+
+state.format_roe_countdown = function (seconds)
+    local remaining = math.max(0, math.floor(tonumber(seconds) or 0));
+    local hours = math.floor(remaining / 3600);
+    local minutes = math.floor((remaining % 3600) / 60);
+    local secs = remaining % 60;
+    return string.format('%02d:%02d:%02d', hours, minutes, secs);
+end
+
+state.render_roe_challenge_banner = function ()
+    if (state.roe_challenge_visible[1] ~= true) then
+        return;
+    end
+
+    local now = os.time();
+    local current = state.roe_limited_time_challenge_at(now);
+    local current_color = current.name == 'Gain Experience' and COLORS.accent or COLORS.header;
+    imgui.TextColored(COLORS.muted, 'RoE Challenge');
+    imgui.SameLine(0, 8);
+    imgui.TextColored(current_color, current.name);
+    imgui.SameLine(0, 8);
+    imgui.TextColored(COLORS.muted, state.format_roe_countdown(current.remaining_seconds));
+
+    if (current.name ~= 'Gain Experience') then
+        local gain = state.next_roe_gain_experience(now);
+        if (gain ~= nil) then
+            local local_start = os.date('%a %I:%M %p', gain.starts_at):gsub(' 0', ' ');
+            text_colored_wrapped(
+                COLORS.muted,
+                string.format(
+                    'Next Gain Experience: %s (in %s)',
+                    local_start,
+                    state.format_roe_countdown(gain.remaining_seconds)));
+        end
+    end
+    imgui.Separator();
+end
+
 local function render_active_tabs()
     if (#state.active_order == 0) then
         imgui.TextColored(COLORS.muted, 'No active guides. Open Guide Config to start one.');
@@ -6887,6 +6993,7 @@ local function render_guide_window()
     local visible = imgui.Begin(string.format('Guides v%s###AshitaGuideGuides', addon.version), state.visible, flags);
     capture_guide_window_anchor(window_x, window_y);
     if (visible) then
+        state.render_roe_challenge_banner();
         render_active_tabs();
     end
     imgui.End();

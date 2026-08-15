@@ -49,6 +49,7 @@ attended **Filter Widescan** button; clicking it sends only the configured local
 - Guides-tab selector for a stationary window corner (`top_left`, `top_right`, `bottom_left`, or `bottom_right`)
 - Decision Window selector for the same four anchored auto-expansion directions
 - configurable all-steps list in the normal guide window
+- current limited-time Records of Eminence challenge, live countdown, and next Gain Experience window
 - balanced navigation layout with configurable map size
 - Pages of Valor progress seeding from the current character chat log
 - live Pages of Valor updates from incoming chat text and appended log lines
@@ -121,7 +122,14 @@ adjustable background opacity as AshitaChat. Only the Guides window renders a
 tab strip because it can contain multiple active guides; the single-view Valor
 and Casket windows do not render tabs.
 The Guides tab also controls whether the all-steps section is shown at the
-bottom of the normal guide window. Map size is configurable from 120 to 260
+bottom of the normal guide window. The top of the window shows the current
+four-hour limited-time Records of Eminence challenge and its remaining time.
+Outside a **Gain Experience** window it also shows the next Gain Experience
+start in the computer's local time. Disable the strip with **Show RoE challenge
+timer** in the Guides configuration tab. The calculation uses the fixed UTC
+challenge schedule and never sends commands or packets.
+
+Map size is configurable from 120 to 260
 pixels and defaults to 160 pixels. **Show destination on Minimap** overlays the
 current step destination on the loaded Ashita Minimap plugin when its active
 theme is square-derived, including `square`, `square-minimal`, and calibrated

@@ -71,6 +71,13 @@ $required = @(
     "pop_window_style",
     "guide_show_step_list",
     "guide_tabs_bottom",
+    "roe_challenge_visible",
+    "state.ROE_LIMITED_TIME_CHALLENGES",
+    "state.roe_limited_time_challenge_at",
+    "state.next_roe_gain_experience",
+    "state.render_roe_challenge_banner",
+    "Show RoE challenge timer##ashitaguide_roe_challenge_visible",
+    "Next Gain Experience:",
     "guide_map_size",
     "minimap_marker_enabled",
     "render_minimap_destination_marker",
@@ -211,6 +218,25 @@ $required = @(
 
 if ($content.Contains('MessageBeep(0x30)')) {
     throw 'NM hunt alarms must not use the Windows Exclamation sound associated with consent/admin prompts.'
+}
+
+$roeScheduleStart = $content.IndexOf('state.ROE_LIMITED_TIME_CHALLENGES = {')
+$roeScheduleEnd = $content.IndexOf("};", $roeScheduleStart)
+if ($roeScheduleStart -lt 0 -or $roeScheduleEnd -le $roeScheduleStart) {
+    throw 'Missing limited-time Records of Eminence schedule.'
+}
+$roeSchedule = $content.Substring($roeScheduleStart, $roeScheduleEnd - $roeScheduleStart)
+$roeRows = [regex]::Matches($roeSchedule, "(?m)^    \{ .* \},$")
+if ($roeRows.Count -ne 7) {
+    throw 'The limited-time Records of Eminence schedule must contain seven UTC day rows.'
+}
+foreach ($row in $roeRows) {
+    if ([regex]::Matches($row.Value, "'[^']+'").Count -ne 6) {
+        throw 'Each limited-time Records of Eminence day must contain six four-hour challenges.'
+    }
+}
+if ([regex]::Matches($roeSchedule, "'Gain Experience'").Count -ne 3) {
+    throw 'The weekly Records of Eminence schedule must contain exactly three Gain Experience windows.'
 }
 
 foreach ($needle in $required) {

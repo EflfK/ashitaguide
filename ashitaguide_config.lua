@@ -10,6 +10,7 @@ return {
         -- Valid values: top_left, top_right, bottom_left, bottom_right.
         guide_anchor_corner = 'top_left',
         guide_show_step_list = true,
+        roe_challenge_visible = true,
         guide_map_size = 160,
         minimap_marker_enabled = true,
         guide_opacity = 92,
