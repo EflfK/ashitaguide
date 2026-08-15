@@ -609,6 +609,12 @@ if ($content -notmatch "(?s)previous == nil and guide\.type ~= 'pages_of_valor'.
     throw 'Normal guides do not restore their persisted step when reopened.'
 }
 
+if ($content -notmatch 'local VALOR_MIN_OPACITY = 70;' -or
+    $content -notmatch 'bounded_number\(source\.valor_opacity, legacy_opacity, VALOR_MIN_OPACITY, 100\)' -or
+    $content -notmatch "(?s)'Background opacity##ashitaguide_valor_opacity'.+VALOR_MIN_OPACITY.+100") {
+    throw 'The Pages of Valor window must retain a readable minimum background opacity.'
+}
+
 if ($content -notmatch "(?s)local function next_step\(run\).+state\.settings\.guide_steps\[run\.key\] = run\.step_index") {
     throw 'Forward guide navigation does not persist the selected step.'
 }

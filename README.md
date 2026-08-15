@@ -152,6 +152,8 @@ preferences to `Ashita/config/addons/ashitaguide/settings.lua`, including window
 positions and sizes, the Guides and Decision anchor corners, native chat-frame
 hiding, visibility, map size, Valor settings, Casket settings, per-window
 background opacity, active normal guides, and each guide's last selected step.
+A 70% minimum background opacity keeps the Pages of Valor kill counter legible
+over bright game scenes.
 A normal guide resumes that step even after its tab is closed and reopened or
 the game is restarted.
 Replacing or reinstalling the addon directory does not overwrite any of these
