@@ -240,6 +240,12 @@ step counts, and file update time. Neither tool accepts raw Lua or a destination
 path. If `ai_guides.lua` contains executable or malformed Lua instead of the
 documented data-only table, the MCP publisher refuses to change it.
 
+Each published step must contain one atomic player action. The publisher rejects
+overt sequential wording such as `then`, semicolons, and a second recognized
+action joined with `and`; authors must split those instructions into separate
+steps. An expected result remains valid in the same step, such as trading one
+item `to receive` its reward.
+
 When exact destination coordinates are unavailable, a step may supply the best
 available `targetX` and `targetY` estimate with `approximate: true` and a short
 `markerLabel` such as `J7`. AshitaGuide renders that destination as a gold

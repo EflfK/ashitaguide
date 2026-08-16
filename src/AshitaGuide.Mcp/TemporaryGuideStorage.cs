@@ -186,6 +186,39 @@ public static partial class TemporaryGuideStorage
             {
                 Publish(new TemporaryGuideInput
                 {
+                    Key = "invalid_multi_action",
+                    Name = "Invalid Multi Action",
+                    Steps = new[]
+                    {
+                        new TemporaryGuideStepInput
+                        {
+                            Text = "Enter Walahra Temple, then enter the Shararat Teahouse; select The Empire.",
+                        },
+                    },
+                });
+                throw new InvalidOperationException("Multi-action step validation self-test failed.");
+            }
+            catch (ArgumentException ex) when (ex.Message.Contains("one atomic player action", StringComparison.Ordinal))
+            {
+            }
+
+            Publish(new TemporaryGuideInput
+            {
+                Key = "valid_expected_result",
+                Name = "Valid Expected Result",
+                Steps = new[]
+                {
+                    new TemporaryGuideStepInput
+                    {
+                        Text = "Trade one Mahogany Lbr. to Osker to receive Tamer's whistle.",
+                    },
+                },
+            });
+
+            try
+            {
+                Publish(new TemporaryGuideInput
+                {
                     Key = "invalid_filterscan",
                     Name = "Invalid Filterscan",
                     Steps = new[]
@@ -318,9 +351,12 @@ public static partial class TemporaryGuideStorage
                 $"guide.steps[{index}].markerStyle must be damselfly.");
         }
 
+        var text = CleanText(input.Text, 2048, $"guide.steps[{index}].text");
+        ValidateAtomicStepText(text, index);
+
         return new StoredStep(
             CleanOptionalText(input.Title, 128, $"guide.steps[{index}].title"),
-            CleanText(input.Text, 2048, $"guide.steps[{index}].text"),
+            text,
             CleanOptionalText(input.Zone, 96, $"guide.steps[{index}].zone"),
             CleanOptionalText(input.Location, 64, $"guide.steps[{index}].location"),
             CleanOptionalText(input.Npc, 96, $"guide.steps[{index}].npc"),
@@ -726,6 +762,17 @@ public static partial class TemporaryGuideStorage
     private static string CollapseWhitespace(string? value) =>
         string.Join(' ', (value ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
+    private static void ValidateAtomicStepText(string text, int index)
+    {
+        if (SequentialConnectorPattern().IsMatch(text)
+            || JoinedActionPattern().IsMatch(text))
+        {
+            throw new ArgumentException(
+                $"guide.steps[{index}].text must contain one atomic player action. "
+                + "Split sequential actions into separate steps; do not use 'then', semicolons, or join a second action with 'and'.");
+        }
+    }
+
     [GeneratedRegex("^[a-z][a-z0-9_-]{0,63}$", RegexOptions.CultureInvariant)]
     private static partial Regex GuideKeyPattern();
 
@@ -734,6 +781,12 @@ public static partial class TemporaryGuideStorage
 
     [GeneratedRegex("^[A-Za-z0-9 ,_'-]+$", RegexOptions.CultureInvariant)]
     private static partial Regex FilterScanPattern();
+
+    [GeneratedRegex(@"(?:\bthen\b|\bafterwards?\b|;)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SequentialConnectorPattern();
+
+    [GeneratedRegex(@"\band\s+(?:ask|board|buy|choose|click|cross|defeat|enter|examine|finish|go|identify|inspect|kill|leave|move|obtain|open|press|return|select|speak|take|talk|trade|use|wait|walk|zone)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex JoinedActionPattern();
 
     private sealed record StoredGuide(
         string Key,

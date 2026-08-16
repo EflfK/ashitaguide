@@ -25,7 +25,7 @@ public sealed class TemporaryGuideStepInput
     [Description("Optional short step heading.")]
     public string? Title { get; init; }
 
-    [Description("Instruction shown to the player.")]
+    [Description("One atomic player action shown to the player. Sequential connectors such as 'then', semicolons, or a second action joined by 'and' are rejected; split them into separate steps.")]
     public required string Text { get; init; }
 
     [Description("Optional destination zone name.")]
