@@ -320,8 +320,12 @@ if ($content -notmatch "index = 0x14A, server_id = 17199434, name = 'Damselfly'"
     $content -notmatch "index = 0x1CB, server_id = 17199563, name = 'Sand Bat'" -or
     $content -notmatch "index = 0x17B, server_id = 17215867, name = 'Rock Lizard'" -or
     $content -notmatch "index = 0x18F, server_id = 17215887, name = 'Rock Lizard'" -or
+    $content -notmatch "index = 0x0CF, server_id = 17219791, name = 'Mad Sheep'" -or
+    $content -notmatch "index = 0x158, server_id = 17219928, name = 'Mad Sheep'" -or
     $content -notmatch "timer_kind = 'ph17b'" -or
-    $content -notmatch "timer_kind = 'ph18f'") {
+    $content -notmatch "timer_kind = 'ph18f'" -or
+    $content -notmatch "timer_kind = 'ph0cf'" -or
+    $content -notmatch "timer_kind = 'ph158'") {
     throw 'Current lottery NM hunts must declare their exact placeholders for generic automatic timers.'
 }
 
@@ -349,6 +353,18 @@ foreach ($pattern in @(
 if ($lizzyBlock -match 'seconds = 330') {
     throw 'Leaping Lizzy placeholder timers must use the verified 5:15 reference, not 5:30.'
 }
+
+Assert-NmHuntContains 'Stray Mary' @(
+    'mob_id = 17219795', 'zone_id = 108',
+    "index = 0x0D3, server_id = 17219795, name = 'Stray Mary'",
+    "index = 0x15D, server_id = 17219933, name = 'Stray Mary'",
+    "index = 0x0CF, server_id = 17219791, name = 'Mad Sheep'",
+    "index = 0x158, server_id = 17219928, name = 'Mad Sheep'",
+    "kind = 'ph0cf'.+seconds = 300",
+    "kind = 'ph158'.+seconds = 300",
+    'x = -305\.204, y = -96\.078, z = -11\.695',
+    'x = -293\.900, y = 342\.710, z = 33\.393'
+)
 
 Assert-NmHuntContains 'Ose' @(
     'mob_id = 17649822', 'zone_id = 213',
@@ -574,7 +590,7 @@ if ($arthroBlock -match '\b(?:nm_seconds|placeholder_seconds|timers)\s*=') {
     throw 'King Arthro must not expose ordinary placeholder timers or a fixed group/NM timer.'
 }
 
-foreach ($zoneId in @(30, 100, 102, 103, 104, 107, 167, 174, 198, 200, 204, 213)) {
+foreach ($zoneId in @(30, 100, 102, 103, 104, 107, 108, 167, 174, 198, 200, 204, 213)) {
     if ($content -notmatch "(?s)state\.NM_HUNTS_BY_ZONE = \{.+\[$zoneId\] = state\.[A-Z0-9_]+_NM_HUNTS") {
         throw "The NM Hunt catalog must register zone $zoneId in NM_HUNTS_BY_ZONE."
     }

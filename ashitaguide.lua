@@ -4581,6 +4581,39 @@ state.SOUTH_GUSTABERG_NM_HUNTS = {
     },
 };
 
+state.KONSCHTAT_HIGHLANDS_NM_HUNTS = {
+    {
+        name = 'Stray Mary', level = '19-20', mob_id = 17219795,
+        zone_id = 108, zone_name = 'Konschtat Highlands', icon = 'sheep',
+        spawn_type = 'Lottery', placeholder_count = 2,
+        details = "5% lottery replacement for the exact Mad Sheep at the north and south camps. Either placeholder can produce Stray Mary; each normally returns after five minutes. Drops Mary's Horn (Lullaby +1).",
+        official_url = 'https://catseyexi.com/mob/17219795',
+        filter_scan = 'Mary, 0CF, 158', scan_label = 'Scan Mary PHs',
+        timers = {
+            { kind = 'ph0cf', label = 'North PH 0CF', button = '0CF +5m', seconds = 300 },
+            { kind = 'ph158', label = 'South PH 158', button = '158 +5m', seconds = 300 },
+        },
+        nm_targets = {
+            { index = 0x0D3, server_id = 17219795, name = 'Stray Mary' },
+            { index = 0x15D, server_id = 17219933, name = 'Stray Mary' },
+        },
+        placeholders = {
+            {
+                index = 0x0CF, server_id = 17219791, name = 'Mad Sheep',
+                timer_kind = 'ph0cf',
+            },
+            {
+                index = 0x158, server_id = 17219928, name = 'Mad Sheep',
+                timer_kind = 'ph158',
+            },
+        },
+        markers = {
+            { x = -305.204, y = -96.078, z = -11.695, style = 'sheep' },
+            { x = -293.900, y = 342.710, z = 33.393, style = 'sheep' },
+        },
+    },
+};
+
 state.WEST_RONFAURE_NM_HUNTS = {
     {
         name = 'Jaggedy-Eared Jack', level = '9-10', mob_id = 17187111,
@@ -5009,6 +5042,7 @@ state.NM_HUNTS_BY_ZONE = {
     [103] = state.DUNES_NM_HUNTS,
     [104] = state.JUGNER_FOREST_NM_HUNTS,
     [107] = state.SOUTH_GUSTABERG_NM_HUNTS,
+    [108] = state.KONSCHTAT_HIGHLANDS_NM_HUNTS,
     [167] = state.BOSTAUNIEUX_NM_HUNTS,
     [174] = state.KUFTAL_TUNNEL_NM_HUNTS,
     [198] = state.MAZE_SHAKHRAMI_NM_HUNTS,

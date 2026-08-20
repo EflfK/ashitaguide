@@ -447,7 +447,7 @@ fixed official CatsEyeXI links, and only the attended actions supported by that
 NM. The recommended catalog covers Valkurm Emperor, Leaping Lizzy, every active
 huntable Labyrinth of Onzozo and Maze of Shakhrami NM, Sewer Syrup, Bloodtear
 Baldurf, Carmine Dobsonfly, Jaggedy-Eared Jack, Capricious Cassie, Serket,
-Amemet, and King Arthro.
+Amemet, King Arthro, and Stray Mary.
 
 Exact lottery tracking is enabled only when the CatsEyeXI actor identity and
 normal placeholder respawn are known. Valkurm Emperor tracks its exact
@@ -457,7 +457,9 @@ each uses the server's 5:15 placeholder respawn. Ose, Sewer Syrup,
 Jaggedy-Eared Jack, and Amemet likewise expose their verified exact
 placeholders, with separate timer rows when a hunt has more than one. Manual
 buttons remain available when a death occurs off screen or is otherwise not
-observed. The Labyrinth of Onzozo catalog replaces that zone's always-on circle
+observed. Stray Mary tracks the exact Mad Sheep at both Konschtat Highlands
+camps, gives each a five-minute timer, and maps both verified placeholder
+locations. The Labyrinth of Onzozo catalog replaces that zone's always-on circle
 list with individual MAP and TRACK controls for Mysticmaker Profblix, Lord of
 Onzozo, Narasimha, Hellion, Soulstealer Skullnix, and Ose. Its exact lottery
 actors use the pinned CatsEyeXI group respawns: 16 minutes except Soulstealer's
