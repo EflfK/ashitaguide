@@ -360,8 +360,8 @@ Assert-NmHuntContains 'Stray Mary' @(
     "index = 0x15D, server_id = 17219933, name = 'Stray Mary'",
     "index = 0x0CF, server_id = 17219791, name = 'Mad Sheep'",
     "index = 0x158, server_id = 17219928, name = 'Mad Sheep'",
-    "kind = 'ph0cf'.+seconds = 300",
-    "kind = 'ph158'.+seconds = 300",
+    "kind = 'ph0cf'.+label = 'South PH 0CF'.+seconds = 315",
+    "kind = 'ph158'.+label = 'North PH 158'.+seconds = 315",
     'x = -305\.204, y = -96\.078, z = -11\.695',
     'x = -293\.900, y = 342\.710, z = 33\.393'
 )

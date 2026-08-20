@@ -458,7 +458,7 @@ Jaggedy-Eared Jack, and Amemet likewise expose their verified exact
 placeholders, with separate timer rows when a hunt has more than one. Manual
 buttons remain available when a death occurs off screen or is otherwise not
 observed. Stray Mary tracks the exact Mad Sheep at both Konschtat Highlands
-camps, gives each a five-minute timer, and maps both verified placeholder
+camps, gives each a 5:15 timer, and maps both verified placeholder
 locations. The Labyrinth of Onzozo catalog replaces that zone's always-on circle
 list with individual MAP and TRACK controls for Mysticmaker Profblix, Lord of
 Onzozo, Narasimha, Hellion, Soulstealer Skullnix, and Ose. Its exact lottery

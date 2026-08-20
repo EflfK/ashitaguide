@@ -4586,12 +4586,12 @@ state.KONSCHTAT_HIGHLANDS_NM_HUNTS = {
         name = 'Stray Mary', level = '19-20', mob_id = 17219795,
         zone_id = 108, zone_name = 'Konschtat Highlands', icon = 'sheep',
         spawn_type = 'Lottery', placeholder_count = 2,
-        details = "5% lottery replacement for the exact Mad Sheep at the north and south camps. Either placeholder can produce Stray Mary; each normally returns after five minutes. Drops Mary's Horn (Lullaby +1).",
+        details = "5% lottery replacement for the exact Mad Sheep at the south and north camps. Either placeholder can produce Stray Mary; each normally returns after 5:15. Drops Mary's Horn (Lullaby +1).",
         official_url = 'https://catseyexi.com/mob/17219795',
         filter_scan = 'Mary, 0CF, 158', scan_label = 'Scan Mary PHs',
         timers = {
-            { kind = 'ph0cf', label = 'North PH 0CF', button = '0CF +5m', seconds = 300 },
-            { kind = 'ph158', label = 'South PH 158', button = '158 +5m', seconds = 300 },
+            { kind = 'ph0cf', label = 'South PH 0CF', button = '0CF +5:15', seconds = 315 },
+            { kind = 'ph158', label = 'North PH 158', button = '158 +5:15', seconds = 315 },
         },
         nm_targets = {
             { index = 0x0D3, server_id = 17219795, name = 'Stray Mary' },
